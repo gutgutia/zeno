@@ -38,10 +38,24 @@ export default function VerifyPage() {
     setIsLoading(true);
 
     try {
+      // First, verify our custom OTP
+      const response = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Invalid code');
+        return;
+      }
+
+      // Use the token hash to complete sign-in via Supabase
       const { error } = await supabase.auth.verifyOtp({
-        email,
-        token: code,
-        type: 'email',
+        token_hash: data.token_hash,
+        type: 'magiclink',
       });
 
       if (error) {
@@ -52,7 +66,7 @@ export default function VerifyPage() {
       // Clear pending email
       sessionStorage.removeItem('pending_email');
 
-      toast.success('Successfully signed in!');
+      toast.success(data.isNewUser ? 'Welcome to Zeno!' : 'Successfully signed in!');
       router.push('/dashboards');
     } catch {
       toast.error('Something went wrong. Please try again.');
@@ -65,15 +79,16 @@ export default function VerifyPage() {
     setIsResending(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: true,
-        },
+      const response = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
       });
 
-      if (error) {
-        toast.error(error.message);
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to resend code');
         return;
       }
 
