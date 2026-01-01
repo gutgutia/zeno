@@ -1,5 +1,5 @@
-import { Container } from '@/components/ui/Container';
-import { Card } from '@/components/ui/Card';
+import { Container } from '@/components/ui';
+import { FeatureCard } from './FeatureCard';
 
 const features = [
   {
@@ -78,7 +78,7 @@ export function Features() {
         {/* Features Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature) => (
-            <Card key={feature.title} hover padding="lg">
+            <FeatureCard key={feature.title} hover padding="lg">
               <div className="w-12 h-12 bg-[var(--color-primary-light)] rounded-lg flex items-center justify-center text-[var(--color-primary)] mb-4">
                 {feature.icon}
               </div>
@@ -88,7 +88,7 @@ export function Features() {
               <p className="text-[var(--color-gray-600)]">
                 {feature.description}
               </p>
-            </Card>
+            </FeatureCard>
           ))}
         </div>
       </Container>

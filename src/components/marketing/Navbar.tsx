@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Container } from '@/components/ui/Container';
-import { Button } from '@/components/ui/Button';
+import { Container, Button } from '@/components/ui';
 
 const navLinks = [
   { href: '#features', label: 'Features' },
@@ -46,7 +45,7 @@ export function Navbar() {
             <Button variant="ghost" size="sm">
               Sign In
             </Button>
-            <Button variant="primary" size="sm">
+            <Button size="sm">
               Get Started
             </Button>
           </div>
@@ -85,10 +84,10 @@ export function Navbar() {
                 </Link>
               ))}
               <div className="flex flex-col gap-2 pt-4 border-t border-[var(--color-gray-100)]">
-                <Button variant="ghost" fullWidth>
+                <Button variant="ghost" className="w-full">
                   Sign In
                 </Button>
-                <Button variant="primary" fullWidth>
+                <Button className="w-full">
                   Get Started
                 </Button>
               </div>

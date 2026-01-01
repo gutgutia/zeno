@@ -1,5 +1,4 @@
-import { Container } from '@/components/ui/Container';
-import { Button } from '@/components/ui/Button';
+import { Container, Button } from '@/components/ui';
 
 const plans = [
   {
@@ -31,7 +30,7 @@ const plans = [
       'Export to PDF/PNG',
     ],
     cta: 'Start Free Trial',
-    variant: 'primary' as const,
+    variant: 'default' as const,
     popular: true,
   },
   {
@@ -133,7 +132,7 @@ export function Pricing() {
               </ul>
 
               {/* CTA */}
-              <Button variant={plan.variant} fullWidth>
+              <Button variant={plan.variant} className="w-full">
                 {plan.cta}
               </Button>
             </div>

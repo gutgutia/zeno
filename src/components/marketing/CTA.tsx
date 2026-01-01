@@ -1,5 +1,4 @@
-import { Container } from '@/components/ui/Container';
-import { Button } from '@/components/ui/Button';
+import { Container, Button } from '@/components/ui';
 
 export function CTA() {
   return (
