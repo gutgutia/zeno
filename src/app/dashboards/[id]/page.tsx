@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChartRenderer } from '@/components/charts';
-import type { Dashboard } from '@/types/database';
+import type { Dashboard, BrandingConfig } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { ChartConfig } from '@/types/chart';
 
@@ -21,6 +21,7 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
   const router = useRouter();
 
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [branding, setBranding] = useState<BrandingConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -31,6 +32,17 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
+
+  // Compute CSS variables for branding
+  const brandingStyles = useMemo(() => {
+    if (!branding?.colors) return {};
+    return {
+      '--brand-primary': branding.colors.primary,
+      '--brand-secondary': branding.colors.secondary,
+      '--brand-accent': branding.colors.accent,
+      '--brand-background': branding.colors.background,
+    } as React.CSSProperties;
+  }, [branding]);
 
   // Fetch dashboard data
   useEffect(() => {
@@ -46,6 +58,7 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
         }
         const data = await response.json();
         setDashboard(data.dashboard);
+        setBranding(data.branding || null);
         setEditedTitle(data.dashboard.title);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -185,7 +198,7 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
   const otherCharts = charts.filter((c: ChartConfig) => c.type !== 'number_card');
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex" style={brandingStyles}>
       {/* Main Content */}
       <div className={`flex-1 transition-all duration-300 ${isChatOpen ? 'mr-80' : ''}`}>
         {/* Header */}
@@ -200,6 +213,21 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </Link>
+
+              {/* Company Logo */}
+              {branding?.logoUrl && (
+                <div className="flex items-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={branding.logoUrl}
+                    alt={branding.companyName || 'Company logo'}
+                    className="h-8 object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
 
               {isEditingTitle ? (
                 <div className="flex items-center gap-2">

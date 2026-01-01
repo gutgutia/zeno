@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import { ChartRenderer } from '@/components/charts';
-import type { Dashboard } from '@/types/database';
+import type { Dashboard, BrandingConfig } from '@/types/database';
+import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { ChartConfig } from '@/types/chart';
 
@@ -15,10 +16,10 @@ export default async function PublicDashboardPage({ params }: PageProps) {
   const { slug } = await params;
   const supabase = await createClient();
 
-  // Fetch the published dashboard by slug
+  // Fetch the published dashboard by slug with workspace branding
   const { data, error } = await supabase
     .from('dashboards')
-    .select('*')
+    .select('*, workspaces!inner(branding)')
     .eq('slug', slug)
     .eq('is_published', true)
     .single();
@@ -27,26 +28,53 @@ export default async function PublicDashboardPage({ params }: PageProps) {
     notFound();
   }
 
-  const dashboard = data as Dashboard;
+  const dashboardData = data as Dashboard & {
+    workspaces: { branding: BrandingConfig | null };
+  };
+  const dashboard = dashboardData;
   const config = dashboard.config as DashboardConfig;
-  const dashboardData = (dashboard.data as Record<string, unknown>[]) || [];
+  const chartData = (dashboard.data as Record<string, unknown>[]) || [];
   const charts = config.charts || [];
+
+  // Merge workspace branding with dashboard override
+  const branding = getMergedBranding(
+    dashboardData.workspaces.branding,
+    dashboard.branding_override
+  );
 
   // Separate number cards from other charts for layout
   const numberCards = charts.filter((c: ChartConfig) => c.type === 'number_card');
   const otherCharts = charts.filter((c: ChartConfig) => c.type !== 'number_card');
 
+  // Compute inline styles from branding
+  const brandingStyles: React.CSSProperties = {
+    ...(branding.colors?.background && { backgroundColor: branding.colors.background }),
+  };
+
   return (
-    <div className="min-h-screen bg-[var(--color-gray-50)]">
+    <div className="min-h-screen" style={brandingStyles}>
       {/* Header */}
       <header className="bg-white border-b border-[var(--color-gray-200)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">
-            {config.title || dashboard.title}
-          </h1>
-          {config.description && (
-            <p className="text-[var(--color-gray-600)] mt-1">{config.description}</p>
-          )}
+          <div className="flex items-center gap-4">
+            {/* Company Logo */}
+            {branding.logoUrl && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={branding.logoUrl}
+                alt={branding.companyName || 'Company logo'}
+                className="h-10 object-contain"
+              />
+            )}
+            <div>
+              <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">
+                {config.title || dashboard.title}
+              </h1>
+              {config.description && (
+                <p className="text-[var(--color-gray-600)] mt-1">{config.description}</p>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 
@@ -64,7 +92,7 @@ export default async function PublicDashboardPage({ params }: PageProps) {
             {numberCards.length > 0 && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {numberCards.map((chart: ChartConfig) => (
-                  <ChartRenderer key={chart.id} config={chart} data={dashboardData} />
+                  <ChartRenderer key={chart.id} config={chart} data={chartData} />
                 ))}
               </div>
             )}
@@ -73,7 +101,7 @@ export default async function PublicDashboardPage({ params }: PageProps) {
             {otherCharts.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {otherCharts.map((chart: ChartConfig) => (
-                  <ChartRenderer key={chart.id} config={chart} data={dashboardData} />
+                  <ChartRenderer key={chart.id} config={chart} data={chartData} />
                 ))}
               </div>
             )}

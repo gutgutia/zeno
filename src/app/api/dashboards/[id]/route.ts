@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import type { Dashboard, Workspace } from '@/types/database';
+import type { Dashboard, BrandingConfig } from '@/types/database';
+import { getMergedBranding } from '@/types/database';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -17,10 +18,10 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get the dashboard
+    // Get the dashboard with workspace branding
     const { data, error } = await supabase
       .from('dashboards')
-      .select('*')
+      .select('*, workspaces!inner(owner_id, branding)')
       .eq('id', id)
       .single();
 
@@ -28,22 +29,28 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dashboard not found' }, { status: 404 });
     }
 
-    const dashboard = data as Dashboard;
+    const dashboardData = data as Dashboard & {
+      workspaces: { owner_id: string; branding: BrandingConfig | null };
+    };
 
-    // Check ownership via workspace
-    const { data: workspaceData } = await supabase
-      .from('workspaces')
-      .select('owner_id')
-      .eq('id', dashboard.workspace_id)
-      .single();
-
-    const workspace = workspaceData as { owner_id: string } | null;
-
-    if (!workspace || workspace.owner_id !== user.id) {
+    // Check ownership
+    if (dashboardData.workspaces.owner_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    return NextResponse.json({ dashboard });
+    // Merge workspace branding with dashboard override
+    const effectiveBranding = getMergedBranding(
+      dashboardData.workspaces.branding,
+      dashboardData.branding_override
+    );
+
+    // Remove nested workspace from response, add merged branding
+    const { workspaces: _, ...dashboard } = dashboardData;
+
+    return NextResponse.json({
+      dashboard,
+      branding: effectiveBranding,
+    });
   } catch (error) {
     console.error('Error fetching dashboard:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
