@@ -6,5 +6,5 @@ if (!process.env.RESEND_API_KEY) {
 
 export const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Default sender - update this to your verified domain
-export const FROM_EMAIL = process.env.FROM_EMAIL || 'Zeno <noreply@zeno.app>';
+// Default sender - verified domain
+export const FROM_EMAIL = process.env.FROM_EMAIL || 'Zeno <noreply@zeno.fyi>';

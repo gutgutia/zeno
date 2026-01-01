@@ -55,7 +55,7 @@ export function OTPEmail({ code, expiresInMinutes = 10 }: OTPEmailProps) {
           <Section style={footer}>
             <Text style={footerText}>
               This email was sent by{' '}
-              <Link href="https://zeno.app" style={footerLink}>
+              <Link href="https://zeno.fyi" style={footerLink}>
                 Zeno
               </Link>
               .<br />

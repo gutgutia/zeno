@@ -19,7 +19,7 @@ interface WelcomeEmailProps {
 }
 
 export function WelcomeEmail({
-  appUrl = 'https://zeno.app',
+  appUrl = 'https://zeno.fyi',
 }: WelcomeEmailProps) {
   return (
     <Html>

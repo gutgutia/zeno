@@ -35,7 +35,7 @@ export interface SendWelcomeEmailParams {
 
 export async function sendWelcomeEmail({
   to,
-  appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://zeno.app',
+  appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://zeno.fyi',
 }: SendWelcomeEmailParams) {
   const { data, error } = await resend.emails.send({
     from: FROM_EMAIL,
