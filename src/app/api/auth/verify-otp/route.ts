@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendWelcomeEmail } from '@/lib/email/send';
 
+const MAX_ATTEMPTS = 5;
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -18,7 +20,25 @@ export async function POST(request: Request) {
     const normalizedEmail = email.toLowerCase().trim();
     const supabase = createAdminClient();
 
-    // Find a valid, unused code
+    // Get the most recent unused code for this email
+    const { data: latestCode } = await supabase
+      .from('otp_codes')
+      .select('*')
+      .eq('email', normalizedEmail)
+      .is('used_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    // Check for too many failed attempts
+    if (latestCode && (latestCode.attempts || 0) >= MAX_ATTEMPTS) {
+      return NextResponse.json(
+        { error: 'Too many failed attempts. Please request a new code.' },
+        { status: 429 }
+      );
+    }
+
+    // Find a valid, unused code that matches
     const { data: otpRecord, error: fetchError } = await supabase
       .from('otp_codes')
       .select('*')
@@ -29,6 +49,13 @@ export async function POST(request: Request) {
       .single();
 
     if (fetchError || !otpRecord) {
+      // Increment attempt counter on the latest code
+      if (latestCode) {
+        await supabase
+          .from('otp_codes')
+          .update({ attempts: (latestCode.attempts || 0) + 1 })
+          .eq('id', latestCode.id);
+      }
       return NextResponse.json(
         { error: 'Invalid or expired code' },
         { status: 400 }

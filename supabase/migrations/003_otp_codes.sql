@@ -7,6 +7,7 @@ CREATE TABLE public.otp_codes (
   code VARCHAR(6) NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   used_at TIMESTAMPTZ,
+  attempts INTEGER DEFAULT 0,  -- Track failed verification attempts
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
