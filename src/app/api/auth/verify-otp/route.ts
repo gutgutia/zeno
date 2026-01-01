@@ -1,8 +1,42 @@
 import { NextResponse } from 'next/server';
+import { nanoid } from 'nanoid';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendWelcomeEmail } from '@/lib/email/send';
 
 const MAX_ATTEMPTS = 5;
+
+// Ensure profile and workspace exist for a user
+async function ensureUserSetup(supabase: ReturnType<typeof createAdminClient>, userId: string) {
+  // Check if profile exists
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .single();
+
+  if (!profile) {
+    // Create profile
+    await supabase.from('profiles').insert({ id: userId });
+  }
+
+  // Check if personal workspace exists
+  const { data: workspace } = await supabase
+    .from('workspaces')
+    .select('id')
+    .eq('owner_id', userId)
+    .eq('type', 'personal')
+    .single();
+
+  if (!workspace) {
+    // Create personal workspace
+    await supabase.from('workspaces').insert({
+      name: 'Personal',
+      slug: `personal-${nanoid(8)}`,
+      type: 'personal',
+      owner_id: userId,
+    });
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -75,21 +109,28 @@ export async function POST(request: Request) {
     );
 
     let isNewUser = false;
+    let userId: string;
 
     if (!existingUser) {
       // Create new user
-      const { error: createError } = await supabase.auth.admin.createUser({
+      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
         email: normalizedEmail,
         email_confirm: true, // Auto-confirm since we verified via OTP
       });
 
-      if (createError) {
+      if (createError || !newUser.user) {
         console.error('Failed to create user:', createError);
         return NextResponse.json({ error: 'Failed to create account' }, { status: 500 });
       }
 
+      userId = newUser.user.id;
       isNewUser = true;
+    } else {
+      userId = existingUser.id;
     }
+
+    // Ensure profile and workspace exist (trigger might not have fired)
+    await ensureUserSetup(supabase, userId);
 
     // Generate a magic link for signing in
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({

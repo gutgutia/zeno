@@ -88,8 +88,9 @@ export async function POST(request: Request) {
         .single();
 
       if (createError) {
+        console.error('Failed to create workspace:', createError);
         return NextResponse.json(
-          { error: 'Failed to create workspace' },
+          { error: `Failed to create workspace: ${createError.message}` },
           { status: 500 }
         );
       }
