@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { notFound } from 'next/navigation';
 import { ChartRenderer } from '@/components/charts';
 import type { Dashboard, BrandingConfig } from '@/types/database';
@@ -14,7 +14,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function PublicDashboardPage({ params }: PageProps) {
   const { slug } = await params;
-  const supabase = await createClient();
+
+  // Use admin client to bypass RLS for public read-only access
+  // This avoids RLS recursion issues between dashboards and workspaces
+  const supabase = createAdminClient();
 
   // Fetch the published dashboard by slug with workspace branding
   const { data, error } = await supabase
