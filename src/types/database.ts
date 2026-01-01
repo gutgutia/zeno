@@ -78,6 +78,15 @@ export interface ChatMessage {
   created_at: string;
 }
 
+export interface DashboardShare {
+  id: string;
+  dashboard_id: string;
+  share_type: 'domain' | 'email';
+  share_value: string; // email address or domain (e.g., 'acme.com')
+  created_by: string | null;
+  created_at: string;
+}
+
 // Supabase Database type (for client generation)
 export interface Database {
   public: {

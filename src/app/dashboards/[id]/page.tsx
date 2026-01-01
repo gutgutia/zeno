@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChartRenderer } from '@/components/charts';
+import { ShareDialog } from '@/components/dashboard/ShareDialog';
 import type { Dashboard, BrandingConfig } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { ChartConfig } from '@/types/chart';
@@ -291,6 +292,10 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
                   </button>
                 </div>
               )}
+              <ShareDialog
+                dashboardId={id}
+                isPublished={dashboard.is_published}
+              />
               <Button
                 variant={dashboard.is_published ? 'outline' : 'default'}
                 onClick={handlePublish}

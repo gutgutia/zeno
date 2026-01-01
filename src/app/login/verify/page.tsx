@@ -63,11 +63,13 @@ export default function VerifyPage() {
         return;
       }
 
-      // Clear pending email
+      // Clear pending email and get redirect URL
       sessionStorage.removeItem('pending_email');
+      const redirectUrl = sessionStorage.getItem('auth_redirect');
+      sessionStorage.removeItem('auth_redirect');
 
       toast.success(data.isNewUser ? 'Welcome to Zeno!' : 'Successfully signed in!');
-      router.push('/dashboards');
+      router.push(redirectUrl || '/dashboards');
     } catch {
       toast.error('Something went wrong. Please try again.');
     } finally {

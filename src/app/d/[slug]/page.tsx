@@ -1,10 +1,12 @@
+import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { ChartRenderer } from '@/components/charts';
-import type { Dashboard, BrandingConfig } from '@/types/database';
+import type { Dashboard, BrandingConfig, DashboardShare } from '@/types/database';
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { ChartConfig } from '@/types/chart';
+import Link from 'next/link';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -12,19 +14,62 @@ interface PageProps {
 
 export const dynamic = 'force-dynamic';
 
+// Check if user has access to a shared dashboard
+function checkShareAccess(shares: DashboardShare[], userEmail: string): boolean {
+  const email = userEmail.toLowerCase();
+  const domain = email.split('@')[1];
+
+  return shares.some((share) => {
+    if (share.share_type === 'email') {
+      return share.share_value === email;
+    } else if (share.share_type === 'domain') {
+      return share.share_value === domain;
+    }
+    return false;
+  });
+}
+
+// Access Denied component
+function AccessDenied({ userEmail }: { userEmail: string }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[var(--color-gray-50)]">
+      <div className="text-center max-w-md px-4">
+        <div className="w-16 h-16 bg-[var(--color-gray-100)] rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-[var(--color-gray-400)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <h1 className="text-xl font-semibold text-[var(--color-gray-900)] mb-2">
+          Access Denied
+        </h1>
+        <p className="text-[var(--color-gray-600)] mb-4">
+          You don&apos;t have permission to view this dashboard.
+        </p>
+        <p className="text-sm text-[var(--color-gray-500)] mb-6">
+          Signed in as <span className="font-medium">{userEmail}</span>
+        </p>
+        <Link
+          href="/dashboards"
+          className="inline-flex items-center justify-center px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 transition-opacity"
+        >
+          Go to My Dashboards
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default async function PublicDashboardPage({ params }: PageProps) {
   const { slug } = await params;
 
-  // Use admin client to bypass RLS for public read-only access
-  // This avoids RLS recursion issues between dashboards and workspaces
-  const supabase = createAdminClient();
+  // Use admin client to bypass RLS for fetching dashboard
+  const adminSupabase = createAdminClient();
 
-  // Fetch the published dashboard by slug with workspace branding
-  const { data, error } = await supabase
+  // First, try to find the dashboard by slug (regardless of published status)
+  const { data, error } = await adminSupabase
     .from('dashboards')
-    .select('*, workspaces!inner(branding)')
+    .select('*, workspaces!inner(branding, owner_id)')
     .eq('slug', slug)
-    .eq('is_published', true)
     .single();
 
   if (error || !data) {
@@ -32,8 +77,47 @@ export default async function PublicDashboardPage({ params }: PageProps) {
   }
 
   const dashboardData = data as Dashboard & {
-    workspaces: { branding: BrandingConfig | null };
+    workspaces: { branding: BrandingConfig | null; owner_id: string };
   };
+
+  // If published, allow access to anyone
+  if (!dashboardData.is_published) {
+    // Not published - check for share-based access
+    const userSupabase = await createClient();
+    const { data: { user } } = await userSupabase.auth.getUser();
+
+    // Check if user is the owner
+    const isOwner = user && dashboardData.workspaces.owner_id === user.id;
+
+    if (!isOwner) {
+      // Get shares for this dashboard
+      const { data: shares } = await adminSupabase
+        .from('dashboard_shares')
+        .select('*')
+        .eq('dashboard_id', dashboardData.id);
+
+      const dashboardShares = (shares || []) as DashboardShare[];
+
+      // If no shares exist, this is a private dashboard
+      if (dashboardShares.length === 0) {
+        notFound();
+      }
+
+      // If not authenticated, redirect to login
+      if (!user) {
+        redirect(`/login?redirect=/d/${slug}`);
+      }
+
+      // Check if user's email matches any share
+      const hasAccess = checkShareAccess(dashboardShares, user.email || '');
+
+      if (!hasAccess) {
+        // User is authenticated but doesn't have access
+        return <AccessDenied userEmail={user.email || ''} />;
+      }
+    }
+  }
+
   const dashboard = dashboardData;
   const config = dashboard.config as DashboardConfig;
   const chartData = (dashboard.data as Record<string, unknown>[]) || [];
