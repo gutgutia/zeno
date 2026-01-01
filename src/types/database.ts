@@ -8,12 +8,37 @@ export interface Profile {
   updated_at: string;
 }
 
+// Branding configuration for workspaces (and dashboard overrides)
+export interface BrandingConfig {
+  // Company identity
+  companyName?: string;
+  logoUrl?: string;
+
+  // Color palette (hex colors)
+  colors?: {
+    primary?: string;      // Main brand color
+    secondary?: string;    // Supporting color
+    accent?: string;       // Highlights, CTAs
+    background?: string;   // Dashboard background
+  };
+
+  // Chart color palette (array of hex colors for chart series)
+  chartColors?: string[];
+
+  // Typography
+  fontFamily?: 'system' | 'inter' | 'dm-sans' | 'space-grotesk';
+
+  // Free-form AI guidance for style/tone
+  styleGuide?: string;
+}
+
 export interface Workspace {
   id: string;
   name: string;
   slug: string;
   type: 'personal' | 'team';
   owner_id: string;
+  branding: BrandingConfig | null;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +61,8 @@ export interface Dashboard {
   data: Record<string, unknown>[] | null;
   data_url: string | null;
   config: DashboardConfig;
+  // Dashboard-level branding override (falls back to workspace branding)
+  branding_override: Partial<BrandingConfig> | null;
   is_published: boolean;
   published_at: string | null;
   created_by: string | null;
@@ -76,5 +103,28 @@ export interface Database {
         Update: Partial<Omit<ChatMessage, 'id' | 'dashboard_id'>>;
       };
     };
+  };
+}
+
+// Utility function to merge workspace branding with dashboard override
+export function getMergedBranding(
+  workspaceBranding: BrandingConfig | null,
+  dashboardOverride: Partial<BrandingConfig> | null
+): BrandingConfig {
+  const base = workspaceBranding || {};
+  const override = dashboardOverride || {};
+
+  return {
+    companyName: override.companyName ?? base.companyName,
+    logoUrl: override.logoUrl ?? base.logoUrl,
+    colors: {
+      primary: override.colors?.primary ?? base.colors?.primary,
+      secondary: override.colors?.secondary ?? base.colors?.secondary,
+      accent: override.colors?.accent ?? base.colors?.accent,
+      background: override.colors?.background ?? base.colors?.background,
+    },
+    chartColors: override.chartColors ?? base.chartColors,
+    fontFamily: override.fontFamily ?? base.fontFamily,
+    styleGuide: override.styleGuide ?? base.styleGuide,
   };
 }

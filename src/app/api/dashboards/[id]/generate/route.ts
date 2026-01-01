@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import type { Dashboard } from '@/types/database';
+import type { Dashboard, BrandingConfig } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { DataSchema } from '@/types/dashboard';
+import { CHART_COLORS } from '@/types/chart';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -13,8 +14,21 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You are a data visualization expert. Your task is to analyze a data schema and generate an optimal dashboard configuration with multiple visualizations.
+function buildSystemPrompt(branding: BrandingConfig | null): string {
+  const brandingContext = branding ? `
+BRAND CONTEXT:
+${branding.companyName ? `- Company: ${branding.companyName}` : ''}
+${branding.colors?.primary ? `- Primary brand color: ${branding.colors.primary}` : ''}
+${branding.colors?.secondary ? `- Secondary color: ${branding.colors.secondary}` : ''}
+${branding.colors?.accent ? `- Accent color: ${branding.colors.accent}` : ''}
+${branding.chartColors?.length ? `- Chart color palette: ${JSON.stringify(branding.chartColors)}` : ''}
+${branding.styleGuide ? `- Style guidance: "${branding.styleGuide}"` : ''}
 
+Apply these brand settings when generating chart configurations. Use the provided colors in the charts array.
+` : '';
+
+  return `You are a data visualization expert. Your task is to analyze a data schema and generate an optimal dashboard configuration with multiple visualizations.
+${brandingContext}
 You must respond with ONLY a valid JSON object (no markdown, no explanation) with this structure:
 {
   "title": "Dashboard title based on the data",
@@ -47,6 +61,7 @@ line/area (for trends over time):
   "xAxis": { "column": "date_column", "type": "time" | "category" },
   "yAxis": { "column": "value_column", "aggregation": "sum" | "avg", "format": "number" },
   "splitBy": "optional_category_column" | null,
+  "colors": ["#hex1", "#hex2"],  // Use brand colors if provided
   "smooth": true | false
 }
 
@@ -56,6 +71,7 @@ bar (for comparisons):
   "yAxis": { "column": "value_column", "aggregation": "sum" | "avg", "format": "number" },
   "orientation": "vertical" | "horizontal",
   "splitBy": "optional_category_column" | null,
+  "colors": ["#hex1", "#hex2"],  // Use brand colors if provided
   "stacked": false,
   "sortBy": "value" | "label",
   "sortOrder": "desc" | "asc",
@@ -66,6 +82,7 @@ pie (for proportions):
 {
   "groupBy": "category_column",
   "value": { "column": "value_column", "aggregation": "sum" },
+  "colors": ["#hex1", "#hex2"],  // Use brand colors if provided
   "donut": true | false,
   "showPercent": true,
   "limit": 8
@@ -88,7 +105,9 @@ Guidelines:
    - Categorical columns with few unique values → bar/pie charts
    - Numeric columns → aggregations in number_cards
 5. Keep it focused: 4-8 charts total is ideal
-6. Use clear, descriptive titles`;
+6. Use clear, descriptive titles${branding?.styleGuide ? ' that match the brand style guidance' : ''}
+7. ${branding?.chartColors?.length ? 'Use the provided brand chart colors in all visualizations' : 'Use appropriate colors for the visualizations'}`;
+}
 
 export async function POST(request: Request, { params }: RouteParams) {
   try {
@@ -107,10 +126,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Schema is required' }, { status: 400 });
     }
 
-    // Get the dashboard
+    // Get the dashboard with workspace branding
     const { data: dashboardData, error: fetchError } = await supabase
       .from('dashboards')
-      .select('*, workspaces!inner(owner_id)')
+      .select('*, workspaces!inner(owner_id, branding)')
       .eq('id', id)
       .single();
 
@@ -118,12 +137,38 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dashboard not found' }, { status: 404 });
     }
 
-    const dashboard = dashboardData as Dashboard & { workspaces: { owner_id: string } };
+    const dashboard = dashboardData as Dashboard & {
+      workspaces: { owner_id: string; branding: BrandingConfig | null }
+    };
 
     // Check ownership
     if (dashboard.workspaces.owner_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    // Merge workspace branding with any dashboard override
+    const workspaceBranding = dashboard.workspaces.branding;
+    const dashboardOverride = dashboard.branding_override;
+
+    // Simple merge - dashboard override takes precedence
+    const effectiveBranding: BrandingConfig | null = workspaceBranding || dashboardOverride ? {
+      companyName: dashboardOverride?.companyName ?? workspaceBranding?.companyName,
+      logoUrl: dashboardOverride?.logoUrl ?? workspaceBranding?.logoUrl,
+      colors: {
+        primary: dashboardOverride?.colors?.primary ?? workspaceBranding?.colors?.primary,
+        secondary: dashboardOverride?.colors?.secondary ?? workspaceBranding?.colors?.secondary,
+        accent: dashboardOverride?.colors?.accent ?? workspaceBranding?.colors?.accent,
+        background: dashboardOverride?.colors?.background ?? workspaceBranding?.colors?.background,
+      },
+      chartColors: dashboardOverride?.chartColors ?? workspaceBranding?.chartColors,
+      fontFamily: dashboardOverride?.fontFamily ?? workspaceBranding?.fontFamily,
+      styleGuide: dashboardOverride?.styleGuide ?? workspaceBranding?.styleGuide,
+    } : null;
+
+    // Use brand chart colors or defaults
+    const chartColors = effectiveBranding?.chartColors?.length
+      ? effectiveBranding.chartColors
+      : CHART_COLORS;
 
     // Prepare the prompt for Claude
     const userPrompt = `Analyze this data schema and generate an optimal dashboard configuration:
@@ -150,7 +195,12 @@ ${schema.columns.map(col => {
 Sample Data:
 ${JSON.stringify(schema.sampleRows.slice(0, 3), null, 2)}
 
+Chart color palette to use: ${JSON.stringify(chartColors)}
+
 Generate a dashboard config that provides meaningful insights from this data.`;
+
+    // Build system prompt with branding context
+    const systemPrompt = buildSystemPrompt(effectiveBranding);
 
     // Call Claude API
     const message = await anthropic.messages.create({
@@ -162,7 +212,7 @@ Generate a dashboard config that provides meaningful insights from this data.`;
           content: userPrompt,
         },
       ],
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
     });
 
     // Extract the text content
