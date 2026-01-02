@@ -80,24 +80,27 @@ export function HowItWorks() {
 
         {/* Steps */}
         <div className="grid md:grid-cols-3 gap-8 md:gap-12">
-          {steps.map((step, index) => (
-            <div key={step.number} className="relative">
-              {/* Connector line to next step */}
-              {index < steps.length - 1 && (
-                <div className="hidden md:block absolute top-6 left-[calc(100%+1rem)] w-[calc(100%-2rem)] h-px bg-gray-300" style={{ width: 'calc(3rem + 1px)' }} />
-              )}
-
-              {/* Step content */}
-              <div className="text-5xl font-bold text-gray-200 mb-4">
+          {steps.map((step) => (
+            <div key={step.number} className="flex flex-col">
+              {/* Step number */}
+              <div className="text-5xl font-bold text-[var(--color-gray-200)] mb-4">
                 {step.number}
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              
+              {/* Title */}
+              <h3 className="text-xl font-semibold text-[var(--color-gray-900)] mb-2">
                 {step.title}
               </h3>
-              <p className="text-gray-600 mb-6">
+              
+              {/* Description - fixed height to align visuals */}
+              <p className="text-[var(--color-gray-600)] mb-6 md:min-h-[72px]">
                 {step.description}
               </p>
-              {step.visual}
+              
+              {/* Visual */}
+              <div className="mt-auto">
+                {step.visual}
+              </div>
             </div>
           ))}
         </div>
