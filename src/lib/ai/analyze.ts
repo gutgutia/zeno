@@ -6,8 +6,8 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Haiku 4.5 model for fast, cheap analysis
-const ANALYSIS_MODEL = 'claude-haiku-4-5-20250514';
+// Claude Haiku 4.5 for fast, cheap analysis
+const ANALYSIS_MODEL = 'claude-haiku-4-5';
 
 /**
  * Analyze raw content using Claude Haiku
