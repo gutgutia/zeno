@@ -1,0 +1,196 @@
+import { query, tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
+import { Sandbox } from '@e2b/code-interpreter';
+import { z } from 'zod';
+import { getAgentSystemPrompt, getAgentUserPrompt } from './agent-prompts';
+import type { DashboardConfig } from '@/types/dashboard';
+import type { BrandingConfig } from '@/types/database';
+
+// Store sandbox reference for tool execution
+let activeSandbox: Sandbox | null = null;
+
+/**
+ * Tool for executing Python code in E2B sandbox
+ */
+const executePythonTool = tool(
+  'execute_python',
+  'Execute Python code in a sandbox. The sandbox has pandas, numpy, json, csv, re, datetime, and collections available. Use this to read /tmp/data.txt and compute metrics. Print results to stdout.',
+  {
+    code: z.string().describe('Python code to execute. Results should be printed to stdout.'),
+  },
+  async ({ code }) => {
+    if (!activeSandbox) {
+      return {
+        content: [{ type: 'text' as const, text: 'Error: Sandbox not initialized' }],
+      };
+    }
+
+    try {
+      console.log('[Agent] Executing Python code...');
+      const execution = await activeSandbox.runCode(code);
+
+      const stdout = execution.logs.stdout.join('\n');
+      const stderr = execution.logs.stderr.join('\n');
+
+      if (stderr && !stdout) {
+        console.log('[Agent] Python stderr:', stderr);
+        return {
+          content: [{ type: 'text' as const, text: `Error: ${stderr}` }],
+        };
+      }
+
+      console.log('[Agent] Python output:', stdout.slice(0, 200) + (stdout.length > 200 ? '...' : ''));
+      return {
+        content: [{ type: 'text' as const, text: stdout || 'Code executed successfully (no output)' }],
+      };
+    } catch (error) {
+      console.error('[Agent] Python execution error:', error);
+      return {
+        content: [{ type: 'text' as const, text: `Execution error: ${error instanceof Error ? error.message : String(error)}` }],
+      };
+    }
+  }
+);
+
+/**
+ * Create MCP server with the Python tool
+ */
+const pythonToolServer = createSdkMcpServer({
+  name: 'python',
+  version: '1.0.0',
+  tools: [executePythonTool],
+});
+
+/**
+ * Extract JSON result from agent's final response
+ */
+function extractJsonFromResult(result: string): { html: string; summary: string } | null {
+  // Try to parse the entire result as JSON
+  try {
+    const parsed = JSON.parse(result);
+    if (parsed.html) return parsed;
+  } catch {
+    // Not pure JSON, try to extract
+  }
+
+  // Try to find JSON in the result
+  const jsonMatch = result.match(/\{[\s\S]*"html"[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      // Clean up potential markdown code blocks
+      let jsonStr = jsonMatch[0];
+      if (jsonStr.includes('```')) {
+        jsonStr = jsonStr.replace(/```json?\s*/g, '').replace(/```/g, '');
+      }
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.html) return parsed;
+    } catch {
+      // Failed to parse extracted JSON
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Generate a dashboard/page using the agentic approach with E2B
+ *
+ * This function:
+ * 1. Creates an E2B sandbox
+ * 2. Writes the user's content to the sandbox
+ * 3. Runs an agent loop that can execute Python to analyze the content
+ * 4. Returns the generated HTML
+ */
+export async function generateWithAgent(
+  rawContent: string,
+  branding: BrandingConfig | null,
+  userInstructions?: string
+): Promise<DashboardConfig> {
+  console.log('[Agent] Starting agentic generation...');
+  console.log('[Agent] Content length:', rawContent.length, 'characters');
+
+  // Create E2B sandbox
+  console.log('[Agent] Creating E2B sandbox...');
+  activeSandbox = await Sandbox.create({
+    timeoutMs: 300000, // 5 minute max
+  });
+
+  try {
+    // Write content to sandbox
+    console.log('[Agent] Writing content to sandbox...');
+    await activeSandbox.files.write('/tmp/data.txt', rawContent);
+
+    // Get prompts
+    const systemPrompt = getAgentSystemPrompt(branding);
+    const userPrompt = getAgentUserPrompt(userInstructions);
+
+    console.log('[Agent] Starting agent loop...');
+    let finalResult: { html: string; summary: string } | null = null;
+    let turnCount = 0;
+
+    // Run the agent loop
+    for await (const message of query({
+      prompt: userPrompt,
+      options: {
+        model: 'claude-opus-4-5-20251101',
+        systemPrompt,
+        maxTurns: 15,
+        mcpServers: {
+          python: pythonToolServer,
+        },
+        allowedTools: ['mcp__python__execute_python'],
+      },
+    })) {
+      if (message.type === 'assistant') {
+        turnCount++;
+        console.log(`[Agent] Turn ${turnCount}: Assistant message`);
+      } else if (message.type === 'tool_progress') {
+        console.log(`[Agent] Tool progress: ${message.tool_name}`);
+      } else if (message.type === 'result') {
+        console.log(`[Agent] Completed after ${turnCount} turns`);
+        if (message.subtype === 'success') {
+          console.log(`[Agent] Total cost: $${message.total_cost_usd?.toFixed(4) || 'unknown'}`);
+          finalResult = extractJsonFromResult(message.result);
+        } else {
+          // Error result
+          const errorResult = message as { errors?: string[] };
+          throw new Error(`Agent error: ${errorResult.errors?.join(', ') || 'Unknown error'}`);
+        }
+      } else if (message.type === 'system') {
+        console.log(`[Agent] System message: ${message.subtype}`);
+      }
+    }
+
+    if (!finalResult?.html) {
+      throw new Error('Agent did not produce HTML output');
+    }
+
+    console.log('[Agent] Generation complete. HTML length:', finalResult.html.length);
+
+    // Build and return the config
+    return {
+      contentType: 'data',
+      html: finalResult.html,
+      charts: {}, // All visualizations are inline
+      metadata: {
+        generatedAt: new Date().toISOString(),
+        generationModel: 'claude-opus-4-5-20251101',
+        userInstructions,
+        agentGenerated: true,
+        turnCount,
+      },
+      analysis: {
+        contentType: 'data',
+        summary: finalResult.summary || 'Content transformed',
+        insights: [],
+        suggestedVisualizations: [],
+      },
+    };
+  } finally {
+    // Always close the sandbox
+    console.log('[Agent] Closing E2B sandbox...');
+    if (activeSandbox) {
+      await activeSandbox.kill();
+      activeSandbox = null;
+    }
+  }
+}

@@ -112,7 +112,6 @@ export async function generateDashboardSingleStep(
       generatedAt: new Date().toISOString(),
       generationModel: 'claude-opus-4-5',
       userInstructions,
-      singleStep: true,
     },
     analysis: {
       contentType: 'data',

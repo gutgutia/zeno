@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { generateDashboardSingleStep } from '@/lib/ai/generate';
+import { generateWithAgent } from '@/lib/ai/agent';
 import type { Dashboard, BrandingConfig } from '@/types/database';
+
+// Allow long-running requests for agent loops
+export const maxDuration = 300; // 5 minutes
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -92,14 +95,14 @@ export async function POST(request: Request, { params }: RouteParams) {
       .eq('id', id);
 
     try {
-      // Single-step generation with Opus + extended thinking
-      console.log(`[${id}] Generating dashboard with Opus (single-step + thinking)...`);
-      const config = await generateDashboardSingleStep(
+      // Agentic generation with E2B Python sandbox
+      console.log(`[${id}] Starting agentic generation with E2B sandbox...`);
+      const config = await generateWithAgent(
         rawContent,
         effectiveBranding,
         dashboard.user_instructions || undefined
       );
-      console.log(`[${id}] Generation complete. Charts: ${Object.keys(config.charts).length}`);
+      console.log(`[${id}] Generation complete. HTML length: ${config.html?.length || 0}`);
 
       // Update the dashboard with the generated config
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

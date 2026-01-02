@@ -14,9 +14,11 @@ export interface DashboardConfig {
   analysis?: AnalysisResult;
   metadata: {
     generatedAt: string;
-    analysisModel: string;
+    analysisModel?: string;
     generationModel: string;
     userInstructions?: string;
+    agentGenerated?: boolean;
+    turnCount?: number;
   };
 }
 
