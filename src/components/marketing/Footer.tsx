@@ -48,13 +48,12 @@ export function Footer() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
             {/* Brand Column */}
             <div className="col-span-2 md:col-span-1">
-              <Link href="/" className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 bg-[var(--color-primary)] rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">Z</span>
-                </div>
-                <span className="text-xl font-semibold text-[var(--color-gray-900)]">
-                  Zeno
-                </span>
+              <Link href="/" className="inline-block mb-4">
+                <img 
+                  src="/logo.svg" 
+                  alt="Zeno" 
+                  className="h-6"
+                />
               </Link>
               <p className="text-sm text-[var(--color-gray-600)] mb-4">
                 Beautiful dashboards in seconds. Powered by AI.

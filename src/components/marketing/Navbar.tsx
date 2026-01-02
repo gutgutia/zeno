@@ -18,13 +18,12 @@ export function Navbar() {
       <Container size="2xl">
         <nav className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[var(--color-primary)] rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">Z</span>
-            </div>
-            <span className="text-xl font-semibold text-[var(--color-gray-900)]">
-              Zeno
-            </span>
+          <Link href="/" className="flex items-center">
+            <img 
+              src="/logo.svg" 
+              alt="Zeno" 
+              className="h-7"
+            />
           </Link>
 
           {/* Desktop Navigation */}
