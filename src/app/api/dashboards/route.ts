@@ -126,7 +126,7 @@ export async function POST(request: Request) {
         data_source: dataSource || { type: 'paste' },
         data: data || null,
         data_url: null,
-        config: null, // Will be populated by generation
+        // config is omitted - uses database default, will be populated by generation
         is_published: false,
         published_at: null,
         // New fields for async generation
