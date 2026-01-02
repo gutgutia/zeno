@@ -33,7 +33,8 @@ export async function generatePage(
   const systemPrompt = getGenerationSystemPrompt(branding);
   const userPrompt = getGenerationUserPrompt(analysis, userInstructions);
 
-  const message = await anthropic.messages.create({
+  // Use streaming for long-running Opus requests (required by SDK for operations > 10 minutes)
+  const stream = anthropic.messages.stream({
     model: GENERATION_MODEL,
     max_tokens: 32000, // Opus 4.5 supports high output
     system: systemPrompt,
@@ -44,6 +45,9 @@ export async function generatePage(
       },
     ],
   });
+
+  // Collect the full response
+  const message = await stream.finalMessage();
 
   // Check if the response was truncated
   if (message.stop_reason === 'max_tokens') {
