@@ -39,6 +39,8 @@ export interface Workspace {
   type: 'personal' | 'team';
   owner_id: string;
   branding: BrandingConfig | null;
+  subdomain: string | null;       // e.g., "acme" for acme.zeno.app
+  custom_domain: string | null;   // e.g., "dashboards.acme.com" for CNAME
   created_at: string;
   updated_at: string;
 }

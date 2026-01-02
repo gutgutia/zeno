@@ -1,7 +1,55 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+// Main domains where the app is hosted (subdomains of these are workspace subdomains)
+const MAIN_DOMAINS = [
+  'zeno.app',
+  'zeno.fyi',
+  'localhost',
+  '127.0.0.1',
+];
+
+// Subdomains that are reserved for app functionality (not workspaces)
+const RESERVED_SUBDOMAINS = ['www', 'app', 'api', 'admin'];
+
+/**
+ * Extract subdomain from hostname
+ * Returns null if on main domain or reserved subdomain
+ */
+function getSubdomain(hostname: string): string | null {
+  // Remove port if present
+  const host = hostname.split(':')[0];
+
+  // Check if it's a main domain or localhost
+  for (const mainDomain of MAIN_DOMAINS) {
+    if (host === mainDomain) {
+      return null; // Main domain, no subdomain
+    }
+
+    if (host.endsWith(`.${mainDomain}`)) {
+      // Extract subdomain
+      const subdomain = host.slice(0, -(mainDomain.length + 1));
+
+      // Check if it's a reserved subdomain
+      if (RESERVED_SUBDOMAINS.includes(subdomain)) {
+        return null;
+      }
+
+      // Multi-level subdomain (e.g., "a.b.zeno.app") - take first part
+      const parts = subdomain.split('.');
+      return parts[0];
+    }
+  }
+
+  // Could be a custom domain - return the full hostname as indicator
+  // We'll look this up in the database
+  return `custom:${host}`;
+}
+
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const hostname = request.headers.get('host') || '';
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -34,8 +82,53 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh session if expired - this keeps the user logged in
-  // The getUser call refreshes the session token if needed
   await supabase.auth.getUser();
+
+  // Check for subdomain
+  const subdomain = getSubdomain(hostname);
+
+  if (subdomain) {
+    // Handle custom domain lookup
+    if (subdomain.startsWith('custom:')) {
+      const customDomain = subdomain.slice(7);
+
+      // Look up workspace by custom domain
+      const { data: workspace } = await supabase
+        .from('workspaces')
+        .select('id, subdomain')
+        .eq('custom_domain', customDomain)
+        .single();
+
+      if (workspace) {
+        // Rewrite to workspace route
+        const url = request.nextUrl.clone();
+        url.pathname = `/w/${workspace.subdomain || workspace.id}${pathname}`;
+        return NextResponse.rewrite(url, {
+          request,
+          headers: supabaseResponse.headers,
+        });
+      }
+
+      // Custom domain not found - show 404 or redirect to main site
+      return supabaseResponse;
+    }
+
+    // Regular subdomain - rewrite to workspace route
+    // e.g., acme.zeno.app/my-dashboard -> /w/acme/my-dashboard
+    const url = request.nextUrl.clone();
+    url.pathname = `/w/${subdomain}${pathname}`;
+
+    const response = NextResponse.rewrite(url, {
+      request,
+    });
+
+    // Copy cookies from supabase response
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      response.cookies.set(cookie.name, cookie.value);
+    });
+
+    return response;
+  }
 
   return supabaseResponse;
 }
@@ -47,8 +140,7 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public folder
-     * - api routes that don't need auth
+     * - public folder assets
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
