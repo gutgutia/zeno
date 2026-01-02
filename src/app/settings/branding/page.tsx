@@ -32,12 +32,22 @@ const DEFAULT_CHART_COLORS = [
   '#ec4899', // pink
 ];
 
+interface ExtractedBranding extends BrandingConfig {
+  chartColors?: string[];
+}
+
 export default function BrandingSettingsPage() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Brand extraction state
+  const [extractUrl, setExtractUrl] = useState('');
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [extractedBranding, setExtractedBranding] = useState<ExtractedBranding | null>(null);
 
   // Form state
   const [companyName, setCompanyName] = useState('');
@@ -88,6 +98,56 @@ export default function BrandingSettingsPage() {
 
     fetchWorkspace();
   }, []);
+
+  const handleExtractBrand = async () => {
+    if (!extractUrl.trim()) {
+      setExtractError('Please enter a website URL');
+      return;
+    }
+
+    setIsExtracting(true);
+    setExtractError(null);
+    setExtractedBranding(null);
+
+    try {
+      const response = await fetch('/api/branding/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: extractUrl }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        setExtractError(data.error || 'Failed to extract brand');
+        return;
+      }
+
+      setExtractedBranding(data.branding);
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : 'Failed to extract brand');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const handleApplyExtracted = () => {
+    if (!extractedBranding) return;
+
+    if (extractedBranding.companyName) setCompanyName(extractedBranding.companyName);
+    if (extractedBranding.logoUrl) setLogoUrl(extractedBranding.logoUrl);
+    if (extractedBranding.colors?.primary) setPrimaryColor(extractedBranding.colors.primary);
+    if (extractedBranding.colors?.secondary) setSecondaryColor(extractedBranding.colors.secondary);
+    if (extractedBranding.colors?.accent) setAccentColor(extractedBranding.colors.accent);
+    if (extractedBranding.colors?.background) setBackgroundColor(extractedBranding.colors.background);
+    if (extractedBranding.chartColors) setChartColors(extractedBranding.chartColors);
+    if (extractedBranding.fontFamily) setFontFamily(extractedBranding.fontFamily);
+    if (extractedBranding.styleGuide) setStyleGuide(extractedBranding.styleGuide);
+
+    // Clear extracted preview
+    setExtractedBranding(null);
+    setExtractUrl('');
+  };
 
   const handleSave = async () => {
     if (!workspace) return;
@@ -190,6 +250,170 @@ export default function BrandingSettingsPage() {
           Settings saved successfully!
         </div>
       )}
+
+      {/* Extract from Website */}
+      <Card className="border-2 border-dashed border-[var(--color-primary)] bg-[var(--color-primary)]/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-[var(--color-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Auto-Extract Brand
+          </CardTitle>
+          <CardDescription>
+            Enter your company website and we&apos;ll automatically extract your brand colors, fonts, and style
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              value={extractUrl}
+              onChange={(e) => setExtractUrl(e.target.value)}
+              placeholder="stripe.com or https://stripe.com"
+              className="flex-1"
+              onKeyDown={(e) => e.key === 'Enter' && handleExtractBrand()}
+            />
+            <Button
+              onClick={handleExtractBrand}
+              disabled={isExtracting || !extractUrl.trim()}
+            >
+              {isExtracting ? (
+                <>
+                  <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Analyzing...
+                </>
+              ) : (
+                'Extract Brand'
+              )}
+            </Button>
+          </div>
+
+          {extractError && (
+            <p className="text-sm text-red-600">{extractError}</p>
+          )}
+
+          {/* Extracted Preview */}
+          {extractedBranding && (
+            <div className="mt-4 p-4 bg-white rounded-lg border border-[var(--color-gray-200)]">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-medium text-[var(--color-gray-900)]">Extracted Brand</h4>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setExtractedBranding(null)}>
+                    Dismiss
+                  </Button>
+                  <Button size="sm" onClick={handleApplyExtracted}>
+                    Apply to Form
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                {extractedBranding.companyName && (
+                  <div>
+                    <p className="text-xs text-[var(--color-gray-500)] mb-1">Company</p>
+                    <p className="text-sm font-medium">{extractedBranding.companyName}</p>
+                  </div>
+                )}
+                {extractedBranding.fontFamily && (
+                  <div>
+                    <p className="text-xs text-[var(--color-gray-500)] mb-1">Font</p>
+                    <p className="text-sm font-medium capitalize">{extractedBranding.fontFamily}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Color Preview */}
+              <div className="mb-4">
+                <p className="text-xs text-[var(--color-gray-500)] mb-2">Brand Colors</p>
+                <div className="flex gap-2">
+                  {extractedBranding.colors?.primary && (
+                    <div className="text-center">
+                      <div
+                        className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)]"
+                        style={{ backgroundColor: extractedBranding.colors.primary }}
+                      />
+                      <p className="text-xs text-[var(--color-gray-500)] mt-1">Primary</p>
+                    </div>
+                  )}
+                  {extractedBranding.colors?.secondary && (
+                    <div className="text-center">
+                      <div
+                        className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)]"
+                        style={{ backgroundColor: extractedBranding.colors.secondary }}
+                      />
+                      <p className="text-xs text-[var(--color-gray-500)] mt-1">Secondary</p>
+                    </div>
+                  )}
+                  {extractedBranding.colors?.accent && (
+                    <div className="text-center">
+                      <div
+                        className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)]"
+                        style={{ backgroundColor: extractedBranding.colors.accent }}
+                      />
+                      <p className="text-xs text-[var(--color-gray-500)] mt-1">Accent</p>
+                    </div>
+                  )}
+                  {extractedBranding.colors?.background && (
+                    <div className="text-center">
+                      <div
+                        className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)]"
+                        style={{ backgroundColor: extractedBranding.colors.background }}
+                      />
+                      <p className="text-xs text-[var(--color-gray-500)] mt-1">Background</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Chart Colors Preview */}
+              {extractedBranding.chartColors && extractedBranding.chartColors.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs text-[var(--color-gray-500)] mb-2">Chart Palette</p>
+                  <div className="flex gap-1">
+                    {extractedBranding.chartColors.map((color, i) => (
+                      <div
+                        key={i}
+                        className="w-8 h-8 rounded border border-[var(--color-gray-200)]"
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Style Guide Preview */}
+              {extractedBranding.styleGuide && (
+                <div>
+                  <p className="text-xs text-[var(--color-gray-500)] mb-1">Style Guide</p>
+                  <p className="text-sm text-[var(--color-gray-700)] italic">
+                    &ldquo;{extractedBranding.styleGuide}&rdquo;
+                  </p>
+                </div>
+              )}
+
+              {/* Logo Preview */}
+              {extractedBranding.logoUrl && (
+                <div className="mt-4">
+                  <p className="text-xs text-[var(--color-gray-500)] mb-2">Detected Logo</p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={extractedBranding.logoUrl}
+                    alt="Detected logo"
+                    className="max-h-12 object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Company Identity */}
       <Card>
