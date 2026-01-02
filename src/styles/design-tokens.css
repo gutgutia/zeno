@@ -6,11 +6,17 @@
 :root {
   /* ==========================================================================
      Colors - Brand
+     Marketing: Electric Blue #0055FF (vibrant, modern)
+     Product: Calm Blue #2563EB (for dashboard UI - less eye strain)
      ========================================================================== */
-  --color-primary: #2563EB;
-  --color-primary-hover: #1D4ED8;
-  --color-primary-light: #DBEAFE;
-  --color-primary-lighter: #EFF6FF;
+  --color-primary: #0055FF;
+  --color-primary-hover: #0044CC;
+  --color-primary-light: #E6F0FF;
+  --color-primary-lighter: #F0F7FF;
+  
+  /* Product-specific blue (for dashboard UI) */
+  --color-product-primary: #2563EB;
+  --color-product-primary-hover: #1D4ED8;
 
   --color-accent: #0D9488;
   --color-accent-hover: #0F766E;
@@ -45,7 +51,7 @@
   --color-info-light: #E0F2FE;
 
   /* ==========================================================================
-     Colors - Chart Palette
+     Colors - Chart Palette (uses calmer product blue for data viz)
      ========================================================================== */
   --color-chart-1: #2563EB;
   --color-chart-2: #0D9488;
