@@ -38,13 +38,24 @@ export async function analyzeContent(rawContent: string): Promise<AnalysisResult
     throw new Error('No text response from Claude');
   }
 
+  // Clean the response - strip markdown code blocks if present
+  let responseText = textContent.text.trim();
+
+  // Remove markdown code blocks (```json ... ``` or ``` ... ```)
+  if (responseText.startsWith('```')) {
+    // Remove opening code fence (with optional language identifier)
+    responseText = responseText.replace(/^```(?:json)?\s*\n?/, '');
+    // Remove closing code fence
+    responseText = responseText.replace(/\n?```\s*$/, '');
+  }
+
   // Parse JSON response with error recovery
   let analysis: AnalysisResult;
   try {
-    analysis = JSON.parse(textContent.text);
+    analysis = JSON.parse(responseText);
   } catch {
     // Try to extract JSON from response (in case there's extra text)
-    const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         analysis = JSON.parse(jsonMatch[0]);
@@ -60,12 +71,12 @@ export async function analyzeContent(rawContent: string): Promise<AnalysisResult
         try {
           analysis = JSON.parse(fixedJson);
         } catch (finalError) {
-          console.error('Failed to parse analysis response after fixes:', textContent.text.slice(0, 500));
+          console.error('Failed to parse analysis response after fixes:', responseText.slice(0, 500));
           throw new Error('Failed to parse analysis response as JSON');
         }
       }
     } else {
-      console.error('Failed to parse analysis response:', textContent.text.slice(0, 500));
+      console.error('Failed to parse analysis response:', responseText.slice(0, 500));
       throw new Error('Failed to parse analysis response as JSON');
     }
   }

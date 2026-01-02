@@ -51,17 +51,35 @@ export async function generatePage(
     throw new Error('No text response from Claude');
   }
 
+  // Clean the response - strip markdown code blocks if present
+  let responseText = textContent.text.trim();
+
+  // Remove markdown code blocks (```json ... ``` or ``` ... ```)
+  if (responseText.startsWith('```')) {
+    responseText = responseText.replace(/^```(?:json)?\s*\n?/, '');
+    responseText = responseText.replace(/\n?```\s*$/, '');
+  }
+
   // Parse JSON response
   let result: GenerationResult;
   try {
-    result = JSON.parse(textContent.text);
+    result = JSON.parse(responseText);
   } catch {
     // Try to extract JSON from response
-    const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      result = JSON.parse(jsonMatch[0]);
+      try {
+        result = JSON.parse(jsonMatch[0]);
+      } catch {
+        // Try to fix common JSON issues
+        let fixedJson = jsonMatch[0]
+          .replace(/,(\s*[}\]])/g, '$1')
+          .replace(/([{,]\s*)'/g, '$1"')
+          .replace(/'(\s*[}:\],])/g, '"$1');
+        result = JSON.parse(fixedJson);
+      }
     } else {
-      console.error('Failed to parse generation response:', textContent.text);
+      console.error('Failed to parse generation response:', responseText.slice(0, 500));
       throw new Error('Failed to parse generation response as JSON');
     }
   }
