@@ -183,7 +183,7 @@ export default function WorkspaceSettingsPage() {
   }
 
   const subdomainUrl = subdomain
-    ? `https://${subdomain}.zeno.app`
+    ? `https://${subdomain}.zeno.fyi`
     : null;
 
   return (
@@ -254,7 +254,7 @@ export default function WorkspaceSettingsPage() {
                   className="rounded-none border-x-0"
                 />
                 <span className="px-3 py-2 bg-[var(--color-gray-100)] border border-l-0 border-[var(--color-gray-200)] rounded-r-lg text-sm text-[var(--color-gray-500)]">
-                  .zeno.app
+                  .zeno.fyi
                 </span>
               </div>
               {isCheckingSubdomain && (

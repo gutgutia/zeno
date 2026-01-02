@@ -3,7 +3,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 // Main domains where the app is hosted (subdomains of these are workspace subdomains)
 const MAIN_DOMAINS = [
-  'zeno.app',
   'zeno.fyi',
   'localhost',
   '127.0.0.1',
