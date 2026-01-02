@@ -95,6 +95,23 @@ export async function analyzeContent(rawContent: string): Promise<AnalysisResult
     analysis.summary = 'Content analysis completed';
   }
 
+  // Ensure schema columns have proper defaults
+  if (analysis.schema?.columns) {
+    analysis.schema.columns = analysis.schema.columns.map(col => ({
+      ...col,
+      distribution: col.distribution || {},
+      stats: col.stats || null,
+      uniqueCount: col.uniqueCount || 0,
+      nullCount: col.nullCount || 0,
+      sampleValues: col.sampleValues || [],
+    }));
+  }
+
+  // Ensure schema relationships is an array
+  if (analysis.schema && !analysis.schema.relationships) {
+    analysis.schema.relationships = [];
+  }
+
   return analysis;
 }
 

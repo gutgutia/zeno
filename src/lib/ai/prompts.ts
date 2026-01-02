@@ -277,11 +277,11 @@ COLUMN DETAILS:
 ${analysis.schema.columns.map(col => {
   let details = `- ${col.name} (${col.type}, ${col.role})`;
   if (col.stats) {
-    details += `\n  Stats: min=${col.stats.min}, max=${col.stats.max}, avg=${col.stats.avg.toFixed(2)}, sum=${col.stats.sum}`;
+    details += `\n  Stats: min=${col.stats.min}, max=${col.stats.max}, avg=${col.stats.avg?.toFixed(2) ?? 'N/A'}, sum=${col.stats.sum}`;
   }
-  if (Object.keys(col.distribution).length > 0 && Object.keys(col.distribution).length <= 20) {
+  if (col.distribution && Object.keys(col.distribution).length > 0 && Object.keys(col.distribution).length <= 20) {
     details += `\n  Distribution: ${Object.entries(col.distribution).map(([k, v]) => `${k}(${v})`).join(', ')}`;
-  } else if (Object.keys(col.distribution).length > 20) {
+  } else if (col.distribution && Object.keys(col.distribution).length > 20) {
     details += `\n  Unique values: ${col.uniqueCount}`;
   }
   return details;
