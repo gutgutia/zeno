@@ -2,6 +2,174 @@ import type { BrandingConfig } from '@/types/database';
 import type { AnalysisResult } from '@/types/dashboard';
 
 /**
+ * System prompt for single-step Opus generation
+ * This analyzes data AND generates beautiful HTML in one pass
+ */
+export function getSingleStepSystemPrompt(branding: BrandingConfig | null): string {
+  const brandingSection = branding ? `
+BRANDING REQUIREMENTS:
+- Company Name: ${branding.companyName || 'Not specified'}
+- Logo URL: ${branding.logoUrl || 'Not provided'}
+- Primary Color: ${branding.colors?.primary || '#2563EB'}
+- Secondary Color: ${branding.colors?.secondary || '#0D9488'}
+- Accent Color: ${branding.colors?.accent || '#8B5CF6'}
+- Background Color: ${branding.colors?.background || '#F9FAFB'}
+- Chart Colors: ${JSON.stringify(branding.chartColors || ['#2563EB', '#0D9488', '#8B5CF6', '#F59E0B', '#EF4444', '#10B981'])}
+- Font Family: ${branding.fontFamily || 'system'}
+- Style Guide: ${branding.styleGuide || 'Professional and clean'}
+
+Apply these brand colors consistently throughout the design.
+` : `
+BRANDING:
+Use a professional, modern color scheme:
+- Primary: #2563EB (blue)
+- Secondary: #0D9488 (teal)
+- Accent: #8B5CF6 (purple)
+- Background: #F9FAFB (light gray)
+- Chart Colors: ["#2563EB", "#0D9488", "#8B5CF6", "#F59E0B", "#EF4444", "#10B981"]
+`;
+
+  return `You are an expert data analyst and web designer. Your task is to analyze raw data and create a stunning, professional dashboard that tells the story of the data.
+
+${brandingSection}
+
+DESIGN PRINCIPLES:
+1. Lead with insights - What's the most important story in this data?
+2. Create clear visual hierarchy - important metrics should stand out
+3. Use whitespace effectively for readability
+4. Make it responsive (works on mobile and desktop)
+5. Include contextual information (percentages, comparisons, trends)
+6. Design with modern aesthetics - gradients, shadows, rounded corners
+7. Use color purposefully to convey meaning (green=good, red=warning, etc.)
+
+OUTPUT FORMAT:
+You must respond with ONLY a valid JSON object:
+{
+  "html": "Your complete HTML with inline Tailwind-style classes",
+  "charts": {
+    "chart-id-1": { chart configuration },
+    "chart-id-2": { chart configuration }
+  },
+  "summary": "Brief 1-2 sentence summary of the data"
+}
+
+HTML GUIDELINES:
+- Use semantic HTML (header, main, section, article, etc.)
+- Apply styles inline using the style attribute with modern CSS
+- Use flexbox and grid for layouts
+- Include the company logo if provided: <img src="LOGO_URL" alt="Logo" />
+- For interactive charts, use placeholder divs: <div data-chart="chart-id" data-title="Chart Title"></div>
+- Create beautiful stat cards with context (e.g., "42 Active - 65% of total")
+- Add gradient headers, subtle shadows, colored accents
+- Include insight callout boxes for key findings
+
+CHART CONFIGURATIONS:
+For each chart placeholder, provide a configuration:
+
+pie:
+{
+  "type": "pie",
+  "title": "Chart Title",
+  "config": {
+    "groupBy": "category_column",
+    "value": { "column": "value_column", "aggregation": "count" },
+    "colors": ["#2563EB", "#0D9488", "#8B5CF6"],
+    "donut": true,
+    "showPercent": true
+  }
+}
+
+bar:
+{
+  "type": "bar",
+  "title": "Chart Title",
+  "config": {
+    "xAxis": { "column": "category_column" },
+    "yAxis": { "column": "value_column", "aggregation": "sum" },
+    "orientation": "vertical",
+    "colors": ["#2563EB"],
+    "sortBy": "value",
+    "sortOrder": "desc",
+    "limit": 10
+  }
+}
+
+number_card:
+{
+  "type": "number_card",
+  "title": "Metric Name",
+  "config": {
+    "column": "column_name",
+    "aggregation": "sum" | "avg" | "count" | "countDistinct",
+    "format": "number" | "currency" | "percent"
+  }
+}
+
+line:
+{
+  "type": "line",
+  "title": "Chart Title",
+  "config": {
+    "xAxis": { "column": "date_column", "type": "time" },
+    "yAxis": { "column": "value_column", "aggregation": "sum" },
+    "colors": ["#2563EB"],
+    "smooth": true
+  }
+}
+
+table:
+{
+  "type": "table",
+  "title": "Data Table",
+  "config": {
+    "columns": [
+      { "column": "col1", "label": "Column 1" }
+    ],
+    "pageSize": 10
+  }
+}
+
+IMPORTANT:
+- Analyze the data thoroughly before designing
+- Identify the KEY STORY and lead with it
+- Create a visually impressive, professional dashboard
+- Use charts strategically - not every metric needs a chart
+- Include context with numbers (percentages, comparisons)
+- Design like you're presenting to executives`;
+}
+
+/**
+ * User prompt for single-step generation with raw data
+ */
+export function getSingleStepUserPrompt(rawContent: string, userInstructions?: string): string {
+  const instructionsSection = userInstructions
+    ? `USER INSTRUCTIONS:
+${userInstructions}
+
+Please incorporate these specific requests into your design.
+
+`
+    : '';
+
+  return `${instructionsSection}Analyze the following data and create a beautiful, insightful dashboard:
+
+---BEGIN DATA---
+${rawContent}
+---END DATA---
+
+Steps to follow:
+1. First, understand the data structure (columns, types, relationships)
+2. Identify the most important metrics and insights
+3. Determine the best visualizations to tell the data story
+4. Design a stunning dashboard with clear hierarchy
+5. Include contextual information (percentages, trends, comparisons)
+
+Create a dashboard that would impress an executive. Focus on insights, not just displaying data.
+
+Respond with ONLY the JSON object containing "html", "charts", and "summary".`;
+}
+
+/**
  * System prompt for Haiku analysis step
  * This analyzes raw content and extracts structure, patterns, and insights
  */

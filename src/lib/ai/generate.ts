@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { getGenerationSystemPrompt, getGenerationUserPrompt } from './prompts';
+import { getGenerationSystemPrompt, getGenerationUserPrompt, getSingleStepSystemPrompt, getSingleStepUserPrompt } from './prompts';
 import type { AnalysisResult, DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig } from '@/types/database';
 import type { ChartConfig } from '@/types/chart';
@@ -10,6 +10,133 @@ const anthropic = new Anthropic({
 
 // Opus 4.5 for high-quality generation
 const GENERATION_MODEL = 'claude-opus-4-5';
+
+interface SingleStepResult {
+  html: string;
+  charts: Record<string, ChartConfig>;
+  summary: string;
+}
+
+/**
+ * Generate a dashboard using a single Opus call with extended thinking
+ * This is simpler and often produces better results than the two-step approach
+ */
+export async function generateDashboardSingleStep(
+  rawContent: string,
+  branding: BrandingConfig | null,
+  userInstructions?: string
+): Promise<DashboardConfig> {
+  const systemPrompt = getSingleStepSystemPrompt(branding);
+  const userPrompt = getSingleStepUserPrompt(rawContent, userInstructions);
+
+  console.log('[SingleStep] Starting Opus generation with extended thinking...');
+
+  // Use streaming with extended thinking for better analysis
+  const stream = anthropic.messages.stream({
+    model: GENERATION_MODEL,
+    max_tokens: 16000,
+    thinking: {
+      type: 'enabled',
+      budget_tokens: 10000, // Allow Claude to think deeply about the data
+    },
+    system: systemPrompt,
+    messages: [
+      {
+        role: 'user',
+        content: userPrompt,
+      },
+    ],
+  });
+
+  const message = await stream.finalMessage();
+
+  // Check for truncation
+  if (message.stop_reason === 'max_tokens') {
+    console.warn('[SingleStep] Response was truncated');
+  }
+
+  // Extract text content (skip thinking blocks)
+  const textContent = message.content.find(c => c.type === 'text');
+  if (!textContent || textContent.type !== 'text') {
+    throw new Error('No text response from Claude');
+  }
+
+  // Log thinking summary if present
+  const thinkingBlock = message.content.find(c => c.type === 'thinking');
+  if (thinkingBlock && thinkingBlock.type === 'thinking') {
+    console.log('[SingleStep] Claude thinking length:', thinkingBlock.thinking.length, 'chars');
+  }
+
+  // Clean and parse response
+  let responseText = textContent.text.trim();
+
+  // Remove markdown code blocks
+  if (responseText.startsWith('```')) {
+    responseText = responseText.replace(/^```(?:json)?\s*\n?/, '');
+    responseText = responseText.replace(/\n?```\s*$/, '');
+  }
+
+  let result: SingleStepResult;
+  try {
+    result = JSON.parse(responseText);
+  } catch {
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        result = JSON.parse(jsonMatch[0]);
+      } catch {
+        const fixedJson = jsonMatch[0]
+          .replace(/,(\s*[}\]])/g, '$1')
+          .replace(/([{,]\s*)'/g, '$1"')
+          .replace(/'(\s*[}:\],])/g, '"$1');
+        result = JSON.parse(fixedJson);
+      }
+    } else {
+      console.error('[SingleStep] Failed to parse response:', responseText.slice(0, 500));
+      throw new Error('Failed to parse generation response as JSON');
+    }
+  }
+
+  // Validate
+  if (!result.html) {
+    throw new Error('Generation response missing HTML');
+  }
+  if (!result.charts) {
+    result.charts = {};
+  }
+
+  // Ensure chart IDs
+  for (const [id, chart] of Object.entries(result.charts)) {
+    if (!chart.id) {
+      (chart as ChartConfig).id = id;
+    }
+    if (!chart.type) {
+      (chart as ChartConfig).type = 'number_card';
+    }
+  }
+
+  console.log('[SingleStep] Generation complete. Charts:', Object.keys(result.charts).length);
+
+  // Build config (no analysis since single-step)
+  return {
+    contentType: 'data',
+    html: result.html,
+    charts: result.charts,
+    metadata: {
+      generatedAt: new Date().toISOString(),
+      generationModel: 'claude-opus-4-5',
+      userInstructions,
+      singleStep: true,
+    },
+    // Store summary in a lightweight analysis object
+    analysis: {
+      contentType: 'data',
+      summary: result.summary || 'Dashboard generated',
+      insights: [],
+      suggestedVisualizations: [],
+    },
+  };
+}
 
 interface GenerationResult {
   html: string;

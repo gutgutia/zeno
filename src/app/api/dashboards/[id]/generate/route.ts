@@ -1,8 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
-import { analyzeContent } from '@/lib/ai/analyze';
-import { generatePage, buildDashboardConfig } from '@/lib/ai/generate';
+import { generateDashboardSingleStep } from '@/lib/ai/generate';
 import type { Dashboard, BrandingConfig } from '@/types/database';
 
 interface RouteParams {
@@ -82,47 +80,26 @@ export async function POST(request: Request, { params }: RouteParams) {
       styleGuide: dashboardOverride?.styleGuide ?? workspaceBranding?.styleGuide,
     } : null;
 
-    // Update status to analyzing
+    // Update status to generating
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase as any)
       .from('dashboards')
       .update({
-        generation_status: 'analyzing',
+        generation_status: 'generating',
         generation_started_at: new Date().toISOString(),
         generation_error: null,
       })
       .eq('id', id);
 
     try {
-      // Step 1: Analyze with Haiku
-      console.log(`[${id}] Step 1: Analyzing content with Haiku...`);
-      const analysis = await analyzeContent(rawContent);
-      console.log(`[${id}] Analysis complete. Content type: ${analysis.contentType}, Insights: ${analysis.insights.length}`);
-
-      // Update status to generating
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
-        .from('dashboards')
-        .update({
-          generation_status: 'generating',
-        })
-        .eq('id', id);
-
-      // Step 2: Generate with Opus
-      console.log(`[${id}] Step 2: Generating page with Opus...`);
-      const generation = await generatePage(
-        analysis,
+      // Single-step generation with Opus + extended thinking
+      console.log(`[${id}] Generating dashboard with Opus (single-step + thinking)...`);
+      const config = await generateDashboardSingleStep(
+        rawContent,
         effectiveBranding,
         dashboard.user_instructions || undefined
       );
-      console.log(`[${id}] Generation complete. Charts: ${Object.keys(generation.charts).length}`);
-
-      // Build the config
-      const config = buildDashboardConfig(
-        analysis,
-        generation,
-        dashboard.user_instructions || undefined
-      );
+      console.log(`[${id}] Generation complete. Charts: ${Object.keys(config.charts).length}`);
 
       // Update the dashboard with the generated config
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
