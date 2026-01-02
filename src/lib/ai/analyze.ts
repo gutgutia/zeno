@@ -105,7 +105,7 @@ export async function analyzeContent(rawContent: string): Promise<AnalysisResult
     analysis.schema.columns = analysis.schema.columns.map(col => ({
       ...col,
       distribution: col.distribution || {},
-      stats: col.stats || null,
+      stats: col.stats || undefined,
       uniqueCount: col.uniqueCount || 0,
       nullCount: col.nullCount || 0,
       sampleValues: col.sampleValues || [],
