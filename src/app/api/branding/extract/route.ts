@@ -8,7 +8,7 @@ const anthropic = new Anthropic({
 });
 
 // Use Sonnet 4.5 for reliable extraction
-const EXTRACTION_MODEL = 'claude-sonnet-4-5-20241022';
+const EXTRACTION_MODEL = 'claude-sonnet-4-5';
 
 interface ExtractedBranding extends BrandingConfig {
   suggestedChartColors?: string[];
