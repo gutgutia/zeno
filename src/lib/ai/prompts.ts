@@ -251,11 +251,11 @@ CONTENT TYPE: ${analysis.contentType}
 
 ${analysis.schema ? `
 DATA SCHEMA:
-- Total Rows: ${analysis.schema.rowCount}
-- Columns: ${analysis.schema.columns.map(c => `${c.name} (${c.type}, ${c.role})`).join(', ')}
+- Total Rows: ${analysis.schema.rowCount || 0}
+- Columns: ${analysis.schema.columns?.map(c => `${c.name} (${c.type}, ${c.role})`).join(', ') || 'None detected'}
 
 COLUMN DETAILS:
-${analysis.schema.columns.map(col => {
+${analysis.schema.columns?.map(col => {
   let details = `- ${col.name} (${col.type}, ${col.role})`;
   if (col.stats) {
     details += `\n  Stats: min=${col.stats.min}, max=${col.stats.max}, avg=${col.stats.avg?.toFixed(2) ?? 'N/A'}, sum=${col.stats.sum}`;
@@ -266,24 +266,24 @@ ${analysis.schema.columns.map(col => {
     details += `\n  Unique values: ${col.uniqueCount}`;
   }
   return details;
-}).join('\n')}
+}).join('\n') || 'No column details available'}
 
 RELATIONSHIPS:
-${analysis.schema.relationships.join('\n')}
+${analysis.schema.relationships?.join('\n') || 'None identified'}
 ` : ''}
 
 ${analysis.structure ? `
 DOCUMENT STRUCTURE:
-- Title: ${analysis.structure.title}
-- Sections: ${analysis.structure.sections.join(', ')}
-- Key Points: ${analysis.structure.keyPoints.join('; ')}
+- Title: ${analysis.structure.title || 'Untitled'}
+- Sections: ${analysis.structure.sections?.join(', ') || 'None'}
+- Key Points: ${analysis.structure.keyPoints?.join('; ') || 'None'}
 ` : ''}
 
 INSIGHTS:
-${analysis.insights.map((insight, i) => `${i + 1}. ${insight}`).join('\n')}
+${analysis.insights?.map((insight, i) => `${i + 1}. ${insight}`).join('\n') || 'No insights generated'}
 
 SUGGESTED VISUALIZATIONS:
-${analysis.suggestedVisualizations.map((viz, i) => `${i + 1}. ${viz}`).join('\n')}
+${analysis.suggestedVisualizations?.map((viz, i) => `${i + 1}. ${viz}`).join('\n') || 'No specific visualizations suggested'}
 
 ${analysis.cleanedData ? `
 SAMPLE DATA (first 5 rows):
