@@ -128,7 +128,8 @@ export async function POST(request: Request) {
     // Get Google connection ID if this is a Google Sheets dashboard
     let googleConnectionId = null;
     if (googleSheetId && dataSource?.type === 'google_sheets') {
-      const { data: connection } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: connection } = await (supabase as any)
         .from('google_connections')
         .select('id')
         .eq('workspace_id', workspace.id)

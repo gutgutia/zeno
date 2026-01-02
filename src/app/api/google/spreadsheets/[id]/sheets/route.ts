@@ -34,7 +34,8 @@ export async function GET(
     }
 
     // Get Google connection for this workspace
-    const { data: connection, error: connectionError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: connection, error: connectionError } = await (supabase as any)
       .from('google_connections')
       .select('*')
       .eq('workspace_id', workspaceId)

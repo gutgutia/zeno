@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ interface GoogleSheetInfo {
   columnCount: number;
 }
 
-export default function NewDashboardPage() {
+function NewDashboardPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -981,5 +981,17 @@ export default function NewDashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function NewDashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[var(--color-gray-50)] p-6 flex items-center justify-center">
+        <div className="animate-pulse text-[var(--color-gray-500)]">Loading...</div>
+      </div>
+    }>
+      <NewDashboardPageContent />
+    </Suspense>
   );
 }

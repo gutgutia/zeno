@@ -149,6 +149,11 @@ export interface Database {
         Insert: Omit<ChatMessage, 'id' | 'created_at'>;
         Update: Partial<Omit<ChatMessage, 'id' | 'dashboard_id'>>;
       };
+      google_connections: {
+        Row: GoogleConnection;
+        Insert: Omit<GoogleConnection, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<GoogleConnection, 'id' | 'user_id' | 'workspace_id'>>;
+      };
     };
   };
 }

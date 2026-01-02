@@ -73,7 +73,8 @@ export async function getValidAccessToken(connectionId: string): Promise<string>
   const supabase = await createClient();
 
   // Get the connection
-  const { data: connection, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: connection, error } = await (supabase as any)
     .from('google_connections')
     .select('*')
     .eq('id', connectionId)
@@ -100,7 +101,8 @@ export async function getValidAccessToken(connectionId: string): Promise<string>
     );
 
     // Update the connection with new token
-    const { error: updateError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: updateError } = await (supabase as any)
       .from('google_connections')
       .update({
         access_token: accessToken,
@@ -137,7 +139,8 @@ export async function saveGoogleConnection(
     : new Date(Date.now() + 3600 * 1000);
 
   // Upsert - update if same workspace+email exists
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('google_connections')
     .upsert(
       {
@@ -167,7 +170,8 @@ export async function saveGoogleConnection(
 export async function getWorkspaceGoogleConnection(workspaceId: string) {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('google_connections')
     .select('*')
     .eq('workspace_id', workspaceId)
@@ -187,7 +191,8 @@ export async function getWorkspaceGoogleConnection(workspaceId: string) {
 export async function deleteGoogleConnection(connectionId: string) {
   const supabase = await createClient();
 
-  const { error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
     .from('google_connections')
     .delete()
     .eq('id', connectionId);

@@ -20,6 +20,9 @@ export interface DashboardConfig {
     agentGenerated?: boolean;
     turnCount?: number;
     extendedThinking?: boolean;
+    // Refresh-related fields
+    lastRefreshedAt?: string;
+    refreshSummary?: string;
   };
 }
 

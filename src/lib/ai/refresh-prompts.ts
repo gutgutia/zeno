@@ -48,7 +48,7 @@ avg_order = df['order_value'].mean()
 # For charts - compute grouped data
 by_region = df.groupby('region')['revenue'].sum().to_dict()
 
-print(f"Total Revenue: ${total_revenue:,.2f}")
+print(f"Total Revenue: " + "$" + f"{total_revenue:,.2f}")
 print(f"Customer Count: {customer_count}")
 print(f"Revenue by Region: {by_region}")
 \`\`\`

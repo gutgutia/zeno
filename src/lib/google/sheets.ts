@@ -66,7 +66,7 @@ export async function listUserSpreadsheets(
     modifiedTime: file.modifiedTime!,
     owners: file.owners?.map((o) => ({
       emailAddress: o.emailAddress!,
-      displayName: o.displayName,
+      displayName: o.displayName ?? undefined,
     })),
   }));
 }

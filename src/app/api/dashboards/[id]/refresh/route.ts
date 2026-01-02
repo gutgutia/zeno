@@ -66,7 +66,8 @@ export async function POST(
     const config = dashboard.config as DashboardConfig;
 
     // Update status to refreshing
-    await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
       .from('dashboards')
       .update({ generation_status: 'refreshing' })
       .eq('id', id);
@@ -101,7 +102,8 @@ export async function POST(
 
       if (newHash === oldHash) {
         // No changes, just update last_synced_at
-        await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
           .from('dashboards')
           .update({
             generation_status: 'completed',
@@ -147,7 +149,8 @@ export async function POST(
         },
       };
 
-      await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
         .from('dashboards')
         .update({
           config: updatedConfig,
@@ -167,7 +170,8 @@ export async function POST(
       });
     } catch (error) {
       // Update status to failed
-      await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
         .from('dashboards')
         .update({
           generation_status: 'failed',

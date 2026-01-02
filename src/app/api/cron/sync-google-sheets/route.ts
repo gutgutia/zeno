@@ -5,7 +5,7 @@ import { fetchSheetData, fetchMultipleSheets, computeContentHash } from '@/lib/g
 import { refreshDashboardWithAgent } from '@/lib/ai/agent';
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
-import type { BrandingConfig, Workspace } from '@/types/database';
+import type { BrandingConfig, Dashboard, Workspace } from '@/types/database';
 
 export const maxDuration = 300; // 5 minutes for batch processing
 
@@ -15,6 +15,9 @@ interface SyncResult {
   status: 'refreshed' | 'unchanged' | 'error' | 'skipped';
   message?: string;
 }
+
+// Type for dashboard with workspace relation
+type DashboardWithWorkspace = Dashboard & { workspace: Workspace | null };
 
 // GET /api/cron/sync-google-sheets - Daily sync job for Google Sheets dashboards
 export async function GET(request: NextRequest) {
@@ -39,7 +42,7 @@ export async function GET(request: NextRequest) {
     // - last_synced_at is more than 23 hours ago (to allow for some variance)
     const twentyThreeHoursAgo = new Date(Date.now() - 23 * 60 * 60 * 1000).toISOString();
 
-    const { data: dashboards, error: queryError } = await supabase
+    const { data: dashboardsData, error: queryError } = await supabase
       .from('dashboards')
       .select(`
         *,
@@ -51,6 +54,8 @@ export async function GET(request: NextRequest) {
       .not('config', 'is', null)
       .or(`last_synced_at.is.null,last_synced_at.lt.${twentyThreeHoursAgo}`)
       .limit(10); // Process up to 10 at a time to avoid timeout
+
+    const dashboards = dashboardsData as DashboardWithWorkspace[] | null;
 
     if (queryError) {
       console.error('[Sync] Query error:', queryError);
@@ -75,10 +80,10 @@ export async function GET(request: NextRequest) {
       try {
         console.log(`[Sync] Processing dashboard: ${dashboard.id} - ${dashboard.title}`);
 
-        // Get valid access token
+        // Get valid access token (google_connection_id is non-null from query filter)
         let accessToken: string;
         try {
-          accessToken = await getValidAccessToken(dashboard.google_connection_id);
+          accessToken = await getValidAccessToken(dashboard.google_connection_id!);
         } catch (tokenError) {
           console.error(`[Sync] Token error for ${dashboard.id}:`, tokenError);
           results.push({
@@ -95,17 +100,18 @@ export async function GET(request: NextRequest) {
         const selectedSheets = dashboard.data_source?.selectedSheets;
 
         try {
+          // google_sheet_id is non-null from query filter
           if (selectedSheets && selectedSheets.length > 1) {
             const result = await fetchMultipleSheets(
               accessToken,
-              dashboard.google_sheet_id,
+              dashboard.google_sheet_id!,
               selectedSheets
             );
             newContent = result.data;
           } else {
             const result = await fetchSheetData(
               accessToken,
-              dashboard.google_sheet_id,
+              dashboard.google_sheet_id!,
               dashboard.google_sheet_name || undefined
             );
             newContent = result.data;
@@ -127,7 +133,8 @@ export async function GET(request: NextRequest) {
 
         if (newHash === oldHash) {
           // No changes, just update last_synced_at
-          await supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any)
             .from('dashboards')
             .update({ last_synced_at: new Date().toISOString() })
             .eq('id', dashboard.id);
@@ -146,7 +153,7 @@ export async function GET(request: NextRequest) {
 
         const config = dashboard.config as DashboardConfig;
         const branding = getMergedBranding(
-          (dashboard.workspace as Workspace)?.branding as BrandingConfig | null,
+          dashboard.workspace?.branding as BrandingConfig | null,
           dashboard.branding_override as Partial<BrandingConfig> | null
         );
 
@@ -175,7 +182,8 @@ export async function GET(request: NextRequest) {
             },
           };
 
-          await supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any)
             .from('dashboards')
             .update({
               config: updatedConfig,
