@@ -7,8 +7,8 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Use Haiku for fast, cost-effective extraction
-const EXTRACTION_MODEL = 'claude-haiku-4-5-20250514';
+// Use Sonnet for reliable extraction
+const EXTRACTION_MODEL = 'claude-sonnet-4-20250514';
 
 interface ExtractedBranding extends BrandingConfig {
   suggestedChartColors?: string[];
