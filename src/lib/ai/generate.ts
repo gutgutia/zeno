@@ -35,7 +35,7 @@ export async function generatePage(
 
   const message = await anthropic.messages.create({
     model: GENERATION_MODEL,
-    max_tokens: 16000,
+    max_tokens: 32000, // Opus 4.5 supports high output
     system: systemPrompt,
     messages: [
       {
@@ -44,6 +44,11 @@ export async function generatePage(
       },
     ],
   });
+
+  // Check if the response was truncated
+  if (message.stop_reason === 'max_tokens') {
+    console.warn('Generation response was truncated due to max_tokens limit');
+  }
 
   // Extract text content
   const textContent = message.content.find(c => c.type === 'text');
