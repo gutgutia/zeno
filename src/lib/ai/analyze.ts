@@ -38,7 +38,7 @@ export async function analyzeContent(rawContent: string): Promise<AnalysisResult
     throw new Error('No text response from Claude');
   }
 
-  // Parse JSON response
+  // Parse JSON response with error recovery
   let analysis: AnalysisResult;
   try {
     analysis = JSON.parse(textContent.text);
@@ -46,9 +46,26 @@ export async function analyzeContent(rawContent: string): Promise<AnalysisResult
     // Try to extract JSON from response (in case there's extra text)
     const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      analysis = JSON.parse(jsonMatch[0]);
+      try {
+        analysis = JSON.parse(jsonMatch[0]);
+      } catch {
+        // Try to fix common JSON issues
+        let fixedJson = jsonMatch[0]
+          // Remove trailing commas before } or ]
+          .replace(/,(\s*[}\]])/g, '$1')
+          // Fix single quotes to double quotes (be careful with apostrophes in text)
+          .replace(/([{,]\s*)'/g, '$1"')
+          .replace(/'(\s*[}:\],])/g, '"$1');
+
+        try {
+          analysis = JSON.parse(fixedJson);
+        } catch (finalError) {
+          console.error('Failed to parse analysis response after fixes:', textContent.text.slice(0, 500));
+          throw new Error('Failed to parse analysis response as JSON');
+        }
+      }
     } else {
-      console.error('Failed to parse analysis response:', textContent.text);
+      console.error('Failed to parse analysis response:', textContent.text.slice(0, 500));
       throw new Error('Failed to parse analysis response as JSON');
     }
   }
