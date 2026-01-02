@@ -24,6 +24,7 @@ const examples = [
         { label: 'Best Region', value: 'West', trend: '$244K' },
         { label: 'Q4 Growth', value: '+18%', trend: 'vs Q3' },
       ],
+      chartBars: [45, 52, 49, 61, 38, 41, 45, 50], // Represents quarterly data
     },
   },
   {
@@ -45,6 +46,31 @@ const examples = [
         { label: 'Total Leads', value: '1,539', trend: '+42%' },
         { label: 'Best ROI', value: 'Webinar', trend: '17.5%' },
         { label: 'Cost/Lead', value: '$9.56', trend: '-18%' },
+      ],
+      chartBars: [28, 41, 69, 95, 30, 45, 60, 80], // Different pattern for marketing
+    },
+  },
+  {
+    id: 'proposal',
+    label: 'Client Proposal',
+    before: {
+      title: 'proposal_draft.docx',
+      content: [
+        'PROPOSAL: Website Redesign',
+        '',
+        'Client: Acme Corp',
+        'Budget: $45,000',
+        'Timeline: 8 weeks',
+        'Deliverables: Design, Dev, QA',
+      ],
+    },
+    after: {
+      title: 'Acme Corp Proposal',
+      isDocument: true,
+      sections: [
+        { icon: '📋', label: 'Scope', value: '3 phases' },
+        { icon: '💰', label: 'Investment', value: '$45,000' },
+        { icon: '📅', label: 'Timeline', value: '8 weeks' },
       ],
     },
   },
@@ -68,6 +94,8 @@ const examples = [
         { label: 'At Risk', value: 'Docs', trend: '20%' },
         { label: 'ETA', value: 'Mar 15', trend: '3 weeks' },
       ],
+      chartBars: [90, 75, 40, 20], // Represents completion percentages
+      chartLabels: ['API', 'UI', 'Test', 'Docs'],
     },
   },
 ];
@@ -88,12 +116,12 @@ export function BeforeAfter() {
             From raw data to ready-to-share
           </h2>
           <p className="text-lg text-[var(--color-gray-600)] max-w-2xl mx-auto">
-            No matter what format your data is in, Zeno transforms it into something beautiful.
+            Dashboards, reports, proposals—Zeno transforms any content into something beautiful.
           </p>
         </div>
 
         {/* Example Tabs */}
-        <div className="flex justify-center gap-2 mb-10">
+        <div className="flex flex-wrap justify-center gap-2 mb-10">
           {examples.map((ex) => (
             <button
               key={ex.id}
@@ -111,17 +139,17 @@ export function BeforeAfter() {
 
         {/* Before/After Comparison */}
         <div className="max-w-4xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-6 md:gap-8">
+          <div className="grid md:grid-cols-2 gap-6 md:gap-8 items-stretch">
             {/* BEFORE */}
-            <div className="relative">
-              <div className="absolute -top-3 left-4 bg-[var(--color-gray-200)] text-[var(--color-gray-600)] text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide">
+            <div className="relative flex flex-col">
+              <div className="absolute -top-3 left-4 bg-[var(--color-gray-200)] text-[var(--color-gray-600)] text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide z-10">
                 Before
               </div>
-              <div className="bg-white rounded-xl shadow-md border border-[var(--color-gray-200)] overflow-hidden pt-4">
+              <div className="bg-white rounded-xl shadow-md border border-[var(--color-gray-200)] overflow-hidden pt-4 flex-1 flex flex-col">
                 <div className="px-4 pb-2 border-b border-[var(--color-gray-100)]">
                   <span className="text-sm text-[var(--color-gray-500)] font-mono">{example.before.title}</span>
                 </div>
-                <div className="p-4 bg-[var(--color-gray-50)] font-mono text-sm text-[var(--color-gray-600)]">
+                <div className="p-4 bg-[var(--color-gray-50)] font-mono text-sm text-[var(--color-gray-600)] flex-1">
                   <div className="space-y-1">
                     {example.before.content.map((line, i) => (
                       <div key={i} className={i === 0 ? 'text-[var(--color-gray-400)]' : ''}>
@@ -134,45 +162,68 @@ export function BeforeAfter() {
             </div>
 
             {/* AFTER */}
-            <div className="relative">
-              <div className="absolute -top-3 left-4 bg-[var(--color-primary)] text-white text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide">
+            <div className="relative flex flex-col">
+              <div className="absolute -top-3 left-4 bg-[var(--color-primary)] text-white text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wide z-10">
                 After
               </div>
-              <div className="bg-white rounded-xl shadow-md border border-[var(--color-primary)] overflow-hidden pt-4">
+              <div className="bg-white rounded-xl shadow-md border border-[var(--color-primary)] overflow-hidden pt-4 flex-1 flex flex-col">
                 <div className="px-4 pb-2 border-b border-[var(--color-gray-100)]">
                   <span className="text-sm font-semibold text-[var(--color-gray-900)]">{example.after.title}</span>
                 </div>
-                <div className="p-4">
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    {example.after.metrics.map((metric) => (
-                      <div key={metric.label} className="bg-[var(--color-gray-50)] rounded-lg p-3 text-center">
-                        <p className="text-xs text-[var(--color-gray-500)] mb-1">{metric.label}</p>
-                        <p className="text-lg font-bold text-[var(--color-gray-900)]">{metric.value}</p>
-                        <p className="text-xs text-[var(--color-success)]">{metric.trend}</p>
+                <div className="p-4 flex-1 flex flex-col">
+                  {/* Document-style output */}
+                  {example.after.isDocument ? (
+                    <div className="flex-1">
+                      <div className="space-y-3">
+                        {example.after.sections?.map((section) => (
+                          <div key={section.label} className="flex items-center gap-3 bg-[var(--color-gray-50)] rounded-lg p-3">
+                            <span className="text-2xl">{section.icon}</span>
+                            <div>
+                              <p className="text-xs text-[var(--color-gray-500)]">{section.label}</p>
+                              <p className="font-semibold text-[var(--color-gray-900)]">{section.value}</p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  {/* Mini visualization */}
-                  <div className="h-16 bg-gradient-to-t from-[var(--color-primary-light)] to-transparent rounded-lg flex items-end justify-around px-3 pb-2">
-                    {[40, 55, 45, 70, 60, 85, 75, 90].map((height, i) => (
-                      <div
-                        key={i}
-                        className="w-3 bg-[var(--color-primary)] rounded-t opacity-70"
-                        style={{ height: `${height}%` }}
-                      />
-                    ))}
-                  </div>
+                      <div className="mt-4 pt-3 border-t border-[var(--color-gray-100)]">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-[var(--color-gray-500)]">Ready to send</span>
+                          <span className="text-[var(--color-primary)] font-medium">Share →</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Dashboard-style output */
+                    <>
+                      <div className="grid grid-cols-3 gap-3 mb-4">
+                        {example.after.metrics?.map((metric) => (
+                          <div key={metric.label} className="bg-[var(--color-gray-50)] rounded-lg p-3 text-center">
+                            <p className="text-xs text-[var(--color-gray-500)] mb-1">{metric.label}</p>
+                            <p className="text-lg font-bold text-[var(--color-gray-900)]">{metric.value}</p>
+                            <p className="text-xs text-[var(--color-success)]">{metric.trend}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Unique visualization per example */}
+                      <div className="flex-1 min-h-[64px] bg-gradient-to-t from-[var(--color-primary-light)] to-transparent rounded-lg flex items-end justify-around px-3 pb-2">
+                        {example.after.chartBars?.map((height, i) => (
+                          <div key={i} className="flex flex-col items-center gap-1">
+                            <div
+                              className="w-3 md:w-4 bg-[var(--color-primary)] rounded-t opacity-70"
+                              style={{ height: `${height * 0.6}px` }}
+                            />
+                            {example.after.chartLabels && (
+                              <span className="text-[8px] text-[var(--color-gray-400)]">
+                                {example.after.chartLabels[i]}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Arrow between (desktop only) */}
-          <div className="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-            <div className="w-10 h-10 bg-[var(--color-gray-100)] rounded-full flex items-center justify-center">
-              <svg className="w-5 h-5 text-[var(--color-gray-400)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
             </div>
           </div>
         </div>

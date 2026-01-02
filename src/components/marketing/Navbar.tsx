@@ -41,7 +41,7 @@ export function Navbar() {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" className="hover:bg-gray-100 hover:text-gray-900">
               Sign In
             </Button>
             <Button size="sm">
@@ -83,7 +83,7 @@ export function Navbar() {
                 </Link>
               ))}
               <div className="flex flex-col gap-2 pt-4 border-t border-[var(--color-gray-100)]">
-                <Button variant="ghost" className="w-full">
+                <Button variant="ghost" className="w-full hover:bg-gray-100 hover:text-gray-900">
                   Sign In
                 </Button>
                 <Button className="w-full">

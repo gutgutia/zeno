@@ -14,9 +14,9 @@ export function Hero() {
 
         {/* Headline */}
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[var(--color-gray-900)] tracking-tight mb-6">
-          Make your data
+          Beautiful dashboards
           <br />
-          <span className="text-[var(--color-primary)]">look amazing</span>
+          <span className="text-[var(--color-primary)]">in seconds</span>
         </h1>
 
         {/* Subheadline */}
