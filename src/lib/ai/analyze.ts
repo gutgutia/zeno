@@ -22,7 +22,7 @@ export async function analyzeContent(rawContent: string): Promise<AnalysisResult
 
   const message = await anthropic.messages.create({
     model: ANALYSIS_MODEL,
-    max_tokens: 16000, // Haiku supports up to 8192 output, but we request more for safety
+    max_tokens: 8192,
     system: systemPrompt,
     messages: [
       {
@@ -31,6 +31,11 @@ export async function analyzeContent(rawContent: string): Promise<AnalysisResult
       },
     ],
   });
+
+  // Check if the response was truncated
+  if (message.stop_reason === 'max_tokens') {
+    console.warn('Analysis response was truncated due to max_tokens limit');
+  }
 
   // Extract text content
   const textContent = message.content.find(c => c.type === 'text');

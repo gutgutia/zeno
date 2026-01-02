@@ -6,76 +6,57 @@ import type { AnalysisResult } from '@/types/dashboard';
  * This analyzes raw content and extracts structure, patterns, and insights
  */
 export function getAnalysisSystemPrompt(): string {
-  return `You are an expert data analyst and content analyzer. Your task is to analyze raw content (data, text, or mixed) and provide a comprehensive structured analysis.
+  return `You are an expert data analyst and content analyzer. Your task is to analyze raw content (data, text, or mixed) and provide a structured analysis.
 
-You must respond with ONLY a valid JSON object (no markdown, no explanation, no code blocks).
+You must respond with ONLY a valid JSON object (no markdown, no code blocks).
 
 Your analysis should:
 1. Detect the content type (data, text, or mixed)
 2. For data content:
-   - Clean and normalize messy data (handle inconsistent formatting, notes mixed in, etc.)
    - Identify all columns and their types
-   - Compute COMPLETE distribution counts for categorical columns (every unique value and its count)
+   - Compute distribution counts for categorical columns (top values with counts)
    - Calculate statistics for numeric columns (min, max, avg, sum)
    - Identify relationships between columns
    - Determine the role of each column (dimension, measure, identifier, temporal)
 3. For text content:
    - Extract the document structure (sections, headings)
    - Identify key points and main themes
-   - Extract important entities (names, dates, numbers)
 4. Generate actionable insights about the content
-5. Suggest appropriate visualizations or layouts
+5. Suggest appropriate visualizations
 
 Response JSON structure:
 {
   "contentType": "data" | "text" | "mixed",
-  "summary": "Brief 1-2 sentence summary of what this content is about",
-
-  // For data content
-  "cleanedData": [...], // Array of cleaned/normalized row objects
+  "summary": "Brief 1-2 sentence summary",
   "schema": {
     "columns": [
       {
         "name": "column_name",
         "type": "string" | "number" | "date" | "boolean",
         "role": "dimension" | "measure" | "identifier" | "temporal",
-        "distribution": { "value1": count1, "value2": count2, ... }, // COMPLETE distribution
-        "stats": { "min": 0, "max": 100, "avg": 50, "sum": 1000 }, // for numeric
-        "nullCount": 0,
+        "distribution": { "value1": count1, "value2": count2 },
+        "stats": { "min": 0, "max": 100, "avg": 50, "sum": 1000 },
         "uniqueCount": 10,
         "sampleValues": ["sample1", "sample2"]
       }
     ],
     "rowCount": 100,
-    "relationships": ["Owner is assigned to Projects", "Status indicates lifecycle stage"]
+    "relationships": ["Owner is assigned to Projects"]
   },
-
-  // For text content
   "structure": {
     "title": "Document Title",
-    "sections": ["Section 1 Title", "Section 2 Title"],
-    "keyPoints": ["Key point 1", "Key point 2"],
-    "entities": ["Entity 1", "Entity 2"]
+    "sections": ["Section 1", "Section 2"],
+    "keyPoints": ["Key point 1", "Key point 2"]
   },
-
-  // Common
-  "insights": [
-    "67% of customers are Active",
-    "Sarah owns the most projects (35)",
-    "There's a correlation between status and age"
-  ],
-  "suggestedVisualizations": [
-    "Pie chart for status distribution",
-    "Bar chart for projects by owner",
-    "Number cards for key metrics"
-  ]
+  "insights": ["67% of customers are Active", "Sarah owns the most projects"],
+  "suggestedVisualizations": ["Pie chart for status", "Bar chart for projects by owner"]
 }
 
 Important:
-- For distributions, include ALL unique values and their counts, not just samples
-- Be thorough in cleaning messy data - handle notes, mixed formats, empty rows
-- Identify meaningful patterns and relationships
-- Suggest visualizations that would provide genuine insight`;
+- Do NOT include a "cleanedData" field - we already have the raw data
+- For distributions, include top 10-15 values max, not all unique values
+- Keep the response concise to avoid truncation
+- Focus on actionable insights`;
 }
 
 /**
