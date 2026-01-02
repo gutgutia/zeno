@@ -1,8 +1,6 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 
 export interface SheetInfo {
   name: string;
@@ -84,9 +82,11 @@ export function SheetSelector({
                 : 'border-[var(--color-gray-200)] hover:border-[var(--color-gray-300)]'
             }`}
           >
-            <Checkbox
+            <input
+              type="checkbox"
               checked={selectedSheets.includes(sheet.name)}
-              onCheckedChange={() => toggleSheet(sheet.name)}
+              onChange={() => toggleSheet(sheet.name)}
+              className="w-4 h-4 rounded border-[var(--color-gray-300)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
             />
             <div className="flex-1 min-w-0">
               <div className="font-medium text-[var(--color-gray-900)] truncate">
