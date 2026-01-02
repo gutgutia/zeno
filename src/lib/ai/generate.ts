@@ -9,7 +9,7 @@ const anthropic = new Anthropic({
 });
 
 // Opus 4.5 for high-quality generation
-const GENERATION_MODEL = 'claude-opus-4-5-20250514';
+const GENERATION_MODEL = 'claude-opus-4-5';
 
 interface GenerationResult {
   html: string;
@@ -130,8 +130,8 @@ export function buildDashboardConfig(
     analysis: analysis,
     metadata: {
       generatedAt: new Date().toISOString(),
-      analysisModel: 'claude-haiku-4-20250514',
-      generationModel: 'claude-opus-4-5-20250514',
+      analysisModel: 'claude-haiku-4-5',
+      generationModel: 'claude-opus-4-5',
       userInstructions,
     },
   };
