@@ -59,70 +59,72 @@ export function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--color-gray-50)]">
-      <div className="w-full max-w-md px-4">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <div className="w-10 h-10 bg-[var(--color-primary)] rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">Z</span>
-            </div>
-            <span className="text-2xl font-semibold text-[var(--color-gray-900)]">
-              Zeno
-            </span>
-          </Link>
-        </div>
-
-        {/* Card */}
-        <div className="bg-white rounded-xl border border-[var(--color-gray-200)] shadow-sm p-8">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-[var(--color-gray-900)] mb-2">
-              Welcome back
-            </h1>
-            <p className="text-[var(--color-gray-600)]">
-              Enter your email to sign in to your account
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email address</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
-                autoComplete="email"
-                autoFocus
-              />
-            </div>
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Sending code...' : 'Continue with Email'}
-            </Button>
-          </form>
-
-          <p className="text-center text-sm text-[var(--color-gray-500)] mt-6">
-            We&apos;ll send you a verification code to sign in.
-            <br />
-            No password needed.
-          </p>
-        </div>
-
-        {/* Footer */}
-        <p className="text-center text-sm text-[var(--color-gray-500)] mt-8">
-          By continuing, you agree to our{' '}
-          <Link href="/terms" className="text-[var(--color-primary)] hover:underline">
-            Terms of Service
-          </Link>{' '}
-          and{' '}
-          <Link href="/privacy" className="text-[var(--color-primary)] hover:underline">
-            Privacy Policy
-          </Link>
+    <div className="w-full max-w-[400px] mx-auto">
+      <div className="mb-10 text-center lg:text-left">
+        <h1 className="text-3xl font-bold tracking-tight text-[var(--color-gray-900)] mb-3">
+          Get started with Zeno
+        </h1>
+        <p className="text-[var(--color-gray-600)] text-lg">
+          Sign in or create an account to start building beautiful dashboards.
         </p>
       </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="email" className="text-sm font-medium text-[var(--color-gray-700)]">
+            Email address
+          </Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="name@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={isLoading}
+            autoComplete="email"
+            autoFocus
+            className="h-12 px-4 text-base border-[var(--color-gray-200)] focus-visible:ring-[var(--color-primary-light)] focus-visible:border-[var(--color-primary)] transition-all"
+          />
+        </div>
+
+        <Button 
+          type="submit" 
+          className="w-full h-12 text-base font-medium bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] transition-colors shadow-sm" 
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <span className="flex items-center gap-2">
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Sending code...
+            </span>
+          ) : (
+            'Continue with Email'
+          )}
+        </Button>
+      </form>
+
+      <div className="mt-8 pt-8 border-t border-[var(--color-gray-100)] text-center lg:text-left">
+        <div className="flex items-center justify-center lg:justify-start gap-3 text-sm text-[var(--color-gray-500)]">
+          <svg className="w-5 h-5 text-[var(--color-gray-400)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          <span>We&apos;ll email you a magic code for a password-free sign in.</span>
+        </div>
+      </div>
+
+      <p className="text-center lg:text-left text-sm text-[var(--color-gray-500)] mt-8">
+        By continuing, you agree to our{' '}
+        <Link href="/terms" className="text-[var(--color-primary)] font-medium hover:underline hover:text-[var(--color-primary-hover)] transition-colors">
+          Terms of Service
+        </Link>{' '}
+        and{' '}
+        <Link href="/privacy" className="text-[var(--color-primary)] font-medium hover:underline hover:text-[var(--color-primary-hover)] transition-colors">
+          Privacy Policy
+        </Link>
+      </p>
     </div>
   );
 }
