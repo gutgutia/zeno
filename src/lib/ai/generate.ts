@@ -13,7 +13,6 @@ const GENERATION_MODEL = 'claude-opus-4-5';
 
 interface SingleStepResult {
   html: string;
-  charts: Record<string, ChartConfig>;
   summary: string;
 }
 
@@ -101,34 +100,20 @@ export async function generateDashboardSingleStep(
   if (!result.html) {
     throw new Error('Generation response missing HTML');
   }
-  if (!result.charts) {
-    result.charts = {};
-  }
 
-  // Ensure chart IDs
-  for (const [id, chart] of Object.entries(result.charts)) {
-    if (!chart.id) {
-      (chart as ChartConfig).id = id;
-    }
-    if (!chart.type) {
-      (chart as ChartConfig).type = 'number_card';
-    }
-  }
+  console.log('[SingleStep] Generation complete. HTML length:', result.html.length);
 
-  console.log('[SingleStep] Generation complete. Charts:', Object.keys(result.charts).length);
-
-  // Build config (no analysis since single-step)
+  // Build config - no charts, everything is inline in the HTML
   return {
     contentType: 'data',
     html: result.html,
-    charts: result.charts,
+    charts: {}, // Empty - all visualizations are inline SVG/CSS
     metadata: {
       generatedAt: new Date().toISOString(),
       generationModel: 'claude-opus-4-5',
       userInstructions,
       singleStep: true,
     },
-    // Store summary in a lightweight analysis object
     analysis: {
       contentType: 'data',
       summary: result.summary || 'Dashboard generated',

@@ -16,7 +16,6 @@ BRANDING REQUIREMENTS:
 - Background Color: ${branding.colors?.background || '#F9FAFB'}
 - Chart Colors: ${JSON.stringify(branding.chartColors || ['#2563EB', '#0D9488', '#8B5CF6', '#F59E0B', '#EF4444', '#10B981'])}
 - Font Family: ${branding.fontFamily || 'system'}
-- Style Guide: ${branding.styleGuide || 'Professional and clean'}
 
 Apply these brand colors consistently throughout the design.
 ` : `
@@ -29,7 +28,7 @@ Use a professional, modern color scheme:
 - Chart Colors: ["#2563EB", "#0D9488", "#8B5CF6", "#F59E0B", "#EF4444", "#10B981"]
 `;
 
-  return `You are an expert data analyst and web designer. Your task is to analyze raw data and create a stunning, professional dashboard that tells the story of the data.
+  return `You are an expert data analyst and web designer. Your task is to analyze raw data and create a stunning, professional dashboard as a complete, self-contained HTML page.
 
 ${brandingSection}
 
@@ -37,105 +36,61 @@ DESIGN PRINCIPLES:
 1. Lead with insights - What's the most important story in this data?
 2. Create clear visual hierarchy - important metrics should stand out
 3. Use whitespace effectively for readability
-4. Make it responsive (works on mobile and desktop)
-5. Include contextual information (percentages, comparisons, trends)
-6. Design with modern aesthetics - gradients, shadows, rounded corners
-7. Use color purposefully to convey meaning (green=good, red=warning, etc.)
+4. Include contextual information (percentages, comparisons, trends)
+5. Design with modern aesthetics - gradients, shadows, rounded corners
+6. Use color purposefully to convey meaning (green=good, red=warning, etc.)
 
 OUTPUT FORMAT:
 You must respond with ONLY a valid JSON object:
 {
-  "html": "Your complete HTML with inline Tailwind-style classes",
-  "charts": {
-    "chart-id-1": { chart configuration },
-    "chart-id-2": { chart configuration }
-  },
+  "html": "Your complete self-contained HTML page",
   "summary": "Brief 1-2 sentence summary of the data"
 }
 
-HTML GUIDELINES:
-- Use semantic HTML (header, main, section, article, etc.)
-- Apply styles inline using the style attribute with modern CSS
-- Use flexbox and grid for layouts
-- Include the company logo if provided: <img src="LOGO_URL" alt="Logo" />
-- For interactive charts, use placeholder divs: <div data-chart="chart-id" data-title="Chart Title"></div>
-- Create beautiful stat cards with context (e.g., "42 Active - 65% of total")
-- Add gradient headers, subtle shadows, colored accents
-- Include insight callout boxes for key findings
+HTML REQUIREMENTS:
+Generate a COMPLETE, SELF-CONTAINED HTML page. Everything must be inline - no external dependencies.
 
-CHART CONFIGURATIONS:
-For each chart placeholder, provide a configuration:
+1. STRUCTURE:
+   - Use semantic HTML5 (header, main, section, article)
+   - Include all styles inline using the style attribute
+   - Use modern CSS (flexbox, grid, gradients, shadows)
 
-pie:
-{
-  "type": "pie",
-  "title": "Chart Title",
-  "config": {
-    "groupBy": "category_column",
-    "value": { "column": "value_column", "aggregation": "count" },
-    "colors": ["#2563EB", "#0D9488", "#8B5CF6"],
-    "donut": true,
-    "showPercent": true
-  }
-}
+2. VISUALIZATIONS - Generate these directly as inline SVG or HTML:
+   - PIE/DONUT CHARTS: Use inline SVG with <circle> elements and stroke-dasharray for segments
+   - BAR CHARTS: Use inline SVG with <rect> elements or pure CSS with div bars
+   - METRICS CARDS: Use styled divs with large numbers and context
+   - TABLES: Use HTML <table> with proper styling
+   - PROGRESS BARS: Use CSS with colored div widths
 
-bar:
-{
-  "type": "bar",
-  "title": "Chart Title",
-  "config": {
-    "xAxis": { "column": "category_column" },
-    "yAxis": { "column": "value_column", "aggregation": "sum" },
-    "orientation": "vertical",
-    "colors": ["#2563EB"],
-    "sortBy": "value",
-    "sortOrder": "desc",
-    "limit": 10
-  }
-}
+3. EXAMPLE PIE CHART (inline SVG):
+   <svg viewBox="0 0 100 100" style="width: 200px; height: 200px;">
+     <circle cx="50" cy="50" r="40" fill="none" stroke="#2563EB" stroke-width="20"
+             stroke-dasharray="125.6 251.2" transform="rotate(-90 50 50)"/>
+     <circle cx="50" cy="50" r="40" fill="none" stroke="#0D9488" stroke-width="20"
+             stroke-dasharray="62.8 251.2" stroke-dashoffset="-125.6" transform="rotate(-90 50 50)"/>
+   </svg>
 
-number_card:
-{
-  "type": "number_card",
-  "title": "Metric Name",
-  "config": {
-    "column": "column_name",
-    "aggregation": "sum" | "avg" | "count" | "countDistinct",
-    "format": "number" | "currency" | "percent"
-  }
-}
+4. EXAMPLE BAR CHART (CSS):
+   <div style="display: flex; align-items: end; gap: 8px; height: 150px;">
+     <div style="width: 40px; height: 80%; background: linear-gradient(to top, #2563EB, #3B82F6); border-radius: 4px 4px 0 0;"></div>
+     <div style="width: 40px; height: 60%; background: linear-gradient(to top, #0D9488, #14B8A6); border-radius: 4px 4px 0 0;"></div>
+   </div>
 
-line:
-{
-  "type": "line",
-  "title": "Chart Title",
-  "config": {
-    "xAxis": { "column": "date_column", "type": "time" },
-    "yAxis": { "column": "value_column", "aggregation": "sum" },
-    "colors": ["#2563EB"],
-    "smooth": true
-  }
-}
-
-table:
-{
-  "type": "table",
-  "title": "Data Table",
-  "config": {
-    "columns": [
-      { "column": "col1", "label": "Column 1" }
-    ],
-    "pageSize": 10
-  }
-}
+5. DESIGN ELEMENTS TO INCLUDE:
+   - Gradient header/hero section
+   - Stat cards with large numbers, labels, and context (e.g., "↑ 12% from last month")
+   - Colored status indicators (dots, badges)
+   - Insight callout boxes with background colors
+   - Clean data tables with alternating row colors
+   - Visual charts using SVG or CSS
 
 IMPORTANT:
-- Analyze the data thoroughly before designing
-- Identify the KEY STORY and lead with it
-- Create a visually impressive, professional dashboard
-- Use charts strategically - not every metric needs a chart
-- Include context with numbers (percentages, comparisons)
-- Design like you're presenting to executives`;
+- DO NOT use any external libraries or placeholder elements
+- Generate ALL visualizations inline as SVG or CSS
+- Make it look like a professional executive dashboard
+- Include actual data values from the input, not placeholder text
+- Calculate percentages, totals, and other derived metrics
+- The HTML should render beautifully with zero JavaScript`;
 }
 
 /**
@@ -159,14 +114,14 @@ ${rawContent}
 
 Steps to follow:
 1. First, understand the data structure (columns, types, relationships)
-2. Identify the most important metrics and insights
-3. Determine the best visualizations to tell the data story
-4. Design a stunning dashboard with clear hierarchy
-5. Include contextual information (percentages, trends, comparisons)
+2. Calculate key metrics: totals, averages, distributions, percentages
+3. Identify the most important insights and story in the data
+4. Design a stunning dashboard with clear visual hierarchy
+5. Generate all charts as inline SVG or CSS (no placeholders!)
 
-Create a dashboard that would impress an executive. Focus on insights, not just displaying data.
+Create a dashboard that would impress an executive. Focus on insights, not just displaying raw data.
 
-Respond with ONLY the JSON object containing "html", "charts", and "summary".`;
+Respond with ONLY a JSON object: {"html": "...", "summary": "..."}`;
 }
 
 /**
