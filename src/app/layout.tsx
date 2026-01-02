@@ -19,13 +19,13 @@ export const metadata: Metadata = {
     url: "https://zeno.fyi",
     siteName: "Zeno",
     type: "website",
-    images: ["/social/og-image.svg"],
+    images: ["/social/og-image.png"],
   },
   twitter: {
     card: "summary_large_image",
     title: "Zeno - Beautiful Dashboards in Seconds",
     description: "Paste your data, describe what you want, and let AI create stunning, shareable dashboards.",
-    images: ["/social/og-image.svg"],
+    images: ["/social/og-image.png"],
   },
 };
 
