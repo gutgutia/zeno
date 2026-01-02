@@ -1,2 +1,2 @@
 export { resend, FROM_EMAIL } from './resend';
-export { sendOTPEmail, sendWelcomeEmail } from './send';
+export { sendOTPEmail, sendWelcomeEmail, sendDashboardReadyEmail } from './send';

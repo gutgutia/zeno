@@ -101,8 +101,8 @@ function EmptyState() {
 }
 
 function DashboardCard({ dashboard }: { dashboard: Dashboard }) {
-  const config = dashboard.config as { charts?: unknown[] };
-  const chartCount = config?.charts?.length || 0;
+  const config = dashboard.config as { charts?: Record<string, unknown> } | null;
+  const chartCount = config?.charts ? Object.keys(config.charts).length : 0;
 
   return (
     <Link

@@ -1,4 +1,4 @@
-import type { DashboardConfig } from './dashboard';
+import type { DashboardConfig, GenerationStatus } from './dashboard';
 
 export interface Profile {
   id: string;
@@ -62,11 +62,20 @@ export interface Dashboard {
   data_source: DataSource;
   data: Record<string, unknown>[] | null;
   data_url: string | null;
-  config: DashboardConfig;
+  config: DashboardConfig | null;
   // Dashboard-level branding override (falls back to workspace branding)
   branding_override: Partial<BrandingConfig> | null;
   is_published: boolean;
   published_at: string | null;
+  // Generation status for async processing
+  generation_status: GenerationStatus;
+  generation_error: string | null;
+  generation_started_at: string | null;
+  generation_completed_at: string | null;
+  // Raw content (original pasted/uploaded content)
+  raw_content: string | null;
+  user_instructions: string | null;
+  notify_email: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;

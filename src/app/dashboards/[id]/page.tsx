@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, use, useMemo } from 'react';
+import { useState, useEffect, use, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChartRenderer } from '@/components/charts';
+import { PageRenderer } from '@/components/dashboard/PageRenderer';
 import { ShareDialog } from '@/components/dashboard/ShareDialog';
+import { toast } from 'sonner';
 import type { Dashboard, BrandingConfig } from '@/types/database';
-import type { DashboardConfig } from '@/types/dashboard';
-import type { ChartConfig } from '@/types/chart';
+import type { DashboardConfig, GenerationStatus } from '@/types/dashboard';
 
 interface ChatMessage {
   id: string;
@@ -17,7 +17,9 @@ interface ChatMessage {
   content: string;
 }
 
-export default function DashboardViewerPage({ params }: { params: Promise<{ id: string }> }) {
+const POLL_INTERVAL = 3000; // 3 seconds
+
+export default function DashboardEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
 
@@ -46,30 +48,65 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
   }, [branding]);
 
   // Fetch dashboard data
-  useEffect(() => {
-    async function fetchDashboard() {
-      try {
-        const response = await fetch(`/api/dashboards/${id}`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            router.push('/dashboards');
-            return;
-          }
-          throw new Error('Failed to fetch dashboard');
+  const fetchDashboard = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/dashboards/${id}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          router.push('/dashboards');
+          return null;
         }
-        const data = await response.json();
+        throw new Error('Failed to fetch dashboard');
+      }
+      const data = await response.json();
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      return null;
+    }
+  }, [id, router]);
+
+  // Initial fetch
+  useEffect(() => {
+    async function init() {
+      const data = await fetchDashboard();
+      if (data) {
         setDashboard(data.dashboard);
         setBranding(data.branding || null);
         setEditedTitle(data.dashboard.title);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setIsLoading(false);
       }
+      setIsLoading(false);
     }
+    init();
+  }, [fetchDashboard]);
 
-    fetchDashboard();
-  }, [id, router]);
+  // Poll for generation status updates
+  useEffect(() => {
+    if (!dashboard) return;
+
+    const status = dashboard.generation_status as GenerationStatus;
+    const isGenerating = status === 'pending' || status === 'analyzing' || status === 'generating';
+
+    if (!isGenerating) return;
+
+    const interval = setInterval(async () => {
+      const data = await fetchDashboard();
+      if (data) {
+        const newStatus = data.dashboard.generation_status as GenerationStatus;
+        setDashboard(data.dashboard);
+
+        if (newStatus === 'completed') {
+          toast.success('Your dashboard is ready!');
+          clearInterval(interval);
+        } else if (newStatus === 'failed') {
+          toast.error('Generation failed. Please try again.');
+          clearInterval(interval);
+        }
+      }
+    }, POLL_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [dashboard?.generation_status, fetchDashboard]);
 
   const handleTitleSave = async () => {
     if (!dashboard || !editedTitle.trim()) return;
@@ -95,7 +132,7 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
 
   const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim() || isChatLoading || !dashboard) return;
+    if (!chatInput.trim() || isChatLoading || !dashboard?.config) return;
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -164,8 +201,33 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
 
       const data = await response.json();
       setDashboard(data.dashboard);
+      toast.success(data.dashboard.is_published ? 'Dashboard published!' : 'Dashboard unpublished');
     } catch (err) {
       console.error('Failed to update publish status:', err);
+      toast.error('Failed to update publish status');
+    }
+  };
+
+  const handleRetryGeneration = async () => {
+    try {
+      const response = await fetch(`/api/dashboards/${id}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to retry generation');
+      }
+
+      // Refetch to get updated status
+      const data = await fetchDashboard();
+      if (data) {
+        setDashboard(data.dashboard);
+      }
+      toast.info('Retrying generation...');
+    } catch (err) {
+      console.error('Failed to retry generation:', err);
+      toast.error('Failed to retry generation');
     }
   };
 
@@ -190,13 +252,13 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
     );
   }
 
-  const config = dashboard.config as DashboardConfig;
-  const data = (dashboard.data as Record<string, unknown>[]) || [];
-  const charts = config.charts || [];
+  const generationStatus = dashboard.generation_status as GenerationStatus;
+  const isGenerating = generationStatus === 'pending' || generationStatus === 'analyzing' || generationStatus === 'generating';
+  const hasFailed = generationStatus === 'failed';
+  const isComplete = generationStatus === 'completed' && dashboard.config;
 
-  // Separate number cards from other charts for layout
-  const numberCards = charts.filter((c: ChartConfig) => c.type === 'number_card');
-  const otherCharts = charts.filter((c: ChartConfig) => c.type !== 'number_card');
+  const config = dashboard.config as DashboardConfig | null;
+  const data = (dashboard.data as Record<string, unknown>[]) || [];
 
   return (
     <div className="min-h-screen flex" style={brandingStyles}>
@@ -266,6 +328,15 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
                   {dashboard.title}
                 </h1>
               )}
+
+              {/* Generation Status Badge */}
+              {isGenerating && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                  {generationStatus === 'analyzing' ? 'Analyzing...' :
+                   generationStatus === 'generating' ? 'Generating...' : 'Pending...'}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
@@ -281,6 +352,7 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
                     onClick={() => {
                       const url = `${window.location.origin}/d/${dashboard.slug}`;
                       navigator.clipboard.writeText(url);
+                      toast.success('Link copied to clipboard!');
                     }}
                     className="text-sm text-[var(--color-primary)] hover:underline flex items-center gap-1"
                     title="Click to copy public link"
@@ -299,6 +371,7 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
               <Button
                 variant={dashboard.is_published ? 'outline' : 'default'}
                 onClick={handlePublish}
+                disabled={!isComplete}
               >
                 {dashboard.is_published ? 'Unpublish' : 'Publish'}
               </Button>
@@ -314,31 +387,68 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
 
         {/* Dashboard Content */}
         <div className="p-6">
-          {charts.length === 0 ? (
+          {/* Generating State */}
+          {isGenerating && (
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+              <div className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin mb-6" />
+              <h2 className="text-xl font-semibold text-[var(--color-gray-900)] mb-2">
+                {generationStatus === 'analyzing' ? 'Analyzing your content...' :
+                 generationStatus === 'generating' ? 'Designing your dashboard...' :
+                 'Starting generation...'}
+              </h2>
+              <p className="text-[var(--color-gray-600)] max-w-md">
+                {generationStatus === 'analyzing'
+                  ? 'Our AI is analyzing your data to understand its structure and patterns.'
+                  : generationStatus === 'generating'
+                  ? 'Creating a beautiful, insightful page based on your content.'
+                  : 'Your dashboard generation will begin shortly.'}
+              </p>
+              {dashboard.notify_email && (
+                <p className="text-sm text-[var(--color-gray-500)] mt-4">
+                  We&apos;ll email you when it&apos;s ready. Feel free to close this page.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Failed State */}
+          {hasFailed && (
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-[var(--color-gray-900)] mb-2">
+                Generation Failed
+              </h2>
+              <p className="text-[var(--color-gray-600)] max-w-md mb-4">
+                {dashboard.generation_error || 'Something went wrong while generating your dashboard.'}
+              </p>
+              <Button onClick={handleRetryGeneration}>
+                Try Again
+              </Button>
+            </div>
+          )}
+
+          {/* Completed State - Render the page */}
+          {isComplete && config && (
+            <PageRenderer
+              html={config.html}
+              charts={config.charts}
+              data={data}
+            />
+          )}
+
+          {/* No config yet and not generating/failed */}
+          {!isComplete && !isGenerating && !hasFailed && (
             <div className="text-center py-16">
               <p className="text-[var(--color-gray-500)] mb-4">
-                No charts yet. Use the chat to describe the visualizations you want.
+                No content generated yet.
               </p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Number Cards Row */}
-              {numberCards.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {numberCards.map((chart: ChartConfig) => (
-                    <ChartRenderer key={chart.id} config={chart} data={data} />
-                  ))}
-                </div>
-              )}
-
-              {/* Other Charts Grid */}
-              {otherCharts.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {otherCharts.map((chart: ChartConfig) => (
-                    <ChartRenderer key={chart.id} config={chart} data={data} />
-                  ))}
-                </div>
-              )}
+              <Button onClick={handleRetryGeneration}>
+                Generate Dashboard
+              </Button>
             </div>
           )}
         </div>
@@ -362,9 +472,9 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
                 <p className="mb-2">Ask me to modify your dashboard</p>
                 <p className="text-xs">Examples:</p>
                 <ul className="text-xs mt-2 space-y-1">
-                  <li>&quot;Add a line chart showing revenue over time&quot;</li>
-                  <li>&quot;Change the bar chart to horizontal&quot;</li>
-                  <li>&quot;Remove the pie chart&quot;</li>
+                  <li>&quot;Make the header more prominent&quot;</li>
+                  <li>&quot;Add a chart showing trends over time&quot;</li>
+                  <li>&quot;Change the color scheme to blue&quot;</li>
                 </ul>
               </div>
             )}
@@ -391,8 +501,8 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
                 <div className="bg-[var(--color-gray-100)] rounded-lg px-3 py-2">
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-[var(--color-gray-400)] rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-[var(--color-gray-400)] rounded-full animate-bounce delay-100" />
-                    <div className="w-2 h-2 bg-[var(--color-gray-400)] rounded-full animate-bounce delay-200" />
+                    <div className="w-2 h-2 bg-[var(--color-gray-400)] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                    <div className="w-2 h-2 bg-[var(--color-gray-400)] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                   </div>
                 </div>
               </div>
@@ -406,9 +516,9 @@ export default function DashboardViewerPage({ params }: { params: Promise<{ id: 
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder="Describe a change..."
-                disabled={isChatLoading}
+                disabled={isChatLoading || !isComplete}
               />
-              <Button type="submit" disabled={isChatLoading || !chatInput.trim()}>
+              <Button type="submit" disabled={isChatLoading || !chatInput.trim() || !isComplete}>
                 Send
               </Button>
             </div>
