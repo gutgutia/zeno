@@ -5,6 +5,33 @@ import type { ParsedData, DataSchema, ColumnInfo } from '@/types/dashboard';
 export interface ParseOptions {
   hasHeader?: boolean;
   delimiter?: string;
+  selectedSheets?: string[]; // For Excel: which sheets to include
+}
+
+export interface ExcelSheetInfo {
+  name: string;
+  rowCount: number;
+  columnCount: number;
+}
+
+// Get list of sheets from Excel file
+export function getExcelSheets(buffer: ArrayBuffer): ExcelSheetInfo[] {
+  try {
+    const workbook = XLSX.read(buffer, { type: 'array' });
+
+    return workbook.SheetNames.map((name) => {
+      const worksheet = workbook.Sheets[name];
+      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+
+      return {
+        name,
+        rowCount: range.e.r - range.s.r + 1,
+        columnCount: range.e.c - range.s.c + 1,
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 // Parse CSV text
@@ -34,24 +61,63 @@ export function parseCSV(text: string, options: ParseOptions = {}): ParsedData {
   };
 }
 
-// Parse Excel file
-export function parseExcel(buffer: ArrayBuffer): ParsedData {
+// Parse Excel file (supports multiple sheets)
+export function parseExcel(
+  buffer: ArrayBuffer,
+  selectedSheets?: string[]
+): ParsedData {
   try {
     const workbook = XLSX.read(buffer, { type: 'array' });
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
 
-    // Convert to JSON with headers
-    const rows = XLSX.utils.sheet_to_json(worksheet, {
-      defval: null,
-      raw: false,
-    }) as Record<string, unknown>[];
+    // Determine which sheets to parse
+    const sheetsToProcess = selectedSheets && selectedSheets.length > 0
+      ? selectedSheets.filter((name) => workbook.SheetNames.includes(name))
+      : [workbook.SheetNames[0]]; // Default to first sheet
 
-    // Get column names from the first row
-    const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+    if (sheetsToProcess.length === 0) {
+      return {
+        rows: [],
+        columns: [],
+        errors: [{
+          type: 'parse',
+          code: 'NO_SHEETS',
+          message: 'No valid sheets found to parse',
+        }],
+      };
+    }
+
+    let allRows: Record<string, unknown>[] = [];
+    let columns: string[] = [];
+
+    for (const sheetName of sheetsToProcess) {
+      const worksheet = workbook.Sheets[sheetName];
+
+      // Convert to JSON with headers
+      const sheetRows = XLSX.utils.sheet_to_json(worksheet, {
+        defval: null,
+        raw: false,
+      }) as Record<string, unknown>[];
+
+      if (sheetRows.length === 0) continue;
+
+      if (columns.length === 0) {
+        // First sheet with data - use its columns as the base
+        columns = Object.keys(sheetRows[0]);
+        allRows = sheetRows;
+      } else {
+        // Subsequent sheets - merge rows, aligning to existing columns
+        // Add any new columns from this sheet
+        const sheetColumns = Object.keys(sheetRows[0]);
+        const newColumns = sheetColumns.filter((col) => !columns.includes(col));
+        columns = [...columns, ...newColumns];
+
+        // Add rows from this sheet
+        allRows = [...allRows, ...sheetRows];
+      }
+    }
 
     return {
-      rows,
+      rows: allRows,
       columns,
       errors: [],
     };
@@ -192,16 +258,30 @@ export async function parseData(
       parsedData = parseCSV(text, options);
     } else if (extension === 'xlsx' || extension === 'xls') {
       const buffer = await input.arrayBuffer();
-      parsedData = parseExcel(buffer);
+      parsedData = parseExcel(buffer, options.selectedSheets);
     } else {
       throw new Error(`Unsupported file type: ${extension}`);
     }
   } else {
     // ArrayBuffer - assume Excel
-    parsedData = parseExcel(input);
+    parsedData = parseExcel(input, options.selectedSheets);
   }
 
   const schema = generateSchema(parsedData);
 
   return { data: parsedData, schema };
+}
+
+// Get available sheets from Excel file without fully parsing
+export async function getFileSheets(
+  file: File
+): Promise<ExcelSheetInfo[] | null> {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+
+  if (extension !== 'xlsx' && extension !== 'xls') {
+    return null; // Not an Excel file
+  }
+
+  const buffer = await file.arrayBuffer();
+  return getExcelSheets(buffer);
 }

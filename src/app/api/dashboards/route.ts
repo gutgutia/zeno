@@ -56,7 +56,18 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { title, rawContent, data, dataSource, userInstructions, notifyEmail } = body;
+    const {
+      title,
+      rawContent,
+      data,
+      dataSource,
+      userInstructions,
+      notifyEmail,
+      // Google Sheets specific fields
+      googleSheetId,
+      googleSheetName,
+      syncEnabled,
+    } = body;
 
     if (!title) {
       return NextResponse.json(
@@ -114,6 +125,22 @@ export async function POST(request: Request) {
       .slice(0, 50);
     const slug = `${baseSlug}-${nanoid(6)}`;
 
+    // Get Google connection ID if this is a Google Sheets dashboard
+    let googleConnectionId = null;
+    if (googleSheetId && dataSource?.type === 'google_sheets') {
+      const { data: connection } = await supabase
+        .from('google_connections')
+        .select('id')
+        .eq('workspace_id', workspace.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (connection) {
+        googleConnectionId = connection.id;
+      }
+    }
+
     // Create the dashboard with pending generation status
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: dashboard, error } = await (supabase as any)
@@ -138,6 +165,12 @@ export async function POST(request: Request) {
         user_instructions: userInstructions || null,
         notify_email: notifyEmail || false,
         created_by: user.id,
+        // Google Sheets fields
+        google_connection_id: googleConnectionId,
+        google_sheet_id: googleSheetId || null,
+        google_sheet_name: googleSheetName || null,
+        sync_enabled: syncEnabled || false,
+        last_synced_at: googleSheetId ? new Date().toISOString() : null,
       })
       .select()
       .single();

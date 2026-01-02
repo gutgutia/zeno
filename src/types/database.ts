@@ -50,7 +50,26 @@ export interface DataSource {
   fileName?: string;
   fileSize?: number;
   fileType?: string;
-  // Future: sheetId, tableId, syncConfig, etc.
+  // For multi-sheet files (Excel, Google Sheets)
+  selectedSheets?: string[];  // Sheet/tab names selected by user
+  availableSheets?: string[]; // All available sheets in the file
+  // Google Sheets specific
+  spreadsheetId?: string;
+  spreadsheetName?: string;
+}
+
+// Google OAuth connection
+export interface GoogleConnection {
+  id: string;
+  user_id: string;
+  workspace_id: string;
+  google_email: string;
+  google_user_id: string | null;
+  access_token: string;
+  refresh_token: string;
+  token_expires_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Dashboard {
@@ -79,6 +98,14 @@ export interface Dashboard {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Google Sheets integration
+  google_connection_id: string | null;
+  google_sheet_id: string | null;
+  google_sheet_name: string | null;
+  google_sheet_range: string | null;
+  last_synced_at: string | null;
+  sync_enabled: boolean;
+  content_hash: string | null;
 }
 
 export interface ChatMessage {

@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-google-sheets",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}
