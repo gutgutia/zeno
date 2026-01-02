@@ -1,13 +1,80 @@
 import type { ChartConfig } from './chart';
 
+// Content type detection
+export type ContentType = 'data' | 'text' | 'mixed';
+
+// Generation status for async processing
+export type GenerationStatus = 'pending' | 'analyzing' | 'generating' | 'completed' | 'failed';
+
+// New dashboard config structure
 export interface DashboardConfig {
-  title?: string;
-  description?: string;
-  charts: ChartConfig[];
-  layout?: LayoutConfig;
-  theme?: ThemeConfig;
+  contentType: ContentType;
+  html: string;
+  charts: Record<string, ChartConfig>;
+  analysis?: AnalysisResult;
+  metadata: {
+    generatedAt: string;
+    analysisModel: string;
+    generationModel: string;
+    userInstructions?: string;
+  };
 }
 
+// Analysis result from Haiku step
+export interface AnalysisResult {
+  contentType: ContentType;
+
+  // For data content
+  cleanedData?: Record<string, unknown>[];
+  schema?: AnalyzedSchema;
+
+  // For text content
+  structure?: TextStructure;
+
+  // Common
+  insights: string[];
+  suggestedVisualizations: string[];
+  summary: string;
+}
+
+export interface AnalyzedSchema {
+  columns: ColumnAnalysis[];
+  rowCount: number;
+  relationships: string[];
+}
+
+export interface ColumnAnalysis {
+  name: string;
+  type: 'string' | 'number' | 'date' | 'boolean';
+  role: 'dimension' | 'measure' | 'identifier' | 'temporal';
+  distribution: Record<string, number>;
+  stats?: {
+    min: number;
+    max: number;
+    avg: number;
+    sum: number;
+  };
+  nullCount: number;
+  uniqueCount: number;
+  sampleValues: unknown[];
+}
+
+export interface TextStructure {
+  title?: string;
+  sections: string[];
+  keyPoints: string[];
+  entities: string[];
+}
+
+// Generation request payload
+export interface GenerationRequest {
+  rawContent: string;
+  contentType?: ContentType;
+  userInstructions?: string;
+  notifyEmail?: boolean;
+}
+
+// Layout config (keeping for reference, may be used later)
 export interface LayoutConfig {
   columns?: number;
   gap?: number;
@@ -50,4 +117,15 @@ export interface ColumnInfo {
     avg?: number;
   };
   sampleValues: unknown[];
+}
+
+// Token estimation
+export function estimateTokens(content: string): number {
+  return Math.ceil(content.length / 4);
+}
+
+export const MAX_TOKENS = 200000;
+
+export function isContentTooLarge(content: string): boolean {
+  return estimateTokens(content) > MAX_TOKENS;
 }

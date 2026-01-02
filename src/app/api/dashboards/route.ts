@@ -45,7 +45,7 @@ export async function GET() {
   }
 }
 
-// POST /api/dashboards - Create a new dashboard
+// POST /api/dashboards - Create a new dashboard and trigger async generation
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -56,11 +56,18 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { title, data, dataSource, config } = body;
+    const { title, rawContent, data, dataSource, userInstructions, notifyEmail } = body;
 
-    if (!title || !data || !dataSource) {
+    if (!title) {
       return NextResponse.json(
-        { error: 'Missing required fields: title, data, dataSource' },
+        { error: 'Missing required field: title' },
+        { status: 400 }
+      );
+    }
+
+    if (!rawContent && !data) {
+      return NextResponse.json(
+        { error: 'Missing required field: rawContent or data' },
         { status: 400 }
       );
     }
@@ -107,7 +114,7 @@ export async function POST(request: Request) {
       .slice(0, 50);
     const slug = `${baseSlug}-${nanoid(6)}`;
 
-    // Create the dashboard
+    // Create the dashboard with pending generation status
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: dashboard, error } = await (supabase as any)
       .from('dashboards')
@@ -116,12 +123,20 @@ export async function POST(request: Request) {
         title,
         slug,
         description: null,
-        data_source: dataSource,
-        data,
+        data_source: dataSource || { type: 'paste' },
+        data: data || null,
         data_url: null,
-        config: config || { charts: [] },
+        config: null, // Will be populated by generation
         is_published: false,
         published_at: null,
+        // New fields for async generation
+        generation_status: 'pending',
+        generation_error: null,
+        generation_started_at: null,
+        generation_completed_at: null,
+        raw_content: rawContent || null,
+        user_instructions: userInstructions || null,
+        notify_email: notifyEmail || false,
         created_by: user.id,
       })
       .select()
@@ -131,6 +146,21 @@ export async function POST(request: Request) {
       console.error('Error creating dashboard:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // Trigger async generation in the background
+    // We use fetch to call our own API endpoint without waiting for it
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    fetch(`${baseUrl}/api/dashboards/${dashboard.id}/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Pass the auth cookie for authentication
+        'Cookie': request.headers.get('cookie') || '',
+      },
+      body: JSON.stringify({ async: true }),
+    }).catch(err => {
+      console.error('Failed to trigger async generation:', err);
+    });
 
     return NextResponse.json({ dashboard: dashboard as Dashboard }, { status: 201 });
   } catch (error) {
