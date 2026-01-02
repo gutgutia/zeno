@@ -19,6 +19,7 @@ export interface DashboardConfig {
     userInstructions?: string;
     agentGenerated?: boolean;
     turnCount?: number;
+    extendedThinking?: boolean;
   };
 }
 

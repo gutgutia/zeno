@@ -5,6 +5,22 @@ import { getAgentSystemPrompt, getAgentUserPrompt } from './agent-prompts';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig } from '@/types/database';
 
+// ============================================================================
+// EXPERIMENTATION TOGGLES
+// ============================================================================
+export const AGENT_CONFIG = {
+  // Enable extended thinking for deeper reasoning
+  // This allows the agent to "think" before and between actions
+  extendedThinking: true,
+
+  // Budget for thinking tokens (higher = more reasoning time)
+  thinkingBudgetTokens: 10000,
+
+  // Max turns before stopping
+  maxTurns: 15,
+};
+// ============================================================================
+
 // Store sandbox reference for tool execution
 let activeSandbox: Sandbox | null = null;
 
@@ -124,21 +140,34 @@ export async function generateWithAgent(
     const userPrompt = getAgentUserPrompt(userInstructions);
 
     console.log('[Agent] Starting agent loop...');
+    console.log(`[Agent] Extended thinking: ${AGENT_CONFIG.extendedThinking ? 'ENABLED' : 'DISABLED'}`);
     let finalResult: { html: string; summary: string } | null = null;
     let turnCount = 0;
+
+    // Build query options
+    const queryOptions: Parameters<typeof query>[0]['options'] = {
+      model: 'claude-opus-4-5-20251101',
+      systemPrompt,
+      maxTurns: AGENT_CONFIG.maxTurns,
+      mcpServers: {
+        python: pythonToolServer,
+      },
+      allowedTools: ['mcp__python__execute_python'],
+    };
+
+    // Add extended thinking if enabled
+    if (AGENT_CONFIG.extendedThinking) {
+      // @ts-expect-error - thinking option may not be in SDK types yet
+      queryOptions.thinking = {
+        type: 'enabled',
+        budget_tokens: AGENT_CONFIG.thinkingBudgetTokens,
+      };
+    }
 
     // Run the agent loop
     for await (const message of query({
       prompt: userPrompt,
-      options: {
-        model: 'claude-opus-4-5-20251101',
-        systemPrompt,
-        maxTurns: 15,
-        mcpServers: {
-          python: pythonToolServer,
-        },
-        allowedTools: ['mcp__python__execute_python'],
-      },
+      options: queryOptions,
     })) {
       if (message.type === 'assistant') {
         turnCount++;
@@ -177,6 +206,7 @@ export async function generateWithAgent(
         userInstructions,
         agentGenerated: true,
         turnCount,
+        extendedThinking: AGENT_CONFIG.extendedThinking,
       },
       analysis: {
         contentType: 'data',
