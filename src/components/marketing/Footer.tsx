@@ -44,7 +44,7 @@ export function Footer() {
                 />
               </Link>
               <p className="text-sm text-[var(--color-gray-600)]">
-                Beautiful dashboards in seconds. Powered by AI.
+                Beautiful dashboards in seconds.
               </p>
             </div>
 

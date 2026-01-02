@@ -68,9 +68,9 @@ const examples = [
       title: 'Acme Corp Proposal',
       isDocument: true,
       sections: [
-        { icon: '📋', label: 'Scope', value: '3 phases' },
-        { icon: '💰', label: 'Investment', value: '$45,000' },
-        { icon: '📅', label: 'Timeline', value: '8 weeks' },
+        { label: 'Scope', value: '3 phases' },
+        { label: 'Investment', value: '$45,000' },
+        { label: 'Timeline', value: '8 weeks' },
       ],
     },
   },
@@ -176,20 +176,11 @@ export function BeforeAfter() {
                     <div className="flex-1">
                       <div className="space-y-3">
                         {example.after.sections?.map((section) => (
-                          <div key={section.label} className="flex items-center gap-3 bg-[var(--color-gray-50)] rounded-lg p-3">
-                            <span className="text-2xl">{section.icon}</span>
-                            <div>
-                              <p className="text-xs text-[var(--color-gray-500)]">{section.label}</p>
-                              <p className="font-semibold text-[var(--color-gray-900)]">{section.value}</p>
-                            </div>
+                          <div key={section.label} className="flex items-center justify-between bg-[var(--color-gray-50)] rounded-lg p-4">
+                            <span className="text-sm text-[var(--color-gray-500)]">{section.label}</span>
+                            <span className="font-semibold text-[var(--color-gray-900)]">{section.value}</span>
                           </div>
                         ))}
-                      </div>
-                      <div className="mt-4 pt-3 border-t border-[var(--color-gray-100)]">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-[var(--color-gray-500)]">Ready to send</span>
-                          <span className="text-[var(--color-primary)] font-medium">Share →</span>
-                        </div>
                       </div>
                     </div>
                   ) : (

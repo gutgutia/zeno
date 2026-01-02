@@ -79,29 +79,27 @@ export function HowItWorks() {
         </div>
 
         {/* Steps */}
-        <div className="relative">
-          {/* Connector lines - positioned absolutely across all steps */}
-          <div className="hidden md:block absolute top-[2rem] left-[16.67%] right-[16.67%] h-px bg-[var(--color-gray-300)]" />
+        <div className="grid md:grid-cols-3 gap-8 md:gap-12">
+          {steps.map((step, index) => (
+            <div key={step.number} className="relative">
+              {/* Connector line to next step */}
+              {index < steps.length - 1 && (
+                <div className="hidden md:block absolute top-6 left-[calc(100%+1rem)] w-[calc(100%-2rem)] h-px bg-gray-300" style={{ width: 'calc(3rem + 1px)' }} />
+              )}
 
-          <div className="grid md:grid-cols-3 gap-8 md:gap-12">
-            {steps.map((step) => (
-              <div key={step.number} className="relative">
-                {/* Step content */}
-                <div className="relative z-10">
-                  <div className="text-5xl font-bold text-[var(--color-gray-200)] mb-4">
-                    {step.number}
-                  </div>
-                  <h3 className="text-xl font-semibold text-[var(--color-gray-900)] mb-2">
-                    {step.title}
-                  </h3>
-                  <p className="text-[var(--color-gray-600)] mb-6">
-                    {step.description}
-                  </p>
-                  {step.visual}
-                </div>
+              {/* Step content */}
+              <div className="text-5xl font-bold text-gray-200 mb-4">
+                {step.number}
               </div>
-            ))}
-          </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                {step.title}
+              </h3>
+              <p className="text-gray-600 mb-6">
+                {step.description}
+              </p>
+              {step.visual}
+            </div>
+          ))}
         </div>
       </Container>
     </section>
