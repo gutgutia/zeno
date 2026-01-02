@@ -30,11 +30,11 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
 
-  // Chat state
+  // Chat state - closed by default
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Compute CSS variables for branding
   const brandingStyles = useMemo(() => {
@@ -125,8 +125,10 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
       const data = await response.json();
       setDashboard(data.dashboard);
       setIsEditingTitle(false);
+      toast.success('Title updated');
     } catch (err) {
       console.error('Failed to save title:', err);
+      toast.error('Failed to update title');
     }
   };
 
@@ -171,6 +173,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
       // If the config was updated, refresh the dashboard
       if (data.config) {
         setDashboard((prev) => prev ? { ...prev, config: data.config } : null);
+        toast.success('Dashboard updated');
       }
     } catch (err) {
       const errorMessage: ChatMessage = {
@@ -208,6 +211,13 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     }
   };
 
+  const handleCopyLink = () => {
+    if (!dashboard) return;
+    const url = `${window.location.origin}/d/${dashboard.slug}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Link copied to clipboard!');
+  };
+
   const handleRetryGeneration = async () => {
     try {
       const response = await fetch(`/api/dashboards/${id}/generate`, {
@@ -233,7 +243,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-gray-50)]">
         <div className="w-8 h-8 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -241,7 +251,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
   if (error || !dashboard) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-gray-50)]">
         <div className="text-center">
           <p className="text-[var(--color-error)] mb-4">{error || 'Dashboard not found'}</p>
           <Link href="/dashboards">
@@ -261,16 +271,17 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
   const data = (dashboard.data as Record<string, unknown>[]) || [];
 
   return (
-    <div className="min-h-screen flex" style={brandingStyles}>
-      {/* Main Content */}
-      <div className={`flex-1 transition-all duration-300 ${isChatOpen ? 'mr-80' : ''}`}>
-        {/* Header */}
-        <div className="bg-white border-b border-[var(--color-gray-200)] px-6 py-4">
+    <div className="min-h-screen bg-[var(--color-gray-50)]" style={brandingStyles}>
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-white border-b border-[var(--color-gray-200)] shadow-sm">
+        <div className="px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            {/* Left side - Back button and title */}
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <Link
                 href="/dashboards"
-                className="text-[var(--color-gray-500)] hover:text-[var(--color-gray-700)]"
+                className="flex-shrink-0 p-1.5 rounded-lg text-[var(--color-gray-500)] hover:text-[var(--color-gray-700)] hover:bg-[var(--color-gray-100)] transition-colors"
+                title="Back to dashboards"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -279,12 +290,12 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
               {/* Company Logo */}
               {branding?.logoUrl && (
-                <div className="flex items-center">
+                <div className="flex-shrink-0 hidden sm:block">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={branding.logoUrl}
                     alt={branding.companyName || 'Company logo'}
-                    className="h-8 object-contain"
+                    className="h-7 object-contain"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
@@ -292,104 +303,120 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                 </div>
               )}
 
-              {isEditingTitle ? (
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={editedTitle}
-                    onChange={(e) => setEditedTitle(e.target.value)}
-                    className="text-lg font-semibold"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleTitleSave();
-                      if (e.key === 'Escape') {
+              {/* Title */}
+              <div className="min-w-0 flex-1">
+                {isEditingTitle ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={editedTitle}
+                      onChange={(e) => setEditedTitle(e.target.value)}
+                      className="text-base font-semibold max-w-xs"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleTitleSave();
+                        if (e.key === 'Escape') {
+                          setIsEditingTitle(false);
+                          setEditedTitle(dashboard.title);
+                        }
+                      }}
+                    />
+                    <Button size="sm" onClick={handleTitleSave}>Save</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
                         setIsEditingTitle(false);
                         setEditedTitle(dashboard.title);
-                      }
-                    }}
-                  />
-                  <Button size="sm" onClick={handleTitleSave}>Save</Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setIsEditingTitle(false);
-                      setEditedTitle(dashboard.title);
-                    }}
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsEditingTitle(true)}
+                    className="group flex items-center gap-1.5 text-left"
+                    title="Click to edit title"
                   >
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <h1
-                  className="text-lg font-semibold text-[var(--color-gray-900)] cursor-pointer hover:text-[var(--color-primary)]"
-                  onClick={() => setIsEditingTitle(true)}
-                  title="Click to edit"
-                >
-                  {dashboard.title}
-                </h1>
-              )}
+                    <h1 className="text-base font-semibold text-[var(--color-gray-900)] truncate">
+                      {dashboard.title}
+                    </h1>
+                    <svg
+                      className="w-3.5 h-3.5 text-[var(--color-gray-400)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </button>
+                )}
+              </div>
 
               {/* Generation Status Badge */}
               {isGenerating && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                <span className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
                   {generationStatus === 'analyzing' ? 'Analyzing...' :
                    generationStatus === 'generating' ? 'Generating...' : 'Pending...'}
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Right side - Actions */}
+            <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+              {/* Published Status */}
               {dashboard.is_published && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-[var(--color-success)] flex items-center gap-1">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                    </svg>
-                    Published
-                  </span>
-                  <button
-                    onClick={() => {
-                      const url = `${window.location.origin}/d/${dashboard.slug}`;
-                      navigator.clipboard.writeText(url);
-                      toast.success('Link copied to clipboard!');
-                    }}
-                    className="text-sm text-[var(--color-primary)] hover:underline flex items-center gap-1"
-                    title="Click to copy public link"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    Copy Link
-                  </button>
+                <div className="hidden sm:flex items-center gap-1.5 text-[var(--color-success)]">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                  </svg>
+                  <span className="text-sm font-medium">Published</span>
                 </div>
               )}
+
+              {/* Copy Link Button */}
+              {dashboard.is_published && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopyLink}
+                  className="hidden sm:flex items-center gap-1.5"
+                  title="Copy public link"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <span className="hidden md:inline">Copy Link</span>
+                </Button>
+              )}
+
+              {/* Share Button */}
               <ShareDialog
                 dashboardId={id}
                 isPublished={dashboard.is_published}
               />
+
+              {/* Publish/Unpublish Button */}
               <Button
                 variant={dashboard.is_published ? 'outline' : 'default'}
+                size="sm"
                 onClick={handlePublish}
                 disabled={!isComplete}
               >
                 {dashboard.is_published ? 'Unpublish' : 'Publish'}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setIsChatOpen(!isChatOpen)}
-              >
-                {isChatOpen ? 'Hide Chat' : 'Show Chat'}
-              </Button>
             </div>
           </div>
         </div>
+      </header>
 
-        {/* Dashboard Content */}
-        <div className="p-6">
+      {/* Main Content */}
+      <main className={`transition-all duration-300 ${isChatOpen ? 'mr-96' : ''}`}>
+        <div className="p-4 sm:p-6">
           {/* Generating State */}
           {isGenerating && (
-            <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center bg-white rounded-xl shadow-sm p-8">
               <div className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin mb-6" />
               <h2 className="text-xl font-semibold text-[var(--color-gray-900)] mb-2">
                 {generationStatus === 'analyzing' ? 'Analyzing your content...' :
@@ -400,7 +427,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                 {generationStatus === 'analyzing'
                   ? 'Our AI is analyzing your data to understand its structure and patterns.'
                   : generationStatus === 'generating'
-                  ? 'Creating a beautiful, insightful page based on your content.'
+                  ? 'Creating a beautiful, insightful dashboard based on your content.'
                   : 'Your dashboard generation will begin shortly.'}
               </p>
               {dashboard.notify_email && (
@@ -413,7 +440,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
           {/* Failed State */}
           {hasFailed && (
-            <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center bg-white rounded-xl shadow-sm p-8">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
                 <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -431,18 +458,20 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
             </div>
           )}
 
-          {/* Completed State - Render the page */}
+          {/* Completed State - Render the dashboard */}
           {isComplete && config && (
-            <PageRenderer
-              html={config.html}
-              charts={config.charts}
-              data={data}
-            />
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <PageRenderer
+                html={config.html}
+                charts={config.charts}
+                data={data}
+              />
+            </div>
           )}
 
           {/* No config yet and not generating/failed */}
           {!isComplete && !isGenerating && !hasFailed && (
-            <div className="text-center py-16">
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center bg-white rounded-xl shadow-sm p-8">
               <p className="text-[var(--color-gray-500)] mb-4">
                 No content generated yet.
               </p>
@@ -452,78 +481,137 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
             </div>
           )}
         </div>
-      </div>
+      </main>
 
-      {/* Chat Panel */}
-      {isChatOpen && (
-        <div className="fixed right-0 top-0 bottom-0 w-80 bg-white border-l border-[var(--color-gray-200)] flex flex-col">
-          {/* Chat Header */}
-          <div className="p-4 border-b border-[var(--color-gray-200)]">
-            <h2 className="font-semibold text-[var(--color-gray-900)]">Chat</h2>
+      {/* Floating Edit Button */}
+      {isComplete && !isChatOpen && (
+        <button
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-[var(--color-primary)] text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
+          title="Edit dashboard with AI"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          <span className="font-medium">Edit with AI</span>
+        </button>
+      )}
+
+      {/* Chat Panel - Slide in from right */}
+      <div
+        className={`fixed right-0 top-0 bottom-0 w-96 bg-white border-l border-[var(--color-gray-200)] shadow-xl flex flex-col z-50 transform transition-transform duration-300 ${
+          isChatOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        {/* Chat Header */}
+        <div className="flex items-center justify-between p-4 border-b border-[var(--color-gray-200)] bg-[var(--color-gray-50)]">
+          <div>
+            <h2 className="font-semibold text-[var(--color-gray-900)]">Edit Dashboard</h2>
             <p className="text-sm text-[var(--color-gray-500)]">
-              Describe changes to your dashboard
+              Describe changes you&apos;d like to make
             </p>
           </div>
-
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {chatMessages.length === 0 && (
-              <div className="text-center py-8 text-[var(--color-gray-500)] text-sm">
-                <p className="mb-2">Ask me to modify your dashboard</p>
-                <p className="text-xs">Examples:</p>
-                <ul className="text-xs mt-2 space-y-1">
-                  <li>&quot;Make the header more prominent&quot;</li>
-                  <li>&quot;Add a chart showing trends over time&quot;</li>
-                  <li>&quot;Change the color scheme to blue&quot;</li>
-                </ul>
-              </div>
-            )}
-
-            {chatMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                    msg.role === 'user'
-                      ? 'bg-[var(--color-primary)] text-white'
-                      : 'bg-[var(--color-gray-100)] text-[var(--color-gray-900)]'
-                  }`}
-                >
-                  {msg.content}
-                </div>
-              </div>
-            ))}
-
-            {isChatLoading && (
-              <div className="flex justify-start">
-                <div className="bg-[var(--color-gray-100)] rounded-lg px-3 py-2">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-[var(--color-gray-400)] rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-[var(--color-gray-400)] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                    <div className="w-2 h-2 bg-[var(--color-gray-400)] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Chat Input */}
-          <form onSubmit={handleChatSubmit} className="p-4 border-t border-[var(--color-gray-200)]">
-            <div className="flex gap-2">
-              <Input
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Describe a change..."
-                disabled={isChatLoading || !isComplete}
-              />
-              <Button type="submit" disabled={isChatLoading || !chatInput.trim() || !isComplete}>
-                Send
-              </Button>
-            </div>
-          </form>
+          <button
+            onClick={() => setIsChatOpen(false)}
+            className="p-1.5 rounded-lg text-[var(--color-gray-500)] hover:text-[var(--color-gray-700)] hover:bg-[var(--color-gray-200)] transition-colors"
+            title="Close chat"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
+
+        {/* Chat Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {chatMessages.length === 0 && (
+            <div className="text-center py-8">
+              <div className="w-12 h-12 bg-[var(--color-primary)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-[var(--color-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <p className="text-[var(--color-gray-700)] font-medium mb-2">How can I help?</p>
+              <p className="text-sm text-[var(--color-gray-500)] mb-4">
+                Tell me what you&apos;d like to change about your dashboard
+              </p>
+              <div className="space-y-2">
+                {[
+                  'Make the header more prominent',
+                  'Add a chart showing trends over time',
+                  'Change the color scheme to blue',
+                ].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => setChatInput(suggestion)}
+                    className="block w-full text-left px-3 py-2 text-sm text-[var(--color-gray-600)] bg-[var(--color-gray-50)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
+                  >
+                    &ldquo;{suggestion}&rdquo;
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {chatMessages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
+                  msg.role === 'user'
+                    ? 'bg-[var(--color-primary)] text-white'
+                    : 'bg-[var(--color-gray-100)] text-[var(--color-gray-900)]'
+                }`}
+              >
+                {msg.content}
+              </div>
+            </div>
+          ))}
+
+          {isChatLoading && (
+            <div className="flex justify-start">
+              <div className="bg-[var(--color-gray-100)] rounded-2xl px-4 py-3">
+                <div className="flex space-x-1.5">
+                  <div className="w-2 h-2 bg-[var(--color-gray-400)] rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-[var(--color-gray-400)] rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
+                  <div className="w-2 h-2 bg-[var(--color-gray-400)] rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Chat Input */}
+        <form onSubmit={handleChatSubmit} className="p-4 border-t border-[var(--color-gray-200)] bg-white">
+          <div className="flex gap-2">
+            <Input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Describe a change..."
+              disabled={isChatLoading || !isComplete}
+              className="flex-1"
+            />
+            <Button
+              type="submit"
+              disabled={isChatLoading || !chatInput.trim() || !isComplete}
+              className="flex-shrink-0"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </Button>
+          </div>
+        </form>
+      </div>
+
+      {/* Overlay when chat is open on mobile */}
+      {isChatOpen && (
+        <div
+          className="fixed inset-0 bg-black/20 z-40 lg:hidden"
+          onClick={() => setIsChatOpen(false)}
+        />
       )}
     </div>
   );
