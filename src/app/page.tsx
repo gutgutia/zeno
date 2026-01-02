@@ -1,6 +1,8 @@
 import {
   Navbar,
   Hero,
+  BeforeAfter,
+  WhoItsFor,
   Features,
   HowItWorks,
   Testimonials,
@@ -15,6 +17,8 @@ export default function Home() {
       <Navbar />
       <main>
         <Hero />
+        <BeforeAfter />
+        <WhoItsFor />
         <Features />
         <HowItWorks />
         <Testimonials />

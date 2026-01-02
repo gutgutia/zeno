@@ -10,13 +10,26 @@ Zeno is a platform for creating beautiful, shareable dashboards from data withou
 
 ## Documentation Index
 
+### Product
 | Document | Description |
 |----------|-------------|
-| [01-product-vision.md](./01-product-vision.md) | Product overview, target users, business model, roadmap |
-| [02-mvp-specification.md](./02-mvp-specification.md) | MVP scope, user flows, acceptance criteria, timeline |
-| [03-technical-architecture.md](./03-technical-architecture.md) | Tech stack, system architecture, project structure |
-| [04-database-schema.md](./04-database-schema.md) | Database tables, RLS policies, migrations |
-| [05-ai-integration.md](./05-ai-integration.md) | Claude integration, prompts, config schema |
+| [product-vision.md](./product/product-vision.md) | Product overview, target users, business model, roadmap |
+| [design-system.md](./product/design-system.md) | Colors, typography, components, visual guidelines |
+
+### Architecture
+| Document | Description |
+|----------|-------------|
+| [technical-architecture.md](./architecture/technical-architecture.md) | Tech stack, system architecture, project structure |
+| [database-schema.md](./architecture/database-schema.md) | Database tables, RLS policies, migrations |
+| [ai-integration.md](./architecture/ai-integration.md) | Claude integration, prompts, config schema |
+| [agentic-dashboard-generation.md](./architecture/agentic-dashboard-generation.md) | AI agent flow for dashboard generation |
+
+### Planning
+| Document | Description |
+|----------|-------------|
+| [mvp-specification.md](./planning/mvp-specification.md) | MVP scope, user flows, acceptance criteria |
+| [mvp-implementation-plan.md](./planning/mvp-implementation-plan.md) | Implementation timeline and milestones |
+| [website-redesign.md](./planning/website-redesign.md) | Marketing website redesign plan |
 
 ---
 

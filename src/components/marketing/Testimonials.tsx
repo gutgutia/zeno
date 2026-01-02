@@ -1,23 +1,53 @@
 import { Container } from '@/components/ui';
 
-const testimonials = [
+const reactions = [
   {
-    quote: "I used to spend hours in Excel making charts look presentable. Now I paste data into Zeno and have a beautiful dashboard in under a minute.",
-    author: "Sarah Chen",
-    role: "Marketing Director",
-    company: "TechFlow",
+    quote: "My boss asked how I made this so fast",
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
   },
   {
-    quote: "Our weekly investor updates went from a dreaded task to something I actually enjoy. The AI suggestions are surprisingly good.",
-    author: "Marcus Johnson",
-    role: "Founder",
-    company: "Stealth Startup",
+    quote: "Wait, I didn't have to learn anything?",
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      </svg>
+    ),
   },
   {
-    quote: "Finally, a tool that doesn't require a data science degree. I share dashboards with clients and they're always impressed.",
-    author: "Emily Rodriguez",
-    role: "Consultant",
-    company: "Independent",
+    quote: "My client thought I hired a designer",
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+      </svg>
+    ),
+  },
+  {
+    quote: "This is easier than Google Docs",
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    quote: "Finally, a tool that doesn't need training",
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    quote: "I look so much more professional now",
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    ),
   },
 ];
 
@@ -28,50 +58,26 @@ export function Testimonials() {
         {/* Section Header */}
         <div className="text-center mb-16">
           <p className="text-sm font-semibold text-[var(--color-primary)] uppercase tracking-wide mb-3">
-            Testimonials
+            The reaction
           </p>
           <h2 className="text-3xl md:text-4xl font-bold text-[var(--color-gray-900)] mb-4">
-            Loved by data storytellers
+            What you'll hear yourself saying
           </h2>
         </div>
 
-        {/* Testimonials Grid */}
-        <div className="grid md:grid-cols-3 gap-8">
-          {testimonials.map((testimonial) => (
+        {/* Reactions Grid */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {reactions.map((reaction) => (
             <div
-              key={testimonial.author}
-              className="bg-white rounded-xl p-8 border border-[var(--color-gray-100)] shadow-sm"
+              key={reaction.quote}
+              className="bg-white rounded-xl p-6 border border-[var(--color-gray-100)] shadow-sm flex items-center gap-4 hover:border-[var(--color-primary-light)] transition-colors"
             >
-              {/* Quote Icon */}
-              <svg
-                className="w-10 h-10 text-[var(--color-primary-light)] mb-4"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
-              </svg>
-
-              {/* Quote */}
-              <blockquote className="text-[var(--color-gray-700)] mb-6 leading-relaxed">
-                "{testimonial.quote}"
-              </blockquote>
-
-              {/* Author */}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-primary-light)] to-[var(--color-accent-light)] flex items-center justify-center">
-                  <span className="text-sm font-semibold text-[var(--color-primary)]">
-                    {testimonial.author.charAt(0)}
-                  </span>
-                </div>
-                <div>
-                  <p className="font-medium text-[var(--color-gray-900)]">
-                    {testimonial.author}
-                  </p>
-                  <p className="text-sm text-[var(--color-gray-500)]">
-                    {testimonial.role}, {testimonial.company}
-                  </p>
-                </div>
+              <div className="w-12 h-12 rounded-full bg-[var(--color-primary-light)] flex items-center justify-center text-[var(--color-primary)] flex-shrink-0">
+                {reaction.icon}
               </div>
+              <p className="text-[var(--color-gray-700)] font-medium">
+                "{reaction.quote}"
+              </p>
             </div>
           ))}
         </div>

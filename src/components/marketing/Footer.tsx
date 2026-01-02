@@ -120,7 +120,7 @@ export function Footer() {
               &copy; {new Date().getFullYear()} Zeno. All rights reserved.
             </p>
             <p className="text-sm text-[var(--color-gray-500)]">
-              Made with care for data storytellers everywhere.
+              Made with care for people who want to look good.
             </p>
           </div>
         </div>
