@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { parseData } from '@/lib/data/parser';
-import { detectContentTypeQuick } from '@/lib/ai/analyze';
+import { detectContentTypeQuick } from '@/lib/ai/content-detection';
 import { estimateTokens, isContentTooLarge, MAX_TOKENS } from '@/types/dashboard';
 import type { ParsedData, DataSchema, ContentType } from '@/types/dashboard';
 import type { DataSource } from '@/types/database';
