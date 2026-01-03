@@ -13,15 +13,16 @@
   --color-primary-hover: #0044CC;
   --color-primary-light: #E6F0FF;
   --color-primary-lighter: #F0F7FF;
-  
+
   /* Product-specific blue (for dashboard UI) */
   --color-product-primary: #2563EB;
   --color-product-primary-hover: #1D4ED8;
 
-  --color-accent: #0D9488;
-  --color-accent-hover: #0F766E;
-  --color-accent-light: #CCFBF1;
-  --color-accent-lighter: #F0FDFA;
+  /* Teal accent - for specific use cases (charts, badges) */
+  --color-teal: #0D9488;
+  --color-teal-hover: #0F766E;
+  --color-teal-light: #CCFBF1;
+  --color-teal-lighter: #F0FDFA;
 
   /* ==========================================================================
      Colors - Neutrals

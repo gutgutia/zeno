@@ -13,7 +13,7 @@ export default function LoginLayout({
         {/* Background decorative elements */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
           <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full bg-[var(--color-primary-light)] blur-[100px] opacity-60" />
-          <div className="absolute bottom-[10%] -right-[10%] w-[50%] h-[50%] rounded-full bg-[var(--color-accent-light)] blur-[80px] opacity-40" />
+          <div className="absolute bottom-[10%] -right-[10%] w-[50%] h-[50%] rounded-full bg-[var(--color-primary-light)] blur-[80px] opacity-40" />
         </div>
 
         {/* Content */}
