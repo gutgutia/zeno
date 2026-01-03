@@ -6,6 +6,7 @@ import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import { getChatSystemPrompt, getChatUserPrompt } from '@/lib/ai/prompts';
 import { sanitizeHTML } from '@/lib/rendering/sanitize';
+import { createVersion } from '@/lib/versions';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -17,6 +18,7 @@ const anthropic = new Anthropic({
 
 interface ChatResponse {
   message: string;
+  changeSummary?: string;
   html?: string;
   charts?: Record<string, unknown>;
 }
@@ -141,6 +143,24 @@ export async function POST(request: Request, { params }: RouteParams) {
           { error: 'Failed to save changes' },
           { status: 500 }
         );
+      }
+
+      // Create a minor version for this AI modification
+      try {
+        const changeSummary = aiResponse.changeSummary || 'Modified via AI';
+        await createVersion(supabase, {
+          dashboardId: id,
+          changeType: 'ai_modification',
+          changeSummary,
+          config: updatedConfig,
+          rawContent: dashboard.raw_content,
+          data: dashboard.data,
+          dataSource: dashboard.data_source,
+          userId: user.id,
+        });
+      } catch (versionError) {
+        // Log but don't fail the request - the changes were saved
+        console.error('Failed to create version:', versionError);
       }
 
       return NextResponse.json({

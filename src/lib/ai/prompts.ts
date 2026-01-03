@@ -449,9 +449,15 @@ BRANDING (maintain these):
 RESPONSE FORMAT:
 {
   "message": "Brief explanation of changes made",
-  "html": "Updated complete HTML",
-  "charts": { updated chart configurations }
+  "changeSummary": "Very brief (3-8 words) description for version history, e.g., 'Changed chart colors to blue' or 'Added summary section'",
+  "html": "Updated complete HTML (only if changed)",
+  "charts": { updated chart configurations (only if changed) }
 }
+
+Important:
+- Always include "message" and "changeSummary"
+- Only include "html" and "charts" if you made actual changes to them
+- The changeSummary should be a short label suitable for version history
 
 Always respond with valid JSON only.`;
 }

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { generateWithAgent } from '@/lib/ai/agent';
 import type { Dashboard, BrandingConfig } from '@/types/database';
+import { createVersion } from '@/lib/versions';
 
 // Allow long-running requests for agent loops
 export const maxDuration = 300; // 5 minutes
@@ -121,6 +122,23 @@ export async function POST(request: Request, { params }: RouteParams) {
 
       if (updateError) {
         throw new Error(`Failed to save dashboard: ${updateError.message}`);
+      }
+
+      // Create initial version (1.0)
+      try {
+        await createVersion(supabase, {
+          dashboardId: id,
+          changeType: 'initial',
+          changeSummary: 'Initial dashboard generation',
+          config,
+          rawContent: dashboard.raw_content,
+          data: dashboard.data,
+          dataSource: dashboard.data_source,
+          userId: user.id,
+        });
+      } catch (versionError) {
+        console.error(`[${id}] Failed to create initial version:`, versionError);
+        // Don't fail the generation if version creation fails
       }
 
       // Send email notification if requested

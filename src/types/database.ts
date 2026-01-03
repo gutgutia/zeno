@@ -106,6 +106,9 @@ export interface Dashboard {
   last_synced_at: string | null;
   sync_enabled: boolean;
   content_hash: string | null;
+  // Versioning
+  current_major_version: number;
+  current_minor_version: number;
 }
 
 export interface ChatMessage {
@@ -123,6 +126,32 @@ export interface DashboardShare {
   share_value: string; // email address or domain (e.g., 'acme.com')
   created_by: string | null;
   created_at: string;
+}
+
+// Version change types
+export type VersionChangeType = 'initial' | 'ai_modification' | 'data_refresh' | 'restore';
+
+// Dashboard version snapshot
+export interface DashboardVersion {
+  id: string;
+  dashboard_id: string;
+  major_version: number;
+  minor_version: number;
+  change_type: VersionChangeType;
+  change_summary: string | null;
+  // Snapshot data
+  config: DashboardConfig | null;
+  raw_content: string | null;
+  data: Record<string, unknown>[] | null;
+  data_source: DataSource | null;
+  // Metadata
+  created_at: string;
+  created_by: string | null;
+}
+
+// Helper to format version label
+export function formatVersionLabel(major: number, minor: number): string {
+  return `${major}.${minor}`;
 }
 
 // Supabase Database type (for client generation)
@@ -153,6 +182,11 @@ export interface Database {
         Row: GoogleConnection;
         Insert: Omit<GoogleConnection, 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Omit<GoogleConnection, 'id' | 'user_id' | 'workspace_id'>>;
+      };
+      dashboard_versions: {
+        Row: DashboardVersion;
+        Insert: Omit<DashboardVersion, 'id' | 'created_at'>;
+        Update: Partial<Omit<DashboardVersion, 'id' | 'dashboard_id'>>;
       };
     };
   };
