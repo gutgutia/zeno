@@ -40,6 +40,7 @@ export default function TeamPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreatingOrg, setIsCreatingOrg] = useState(false);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member');
@@ -63,12 +64,39 @@ export default function TeamPage() {
         const data = await response.json();
         // Get the user's owned organization (primary org)
         const ownedOrg = data.find((org: OrganizationWithRole) => org.role === 'owner');
-        setOrganization(ownedOrg || data[0] || null);
+        if (ownedOrg || data[0]) {
+          setOrganization(ownedOrg || data[0]);
+        } else {
+          // No org found - create one for this legacy user
+          await ensureOrganization();
+        }
       }
     } catch (error) {
       console.error('Failed to fetch organization:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const ensureOrganization = async () => {
+    setIsCreatingOrg(true);
+    try {
+      const response = await fetch('/api/organizations/ensure', {
+        method: 'POST',
+      });
+      if (response.ok) {
+        // Refetch organizations after creation
+        const orgsResponse = await fetch('/api/organizations');
+        if (orgsResponse.ok) {
+          const data = await orgsResponse.json();
+          const ownedOrg = data.find((org: OrganizationWithRole) => org.role === 'owner');
+          setOrganization(ownedOrg || data[0] || null);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to ensure organization:', error);
+    } finally {
+      setIsCreatingOrg(false);
     }
   };
 
@@ -196,18 +224,34 @@ export default function TeamPage() {
   const canManageMembers = organization?.role === 'owner' || organization?.role === 'admin';
   const isOwner = organization?.role === 'owner';
 
-  if (isLoading) {
+  if (isLoading || isCreatingOrg) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 w-48 bg-[var(--color-gray-200)] rounded" />
-          <div className="h-32 bg-[var(--color-gray-200)] rounded-xl" />
+        <div className="mb-8">
+          <div className="flex items-center gap-2 text-sm text-[var(--color-gray-500)] mb-2">
+            <Link href="/settings" className="hover:text-[var(--color-gray-700)]">
+              Settings
+            </Link>
+            <span>/</span>
+            <span>Team</span>
+          </div>
+          <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">Team</h1>
+        </div>
+        <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-8 text-center">
+          <div className="w-16 h-16 bg-[var(--color-gray-100)] rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <svg className="w-8 h-8 text-[var(--color-gray-400)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-2">
+            {isCreatingOrg ? 'Setting up your team...' : 'Loading...'}
+          </h2>
         </div>
       </div>
     );
   }
 
-  // If no organization exists (legacy user), show a message
+  // If no organization exists after trying to create, show error
   if (!organization) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -223,16 +267,16 @@ export default function TeamPage() {
         </div>
 
         <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-8 text-center">
-          <div className="w-16 h-16 bg-[var(--color-gray-100)] rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-[var(--color-gray-400)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-2">Setting up your team...</h2>
+          <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-2">Something went wrong</h2>
           <p className="text-[var(--color-gray-500)] mb-4">
-            Please refresh the page. If the issue persists, try signing out and back in.
+            We couldn't set up your team. Please try again or contact support.
           </p>
-          <Button onClick={() => window.location.reload()}>Refresh Page</Button>
+          <Button onClick={() => window.location.reload()}>Try Again</Button>
         </div>
       </div>
     );
