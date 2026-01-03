@@ -39,12 +39,12 @@ export async function POST(
       syncFromSheet?: boolean;
     };
 
-    // Get dashboard with workspace branding
+    // Get dashboard with workspace branding and owner info
     const { data: dashboardData, error: dashboardError } = await supabase
       .from('dashboards')
       .select(`
         *,
-        workspace:workspaces(*)
+        workspace:workspaces!inner(owner_id, branding)
       `)
       .eq('id', id)
       .single();
@@ -56,7 +56,15 @@ export async function POST(
       );
     }
 
-    const dashboard = dashboardData as Dashboard & { workspace: Workspace };
+    const dashboard = dashboardData as Dashboard & { workspace: Workspace & { owner_id: string } };
+
+    // SECURITY: Verify the current user owns this dashboard
+    if (dashboard.workspace.owner_id !== user.id) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      );
+    }
 
     // Verify dashboard has been generated (has config)
     if (!dashboard.config) {
