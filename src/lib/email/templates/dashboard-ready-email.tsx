@@ -6,6 +6,7 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Link,
   Preview,
   Section,
@@ -32,7 +33,13 @@ export function DashboardReadyEmail({
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
-            <Text style={logo}>Zeno</Text>
+            <Img
+              src={`${appUrl}/brand/logo-inverted.svg`}
+              width="100"
+              height="44"
+              alt="Zeno"
+              style={logo}
+            />
             <Text style={tagline}>Your dashboard is ready!</Text>
           </Section>
 
@@ -112,17 +119,14 @@ const container = {
 };
 
 const header = {
-  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+  background: 'linear-gradient(135deg, #0055FF 0%, #0044CC 100%)',
   padding: '40px',
   textAlign: 'center' as const,
 };
 
 const logo = {
-  fontSize: '28px',
-  fontWeight: '700',
-  color: '#ffffff',
-  letterSpacing: '-0.5px',
-  margin: '0 0 8px 0',
+  display: 'block',
+  margin: '0 auto 12px auto',
 };
 
 const tagline = {
@@ -141,7 +145,7 @@ const successIcon = {
   width: '64px',
   height: '64px',
   borderRadius: '50%',
-  backgroundColor: '#d1fae5',
+  backgroundColor: '#e0ecff',
   margin: '0 auto 24px auto',
   display: 'flex',
   alignItems: 'center',
@@ -150,7 +154,7 @@ const successIcon = {
 
 const checkmark = {
   fontSize: '32px',
-  color: '#059669',
+  color: '#0055FF',
   margin: 0,
   lineHeight: '64px',
   textAlign: 'center' as const,
@@ -195,7 +199,7 @@ const previewTitle = {
 
 const ctaButton = {
   display: 'inline-block',
-  background: 'linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%)',
+  background: 'linear-gradient(135deg, #0055FF 0%, #0044CC 100%)',
   color: '#ffffff',
   fontSize: '15px',
   fontWeight: '600',
@@ -246,7 +250,7 @@ const footerText = {
 };
 
 const footerLink = {
-  color: '#2563EB',
+  color: '#0055FF',
   textDecoration: 'none',
 };
 

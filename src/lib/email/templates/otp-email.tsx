@@ -4,6 +4,7 @@ import {
   Head,
   Heading,
   Html,
+  Img,
   Link,
   Preview,
   Section,
@@ -14,9 +15,14 @@ import * as React from 'react';
 interface OTPEmailProps {
   code: string;
   expiresInMinutes?: number;
+  appUrl?: string;
 }
 
-export function OTPEmail({ code, expiresInMinutes = 10 }: OTPEmailProps) {
+export function OTPEmail({
+  code,
+  expiresInMinutes = 10,
+  appUrl = 'https://zeno.fyi',
+}: OTPEmailProps) {
   return (
     <Html>
       <Head />
@@ -25,7 +31,13 @@ export function OTPEmail({ code, expiresInMinutes = 10 }: OTPEmailProps) {
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
-            <Text style={logo}>Zeno</Text>
+            <Img
+              src={`${appUrl}/brand/logo-inverted.svg`}
+              width="100"
+              height="44"
+              alt="Zeno"
+              style={logo}
+            />
           </Section>
 
           {/* Content */}
@@ -85,17 +97,14 @@ const container = {
 };
 
 const header = {
-  background: 'linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%)',
+  background: 'linear-gradient(135deg, #0055FF 0%, #0044CC 100%)',
   padding: '32px 40px',
   textAlign: 'center' as const,
 };
 
 const logo = {
-  fontSize: '28px',
-  fontWeight: '700',
-  color: '#ffffff',
-  letterSpacing: '-0.5px',
-  margin: 0,
+  display: 'block',
+  margin: '0 auto',
 };
 
 const content = {
@@ -136,7 +145,7 @@ const codeLabel = {
 const codeText = {
   fontSize: '36px',
   fontWeight: '700',
-  color: '#2563EB',
+  color: '#0055FF',
   letterSpacing: '8px',
   fontFamily: "'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace",
   margin: 0,
@@ -176,7 +185,7 @@ const footerText = {
 };
 
 const footerLink = {
-  color: '#2563EB',
+  color: '#0055FF',
   textDecoration: 'none',
 };
 
