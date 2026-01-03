@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
 import type { Dashboard, Workspace } from '@/types/database';
+import { generateDashboardMetadata } from '@/lib/ai/metadata';
 
 // GET /api/dashboards - List all dashboards for the current user
 export async function GET() {
@@ -69,12 +70,7 @@ export async function POST(request: Request) {
       syncEnabled,
     } = body;
 
-    if (!title) {
-      return NextResponse.json(
-        { error: 'Missing required field: title' },
-        { status: 400 }
-      );
-    }
+    // Title is now optional - we'll generate it if not provided
 
     if (!rawContent && !data) {
       return NextResponse.json(
@@ -117,14 +113,6 @@ export async function POST(request: Request) {
 
     const workspace = workspaceData as unknown as Workspace;
 
-    // Generate slug from title
-    const baseSlug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 50);
-    const slug = `${baseSlug}-${nanoid(6)}`;
-
     // Get Google connection ID if this is a Google Sheets dashboard
     let googleConnectionId = null;
     if (googleSheetId && dataSource?.type === 'google_sheets') {
@@ -142,15 +130,56 @@ export async function POST(request: Request) {
       }
     }
 
+    // Generate title and description if not provided
+    let finalTitle = title;
+    let finalDescription: string | null = null;
+
+    if (!title || title.trim() === '' || title === 'Untitled Dashboard') {
+      try {
+        console.log('[Dashboard] Generating metadata with Haiku...');
+
+        // Extract column names from parsed data if available
+        let columnNames: string[] | undefined;
+        if (data && Array.isArray(data) && data.length > 0) {
+          columnNames = Object.keys(data[0]);
+        }
+
+        const metadata = await generateDashboardMetadata({
+          rawContent: rawContent || JSON.stringify(data),
+          dataSource,
+          userInstructions,
+          columnNames,
+        });
+
+        finalTitle = metadata.title;
+        finalDescription = metadata.description;
+        console.log('[Dashboard] Generated title:', finalTitle);
+      } catch (error) {
+        console.error('[Dashboard] Failed to generate metadata:', error);
+        // Fall back to a default title
+        finalTitle = dataSource?.fileName
+          ? dataSource.fileName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
+          : 'Data Analysis';
+      }
+    }
+
+    // Generate slug from the final title
+    const baseSlug = (finalTitle || 'dashboard')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 50);
+    const slug = `${baseSlug}-${nanoid(6)}`;
+
     // Create the dashboard with pending generation status
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: dashboard, error } = await (supabase as any)
       .from('dashboards')
       .insert({
         workspace_id: workspace.id,
-        title,
+        title: finalTitle,
         slug,
-        description: null,
+        description: finalDescription,
         data_source: dataSource || { type: 'paste' },
         data: data || null,
         data_url: null,
