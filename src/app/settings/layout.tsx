@@ -34,6 +34,14 @@ export default function SettingsLayout({
                     Branding
                   </Link>
                 </li>
+                <li>
+                  <Link
+                    href="/settings/connections"
+                    className="block px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
+                  >
+                    Connections
+                  </Link>
+                </li>
               </ul>
             </div>
           </nav>
