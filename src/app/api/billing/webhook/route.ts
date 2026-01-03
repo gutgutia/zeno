@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 import { createClient } from '@supabase/supabase-js';
 import type Stripe from 'stripe';
 
-// Use service role client for webhook (no auth context)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy initialization to avoid build errors
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error('Supabase environment variables not configured');
+  }
+  return createClient(url, key);
+}
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -28,7 +32,7 @@ export async function POST(request: Request) {
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    event = getStripe().webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
     console.error('Webhook signature verification failed:', err);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
@@ -79,7 +83,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
     if (credits > 0 && userId) {
       // Add credits using RPC function
-      await supabase.rpc('add_credits', {
+      await getSupabaseAdmin().rpc('add_credits', {
         p_user_id: organizationId ? null : userId,
         p_org_id: organizationId || null,
         p_amount: credits,
@@ -88,7 +92,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       });
 
       // Record the purchase
-      await supabase.from('credit_purchases').insert({
+      await getSupabaseAdmin().from('credit_purchases').insert({
         organization_id: organizationId || null,
         user_id: userId,
         credits,
@@ -113,7 +117,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
 
   if (organizationId) {
     // Update organization subscription
-    await supabase
+    await getSupabaseAdmin()
       .from('organizations')
       .update({
         stripe_subscription_id: subscription.id,
@@ -131,7 +135,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
       const totalCredits = creditsPerSeat * seats;
 
       // Check if we need to refill (first activation or renewal)
-      const { data: orgCredits } = await supabase
+      const { data: orgCredits } = await getSupabaseAdmin()
         .from('organization_credits')
         .select('last_refill_at')
         .eq('organization_id', organizationId)
@@ -148,7 +152,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
         now.getTime() - lastRefill.getTime() > 25 * 24 * 60 * 60 * 1000;
 
       if (shouldRefill) {
-        await supabase.rpc('add_credits', {
+        await getSupabaseAdmin().rpc('add_credits', {
           p_user_id: null,
           p_org_id: organizationId,
           p_amount: totalCredits,
@@ -156,7 +160,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
           p_description: `Monthly refill: ${totalCredits} credits (${seats} seats × ${creditsPerSeat})`,
         });
 
-        await supabase
+        await getSupabaseAdmin()
           .from('organization_credits')
           .update({ last_refill_at: now.toISOString() })
           .eq('organization_id', organizationId);
@@ -166,7 +170,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     }
   } else if (userId) {
     // Individual subscription - update profile
-    await supabase
+    await getSupabaseAdmin()
       .from('profiles')
       .update({ plan_type: plan })
       .eq('id', userId);
@@ -180,7 +184,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
   if (organizationId) {
     // Downgrade org to starter (keep org but remove premium features)
-    await supabase
+    await getSupabaseAdmin()
       .from('organizations')
       .update({
         stripe_subscription_id: null,
@@ -191,7 +195,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     console.log(`Subscription cancelled for org ${organizationId}`);
   } else if (userId) {
     // Downgrade user to free
-    await supabase
+    await getSupabaseAdmin()
       .from('profiles')
       .update({ plan_type: 'free' })
       .eq('id', userId);
@@ -215,7 +219,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string;
 
   // Get customer to notify
-  const customer = await stripe.customers.retrieve(customerId);
+  const customer = await getStripe().customers.retrieve(customerId);
 
   if (customer && !customer.deleted) {
     // TODO: Send email notification about failed payment

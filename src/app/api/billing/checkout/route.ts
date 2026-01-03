@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import { stripe, PRICE_IDS, CREDIT_PACK_PRICES, CREDIT_PACK_AMOUNTS } from '@/lib/stripe';
+import { getStripe, PRICE_IDS, CREDIT_PACK_PRICES, CREDIT_PACK_AMOUNTS } from '@/lib/stripe';
 import type { PlanType, BillingCycle, CreditPackSize } from '@/lib/stripe';
 
 // POST /api/billing/checkout - Create a Stripe Checkout session
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
         customerId = org.stripe_customer_id;
       } else {
         // Create new customer for org
-        const customer = await stripe.customers.create({
+        const customer = await getStripe().customers.create({
           email: org?.billing_email || user.email,
           name: org?.name,
           metadata: {
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
         customerId = profile.stripe_customer_id;
       } else {
         // Create new customer
-        const customer = await stripe.customers.create({
+        const customer = await getStripe().customers.create({
           email: user.email,
           metadata: {
             user_id: user.id,
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Invalid plan or billing cycle' }, { status: 400 });
       }
 
-      const session = await stripe.checkout.sessions.create({
+      const session = await getStripe().checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
         payment_method_types: ['card'],
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Invalid pack size' }, { status: 400 });
       }
 
-      const session = await stripe.checkout.sessions.create({
+      const session = await getStripe().checkout.sessions.create({
         customer: customerId,
         mode: 'payment',
         payment_method_types: ['card'],
