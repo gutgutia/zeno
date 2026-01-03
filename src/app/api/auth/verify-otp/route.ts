@@ -36,6 +36,24 @@ async function ensureUserSetup(supabase: ReturnType<typeof createAdminClient>, u
       owner_id: userId,
     });
   }
+
+  // Check if user has an organization (as owner)
+  const { data: orgMembership } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', userId)
+    .eq('role', 'owner')
+    .limit(1)
+    .single();
+
+  if (!orgMembership) {
+    // Create personal organization using the database function
+    // This bypasses RLS via SECURITY DEFINER
+    await supabase.rpc('create_user_organization', {
+      p_user_id: userId,
+      p_name: 'Personal',
+    });
+  }
 }
 
 export async function POST(request: Request) {
