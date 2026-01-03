@@ -39,28 +39,21 @@ echo -e "${YELLOW}Resetting database...${NC}"
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Run the SQL script using Supabase CLI
-# Option 1: Using supabase db execute (if available)
-if command -v supabase &> /dev/null; then
-    echo "Using Supabase CLI..."
-    supabase db execute --file "$SCRIPT_DIR/reset-database.sql"
-else
-    # Option 2: Using psql directly
-    echo "Supabase CLI not found. Using psql..."
-
-    # Check for required environment variables
-    if [ -z "$DATABASE_URL" ]; then
-        echo -e "${RED}Error: DATABASE_URL environment variable is not set.${NC}"
-        echo ""
-        echo "Set it using:"
-        echo "  export DATABASE_URL='postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres'"
-        echo ""
-        echo "Or run the SQL directly in the Supabase Dashboard SQL Editor."
-        exit 1
-    fi
-
-    psql "$DATABASE_URL" -f "$SCRIPT_DIR/reset-database.sql"
+# Check for required environment variables
+if [ -z "$DATABASE_URL" ]; then
+    echo -e "${RED}Error: DATABASE_URL environment variable is not set.${NC}"
+    echo ""
+    echo "Set it using:"
+    echo "  export DATABASE_URL='postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres'"
+    echo ""
+    echo "You can find this in your Supabase Dashboard under Settings > Database > Connection string."
+    echo "Or run the SQL directly in the Supabase Dashboard SQL Editor."
+    exit 1
 fi
+
+# Run the SQL script using psql
+echo "Connecting to database..."
+psql "$DATABASE_URL" -f "$SCRIPT_DIR/reset-database.sql"
 
 echo ""
 echo -e "${GREEN}✓ Database reset complete!${NC}"
