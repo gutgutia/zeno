@@ -13,6 +13,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EMAIL_LOGO_URL, EMAIL_LOGO_WIDTH, EMAIL_LOGO_HEIGHT } from '../assets';
 
 interface WelcomeEmailProps {
   userEmail?: string;
@@ -31,9 +32,9 @@ export function WelcomeEmail({
           {/* Header */}
           <Section style={header}>
             <Img
-              src={`${appUrl}/brand/logo-inverted.svg`}
-              width="120"
-              height="52"
+              src={EMAIL_LOGO_URL}
+              width={EMAIL_LOGO_WIDTH}
+              height={EMAIL_LOGO_HEIGHT}
               alt="Zeno"
               style={logo}
             />

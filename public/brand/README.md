@@ -74,3 +74,29 @@ convert -background none -resize 512x512 mark-branded.svg mark-branded-512.png
 | LinkedIn Profile | 400x400 | `linkedin-square.svg` |
 | Twitter Profile | 400x400 | `linkedin-square.svg` |
 | OG Image | 1200x630 | `og-image.svg` |
+| Email Logo | 240x105 (@2x) | `logo-mono-light.svg` → PNG |
+
+---
+
+## Email Logo Setup
+
+Email clients (Gmail, Outlook, etc.) don't support SVG images. We use PNG versions stored in Supabase.
+
+**Current setup:** `logo-mono-light.png` (all white logo for dark header backgrounds)
+
+The logo is stored in Supabase Storage at:
+```
+logos/email/logo-mono-light.png
+```
+
+URL format:
+```
+https://[project-ref].supabase.co/storage/v1/object/public/logos/email/logo-mono-light.png
+```
+
+To override the default URL, set:
+```env
+NEXT_PUBLIC_EMAIL_LOGO_URL=https://your-project.supabase.co/storage/v1/object/public/logos/email/logo-mono-light.png
+```
+
+The email templates automatically use the logo from `src/lib/email/assets.ts`.

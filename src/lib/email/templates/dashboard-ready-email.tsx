@@ -13,6 +13,7 @@ import {
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EMAIL_LOGO_URL, EMAIL_LOGO_SMALL_WIDTH, EMAIL_LOGO_SMALL_HEIGHT } from '../assets';
 
 interface DashboardReadyEmailProps {
   dashboardTitle: string;
@@ -34,9 +35,9 @@ export function DashboardReadyEmail({
           {/* Header */}
           <Section style={header}>
             <Img
-              src={`${appUrl}/brand/logo-inverted.svg`}
-              width="100"
-              height="44"
+              src={EMAIL_LOGO_URL}
+              width={EMAIL_LOGO_SMALL_WIDTH}
+              height={EMAIL_LOGO_SMALL_HEIGHT}
               alt="Zeno"
               style={logo}
             />

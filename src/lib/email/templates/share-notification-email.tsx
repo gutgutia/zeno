@@ -6,12 +6,14 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Link,
   Preview,
   Section,
   Text,
 } from '@react-email/components';
 import * as React from 'react';
+import { EMAIL_LOGO_URL, EMAIL_LOGO_SMALL_WIDTH, EMAIL_LOGO_SMALL_HEIGHT } from '../assets';
 
 interface ShareNotificationEmailProps {
   dashboardTitle: string;
@@ -36,7 +38,13 @@ export function ShareNotificationEmail({
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
-            <Text style={logo}>Zeno</Text>
+            <Img
+              src={EMAIL_LOGO_URL}
+              width={EMAIL_LOGO_SMALL_WIDTH}
+              height={EMAIL_LOGO_SMALL_HEIGHT}
+              alt="Zeno"
+              style={logoImg}
+            />
             <Text style={tagline}>A dashboard has been shared with you</Text>
           </Section>
 
@@ -119,12 +127,9 @@ const header = {
   textAlign: 'center' as const,
 };
 
-const logo = {
-  fontSize: '28px',
-  fontWeight: '700',
-  color: '#ffffff',
-  letterSpacing: '-0.5px',
-  margin: '0 0 8px 0',
+const logoImg = {
+  display: 'block',
+  margin: '0 auto 12px auto',
 };
 
 const tagline = {

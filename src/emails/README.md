@@ -8,8 +8,11 @@ We now use **React Email** with **Resend** for sending emails. See:
 
 - `src/lib/email/templates/otp-email.tsx` - OTP login code email
 - `src/lib/email/templates/welcome-email.tsx` - Welcome email
+- `src/lib/email/templates/dashboard-ready-email.tsx` - Dashboard ready notification
+- `src/lib/email/templates/share-notification-email.tsx` - Share notification
 - `src/lib/email/send.ts` - Email sending functions
 - `src/lib/email/resend.ts` - Resend client configuration
+- `src/lib/email/assets.ts` - Email asset URLs (logos, etc.)
 
 ## API Endpoints
 
