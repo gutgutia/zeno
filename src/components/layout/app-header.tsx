@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/hooks';
+import { useAuth, usePlan } from '@/lib/hooks';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 export function AppHeader() {
   const { user, signOut } = useAuth();
+  const { plan, isLoading: isPlanLoading } = usePlan();
   const router = useRouter();
 
   const handleSignOut = async () => {
@@ -23,6 +24,7 @@ export function AppHeader() {
   };
 
   const userInitial = user?.email?.charAt(0).toUpperCase() || 'U';
+  const isFreePlan = plan === 'free';
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-[var(--color-gray-200)]">
@@ -41,7 +43,19 @@ export function AppHeader() {
           </Link>
 
           {/* Right side - User menu */}
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
+            {/* Upgrade nudge for free users */}
+            {!isPlanLoading && isFreePlan && (
+              <Link
+                href="/settings/billing"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-[var(--color-primary)] bg-[var(--color-primary)]/10 rounded-full hover:bg-[var(--color-primary)]/20 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+                Upgrade
+              </Link>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2">
