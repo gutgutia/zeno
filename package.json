@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:push": "supabase db push",
+    "db:reset": "supabase db reset",
+    "db:reset:data": "supabase db execute --file scripts/reset-database.sql"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.76",
