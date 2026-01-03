@@ -177,6 +177,7 @@ export async function POST(request: Request) {
       .from('dashboards')
       .insert({
         workspace_id: workspace.id,
+        owner_id: user.id,
         title: finalTitle,
         slug,
         description: finalDescription,
