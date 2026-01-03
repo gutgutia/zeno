@@ -72,30 +72,6 @@ const plans = [
     variant: 'default' as const,
     popular: true,
   },
-  {
-    name: 'Business',
-    monthlyPrice: 49,
-    annualPrice: 40,
-    description: 'For organizations with advanced needs',
-    credits: '1,200 credits/seat/mo',
-    creditsNote: '~80-250 dashboards',
-    features: [
-      'Everything in Pro',
-      'Unlimited seats',
-      'All data integrations',
-      'SSO/SAML authentication',
-      'Admin controls',
-      'Audit logs',
-      'Dedicated success manager',
-      'SOC 2 documentation',
-      'SLA guarantee',
-    ],
-    limitations: [],
-    cta: 'Contact Sales',
-    ctaLink: '/contact',
-    variant: 'outline' as const,
-    popular: false,
-  },
 ];
 
 const creditPacks = [
@@ -149,7 +125,7 @@ export function Pricing() {
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-6 max-w-7xl mx-auto mb-16">
+        <div className="grid lg:grid-cols-3 md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-12">
           {plans.map((plan) => {
             const price = isAnnual ? plan.annualPrice : plan.monthlyPrice;
             const isProPlan = plan.popular;
@@ -268,6 +244,25 @@ export function Pricing() {
               </div>
             );
           })}
+        </div>
+
+        {/* Enterprise Callout */}
+        <div className="max-w-5xl mx-auto mb-12">
+          <div className="bg-[var(--color-gray-900)] rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="text-center md:text-left">
+              <h3 className="text-xl font-bold text-white mb-2">
+                Need enterprise features?
+              </h3>
+              <p className="text-[var(--color-gray-400)]">
+                SSO, unlimited seats, custom integrations, dedicated support, and SLA guarantees.
+              </p>
+            </div>
+            <Link href="/contact" className="flex-shrink-0">
+              <Button variant="outline" className="bg-transparent border-white text-white hover:bg-white hover:text-[var(--color-gray-900)]">
+                Contact Sales
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Credits Section */}
