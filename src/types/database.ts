@@ -109,6 +109,8 @@ export interface Dashboard {
   // Versioning
   current_major_version: number;
   current_minor_version: number;
+  // Soft delete
+  deleted_at: string | null;
 }
 
 export interface ChatMessage {

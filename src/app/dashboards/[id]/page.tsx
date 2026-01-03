@@ -5,6 +5,21 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { PageRenderer } from '@/components/dashboard/PageRenderer';
 import { ShareDialog } from '@/components/dashboard/ShareDialog';
 import { UpdateDataModal } from '@/components/dashboard/UpdateDataModal';
@@ -40,6 +55,10 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
   // Version history state
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+
+  // Delete confirmation state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Compute CSS variables for branding
   const brandingStyles = useMemo(() => {
@@ -231,6 +250,31 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
   const handleDataRefresh = (result: { config?: DashboardConfig }) => {
     if (result.config) {
       setDashboard((prev) => prev ? { ...prev, config: result.config } : null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!dashboard) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/dashboards/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete dashboard');
+      }
+
+      toast.success('Dashboard moved to trash');
+      router.push('/dashboards');
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete dashboard');
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
     }
   };
 
@@ -465,6 +509,41 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                   </svg>
                 </Button>
               )}
+
+              {/* More Options Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="px-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const url = `${window.location.origin}/d/${dashboard.slug}`;
+                      navigator.clipboard.writeText(url);
+                      toast.success('Link copied to clipboard!');
+                    }}
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Copy Link
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete Dashboard
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
@@ -685,6 +764,34 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
           onRestore={handleVersionRestore}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Dashboard</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{dashboard.title}&quot;? The dashboard will be moved to trash and can be restored later.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

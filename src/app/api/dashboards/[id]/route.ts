@@ -126,7 +126,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
   }
 }
 
-// DELETE /api/dashboards/[id] - Delete a dashboard
+// DELETE /api/dashboards/[id] - Soft delete a dashboard (move to trash)
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
@@ -137,8 +137,9 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get the dashboard
-    const { data: existingData, error: fetchError } = await supabase
+    // Get the dashboard (need to check both deleted and non-deleted)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existingData, error: fetchError } = await (supabase as any)
       .from('dashboards')
       .select('*, workspaces!inner(owner_id)')
       .eq('id', id)
@@ -158,17 +159,23 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Delete the dashboard
-    const { error: deleteError } = await supabase
-      .from('dashboards')
-      .delete()
-      .eq('id', id);
-
-    if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    // Check if already deleted
+    if (existingDashboard.deleted_at) {
+      return NextResponse.json({ error: 'Dashboard is already in trash' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true });
+    // Soft delete: set deleted_at timestamp
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: updateError } = await (supabase as any)
+      .from('dashboards')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, message: 'Dashboard moved to trash' });
   } catch (error) {
     console.error('Error deleting dashboard:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
