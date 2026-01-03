@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -48,6 +48,11 @@ export default function BrandingSettingsPage() {
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [extractedBranding, setExtractedBranding] = useState<ExtractedBranding | null>(null);
+
+  // Logo upload state
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [companyName, setCompanyName] = useState('');
@@ -135,7 +140,8 @@ export default function BrandingSettingsPage() {
     if (!extractedBranding) return;
 
     if (extractedBranding.companyName) setCompanyName(extractedBranding.companyName);
-    if (extractedBranding.logoUrl) setLogoUrl(extractedBranding.logoUrl);
+    // Note: We intentionally don't apply logoUrl from extraction
+    // Users should upload their logo directly for reliability
     if (extractedBranding.colors?.primary) setPrimaryColor(extractedBranding.colors.primary);
     if (extractedBranding.colors?.secondary) setSecondaryColor(extractedBranding.colors.secondary);
     if (extractedBranding.colors?.accent) setAccentColor(extractedBranding.colors.accent);
@@ -209,6 +215,62 @@ export default function BrandingSettingsPage() {
   const removeChartColor = (index: number) => {
     if (chartColors.length > 2) {
       setChartColors(chartColors.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingLogo(true);
+    setLogoError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/branding/logo', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload logo');
+      }
+
+      setLogoUrl(data.logoUrl);
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : 'Failed to upload logo');
+    } finally {
+      setIsUploadingLogo(false);
+      // Reset the input so the same file can be selected again
+      if (logoInputRef.current) {
+        logoInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    setIsUploadingLogo(true);
+    setLogoError(null);
+
+    try {
+      const response = await fetch('/api/branding/logo', {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to remove logo');
+      }
+
+      setLogoUrl('');
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : 'Failed to remove logo');
+    } finally {
+      setIsUploadingLogo(false);
     }
   };
 
@@ -395,21 +457,13 @@ export default function BrandingSettingsPage() {
                 </div>
               )}
 
-              {/* Logo Preview */}
-              {extractedBranding.logoUrl && (
-                <div className="mt-4">
-                  <p className="text-xs text-[var(--color-gray-500)] mb-2">Detected Logo</p>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={extractedBranding.logoUrl}
-                    alt="Detected logo"
-                    className="max-h-12 object-contain"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                </div>
-              )}
+              {/* Logo Note */}
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-700">
+                  <strong>Note:</strong> Logo should be uploaded separately for reliability.
+                  Use the &quot;Upload Logo&quot; button in the Company Identity section below.
+                </p>
+              </div>
             </div>
           )}
         </CardContent>
@@ -434,30 +488,90 @@ export default function BrandingSettingsPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="logoUrl">Logo URL</Label>
-            <Input
-              id="logoUrl"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="https://example.com/logo.png"
-            />
-            <p className="text-xs text-[var(--color-gray-500)]">
-              Enter a URL to your company logo. Recommended size: 200x50 pixels.
-            </p>
-            {logoUrl && (
-              <div className="mt-2 p-4 bg-[var(--color-gray-50)] rounded-lg">
-                <p className="text-xs text-[var(--color-gray-500)] mb-2">Preview:</p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={logoUrl}
-                  alt="Logo preview"
-                  className="max-h-12 object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
+            <Label>Company Logo</Label>
+            <div className="flex items-start gap-4">
+              {/* Logo Preview */}
+              <div className="w-32 h-20 border-2 border-dashed border-[var(--color-gray-200)] rounded-lg flex items-center justify-center bg-[var(--color-gray-50)] overflow-hidden">
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoUrl}
+                    alt="Company logo"
+                    className="max-w-full max-h-full object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '';
+                      (e.target as HTMLImageElement).alt = 'Failed to load';
+                    }}
+                  />
+                ) : (
+                  <div className="text-center text-[var(--color-gray-400)]">
+                    <svg className="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-xs">No logo</span>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Upload Controls */}
+              <div className="flex-1 space-y-2">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                  id="logo-upload"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={isUploadingLogo}
+                  >
+                    {isUploadingLogo ? (
+                      <>
+                        <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        Upload Logo
+                      </>
+                    )}
+                  </Button>
+                  {logoUrl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRemoveLogo}
+                      disabled={isUploadingLogo}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-[var(--color-gray-500)]">
+                  PNG, JPG, GIF, WebP, or SVG. Max 2MB. Recommended: 200x50px
+                </p>
+                {logoError && (
+                  <p className="text-xs text-red-600">{logoError}</p>
+                )}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
