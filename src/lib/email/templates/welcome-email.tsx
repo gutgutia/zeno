@@ -131,7 +131,7 @@ const container = {
 };
 
 const header = {
-  background: 'linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%)',
+  background: 'linear-gradient(135deg, #0055FF 0%, #0044CC 100%)',
   padding: '48px 40px',
   textAlign: 'center' as const,
 };
@@ -190,7 +190,7 @@ const featureText = {
 
 const ctaButton = {
   display: 'inline-block',
-  background: 'linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%)',
+  background: 'linear-gradient(135deg, #0055FF 0%, #0044CC 100%)',
   color: '#ffffff',
   fontSize: '15px',
   fontWeight: '600',
@@ -226,7 +226,7 @@ const helpText = {
 };
 
 const helpLink = {
-  color: '#2563EB',
+  color: '#0055FF',
   textDecoration: 'none',
 };
 
@@ -245,7 +245,7 @@ const footerText = {
 };
 
 const footerLink = {
-  color: '#2563EB',
+  color: '#0055FF',
   textDecoration: 'none',
 };
 

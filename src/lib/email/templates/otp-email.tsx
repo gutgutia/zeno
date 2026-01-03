@@ -85,7 +85,7 @@ const container = {
 };
 
 const header = {
-  background: 'linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%)',
+  background: 'linear-gradient(135deg, #0055FF 0%, #0044CC 100%)',
   padding: '32px 40px',
   textAlign: 'center' as const,
 };
@@ -136,7 +136,7 @@ const codeLabel = {
 const codeText = {
   fontSize: '36px',
   fontWeight: '700',
-  color: '#2563EB',
+  color: '#0055FF',
   letterSpacing: '8px',
   fontFamily: "'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace",
   margin: 0,
@@ -176,7 +176,7 @@ const footerText = {
 };
 
 const footerLink = {
-  color: '#2563EB',
+  color: '#0055FF',
   textDecoration: 'none',
 };
 
