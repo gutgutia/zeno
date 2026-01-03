@@ -4,11 +4,32 @@ export interface Profile {
   id: string;
   name: string | null;
   avatar_url: string | null;
+  plan_type: 'free' | 'team' | 'enterprise';
+  stripe_customer_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
-// Branding configuration for workspaces (and dashboard overrides)
+// Plan limits (configurable via admin)
+export interface PlanLimits {
+  id: string;
+  plan_type: 'free' | 'team' | 'enterprise';
+  max_dashboards: number | null; // null = unlimited
+  max_folders: number | null;
+  max_data_rows: number | null;
+  features: {
+    ai_generation?: boolean;
+    custom_branding?: boolean;
+    priority_support?: boolean;
+    shared_folders?: boolean;
+    sso?: boolean;
+    audit_logs?: boolean;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+// Branding configuration for organizations (and dashboard overrides)
 export interface BrandingConfig {
   // Company identity
   companyName?: string;
@@ -32,6 +53,76 @@ export interface BrandingConfig {
   styleGuide?: string;
 }
 
+// Organization (billing entity)
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+
+  // Billing
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  plan_type: 'team' | 'enterprise';
+  billing_cycle: 'monthly' | 'annual';
+  seats_purchased: number;
+  billing_email: string | null;
+
+  // Branding
+  branding: BrandingConfig | null;
+  subdomain: string | null;
+  custom_domain: string | null;
+
+  // Metadata
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type OrganizationRole = 'owner' | 'admin' | 'member';
+
+export interface OrganizationMember {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  role: OrganizationRole;
+  invited_by: string | null;
+  invited_at: string;
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrganizationInvitation {
+  id: string;
+  organization_id: string;
+  email: string;
+  role: 'admin' | 'member';
+  token: string;
+  invited_by: string;
+  expires_at: string;
+  created_at: string;
+}
+
+// Folder for organizing dashboards
+export interface Folder {
+  id: string;
+  name: string;
+  owner_id: string;
+  organization_id: string | null; // null = personal folder
+  parent_folder_id: string | null;
+  share_settings: FolderShareSettings | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FolderShareSettings {
+  shares: Array<{
+    type: 'email' | 'domain';
+    value: string;
+  }>;
+}
+
+// Legacy: Workspace (deprecated, use Organization)
 export interface Workspace {
   id: string;
   name: string;
@@ -74,7 +165,9 @@ export interface GoogleConnection {
 
 export interface Dashboard {
   id: string;
-  workspace_id: string;
+  workspace_id: string; // Legacy, use owner_id instead
+  owner_id: string;
+  folder_id: string | null;
   title: string;
   slug: string;
   description: string | null;
@@ -165,6 +258,26 @@ export interface Database {
         Insert: Omit<Profile, 'created_at' | 'updated_at'>;
         Update: Partial<Omit<Profile, 'id'>>;
       };
+      organizations: {
+        Row: Organization;
+        Insert: Omit<Organization, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Organization, 'id' | 'created_by'>>;
+      };
+      organization_members: {
+        Row: OrganizationMember;
+        Insert: Omit<OrganizationMember, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<OrganizationMember, 'id' | 'organization_id' | 'user_id'>>;
+      };
+      organization_invitations: {
+        Row: OrganizationInvitation;
+        Insert: Omit<OrganizationInvitation, 'id' | 'created_at' | 'token'>;
+        Update: never; // Invitations are not updateable
+      };
+      folders: {
+        Row: Folder;
+        Insert: Omit<Folder, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Folder, 'id' | 'owner_id'>>;
+      };
       workspaces: {
         Row: Workspace;
         Insert: Omit<Workspace, 'id' | 'created_at' | 'updated_at'>;
@@ -173,7 +286,7 @@ export interface Database {
       dashboards: {
         Row: Dashboard;
         Insert: Omit<Dashboard, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Omit<Dashboard, 'id' | 'workspace_id'>>;
+        Update: Partial<Omit<Dashboard, 'id' | 'owner_id'>>;
       };
       chat_messages: {
         Row: ChatMessage;
@@ -190,16 +303,21 @@ export interface Database {
         Insert: Omit<DashboardVersion, 'id' | 'created_at'>;
         Update: Partial<Omit<DashboardVersion, 'id' | 'dashboard_id'>>;
       };
+      plan_limits: {
+        Row: PlanLimits;
+        Insert: Omit<PlanLimits, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<PlanLimits, 'id' | 'plan_type'>>;
+      };
     };
   };
 }
 
-// Utility function to merge workspace branding with dashboard override
+// Utility function to merge organization/workspace branding with dashboard override
 export function getMergedBranding(
-  workspaceBranding: BrandingConfig | null,
+  baseBranding: BrandingConfig | null,
   dashboardOverride: Partial<BrandingConfig> | null
 ): BrandingConfig {
-  const base = workspaceBranding || {};
+  const base = baseBranding || {};
   const override = dashboardOverride || {};
 
   return {
@@ -215,4 +333,15 @@ export function getMergedBranding(
     fontFamily: override.fontFamily ?? base.fontFamily,
     styleGuide: override.styleGuide ?? base.styleGuide,
   };
+}
+
+// Helper type for organization with member info
+export interface OrganizationWithRole extends Organization {
+  role: OrganizationRole;
+  member_count?: number;
+}
+
+// Helper type for folder with dashboard count
+export interface FolderWithCount extends Folder {
+  dashboard_count: number;
 }
