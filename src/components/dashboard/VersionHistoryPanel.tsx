@@ -36,7 +36,7 @@ function getChangeTypeInfo(changeType: VersionChangeType): { label: string; colo
     case 'initial':
       return {
         label: 'Created',
-        color: 'bg-green-100 text-green-700',
+        color: 'bg-[var(--color-primary-light)] text-[var(--color-primary)]',
         icon: (
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
