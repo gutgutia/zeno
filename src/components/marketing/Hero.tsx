@@ -42,7 +42,7 @@ export function Hero() {
 
         {/* Hero Image/Preview - Before/After Transformation */}
         <div className="relative mx-auto max-w-5xl">
-          <div className="absolute -inset-4 bg-gradient-to-r from-[var(--color-primary-light)] to-[var(--color-accent-light)] rounded-2xl blur-2xl opacity-40" />
+          <div className="absolute -inset-4 bg-gradient-to-r from-[var(--color-primary-light)] to-[var(--color-primary-lighter)] rounded-2xl blur-2xl opacity-40" />
           <div className="relative grid md:grid-cols-2 gap-4 md:gap-6">
             {/* BEFORE - Raw Data */}
             <div className="bg-white rounded-xl shadow-lg border border-[var(--color-gray-200)] overflow-hidden">

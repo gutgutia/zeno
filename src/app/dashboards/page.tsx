@@ -48,7 +48,7 @@ const SHARING_STATUS_CONFIG: Record<SharingStatus, { label: string; icon: React.
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
       </svg>
     ),
-    className: 'text-[var(--color-accent)] bg-[var(--color-accent-light)]',
+    className: 'text-[var(--color-teal)] bg-[var(--color-teal-light)]',
   },
 };
 
@@ -163,7 +163,7 @@ function EmptyState() {
       {/* Decorative background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-[var(--color-primary-light)] rounded-full blur-3xl opacity-30" />
-        <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-[var(--color-accent-light)] rounded-full blur-3xl opacity-30" />
+        <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-[var(--color-primary-lighter)] rounded-full blur-3xl opacity-30" />
       </div>
       
       <div className="relative z-10 text-center max-w-lg">
