@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Container, Button } from '@/components/ui';
 
 export function Hero() {
@@ -27,12 +28,16 @@ export function Hero() {
 
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-          <Button size="lg">
-            Try it free
-          </Button>
-          <Button variant="secondary" size="lg">
-            See the magic ↓
-          </Button>
+          <Link href="/auth">
+            <Button size="lg">
+              Try it free
+            </Button>
+          </Link>
+          <a href="#how-it-works">
+            <Button variant="secondary" size="lg">
+              See the magic ↓
+            </Button>
+          </a>
         </div>
 
         {/* Hero Image/Preview - Before/After Transformation */}

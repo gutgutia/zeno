@@ -14,7 +14,7 @@ export default async function DashboardsPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login');
+    redirect('/auth');
   }
 
   // Get user's workspace

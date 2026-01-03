@@ -21,7 +21,7 @@ export default function VerifyPage() {
     // Get email from session storage
     const pendingEmail = sessionStorage.getItem('pending_email');
     if (!pendingEmail) {
-      router.push('/login');
+      router.push('/auth');
       return;
     }
     setEmail(pendingEmail);
@@ -169,7 +169,7 @@ export default function VerifyPage() {
 
         <div>
           <Link
-            href="/login"
+            href="/auth"
             className="text-sm text-[var(--color-gray-500)] hover:text-[var(--color-gray-900)] transition-colors inline-flex items-center gap-1"
           >
             ← Use a different email

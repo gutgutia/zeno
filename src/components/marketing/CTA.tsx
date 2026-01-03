@@ -22,7 +22,7 @@ export function CTA() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a
-              href="/login"
+              href="/auth"
               className="inline-flex items-center justify-center h-12 px-8 font-medium rounded-lg hover:opacity-90 transition-opacity"
               style={{ backgroundColor: '#FFFFFF', color: '#0055FF' }}
             >

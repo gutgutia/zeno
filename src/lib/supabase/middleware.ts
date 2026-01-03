@@ -45,12 +45,12 @@ export async function updateSession(request: NextRequest) {
 
   if (isProtectedPath && !user) {
     const url = request.nextUrl.clone();
-    url.pathname = '/login';
+    url.pathname = '/auth';
     return NextResponse.redirect(url);
   }
 
-  // Redirect logged-in users away from login page
-  if (request.nextUrl.pathname === '/login' && user) {
+  // Redirect logged-in users away from auth page
+  if (request.nextUrl.pathname === '/auth' && user) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboards';
     return NextResponse.redirect(url);

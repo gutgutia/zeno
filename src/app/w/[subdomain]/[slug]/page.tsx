@@ -131,7 +131,7 @@ export default async function WorkspaceDashboardPage({ params }: PageProps) {
 
       // If not authenticated, redirect to login
       if (!user) {
-        redirect(`/login?redirect=/${slug}`);
+        redirect(`/auth?redirect=/${slug}`);
       }
 
       // Check if user's email matches any share

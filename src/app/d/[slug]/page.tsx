@@ -121,7 +121,7 @@ export default async function PublicDashboardPage({ params }: PageProps) {
 
       // If not authenticated, redirect to login
       if (!user) {
-        redirect(`/login?redirect=/d/${slug}`);
+        redirect(`/auth?redirect=/d/${slug}`);
       }
 
       // Check if user's email matches any share

@@ -50,7 +50,7 @@ export function LoginForm() {
       sessionStorage.setItem('pending_email', email);
 
       toast.success('Check your email for the verification code');
-      router.push('/login/verify');
+      router.push('/auth/verify');
     } catch {
       toast.error('Something went wrong. Please try again.');
     } finally {
