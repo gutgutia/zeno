@@ -5,21 +5,28 @@
 ## Overview
 
 Zeno uses a **tiered subscription model with credits**:
-- **Tiers** unlock features and include monthly credits
+- **3 tiers** (Free, Starter, Pro) + Enterprise for custom needs
 - **Credits** are consumed by AI actions (create, edit, refresh)
 - **Per-seat pricing** for all paid plans
 - **Credits pool at workspace level** (team shares credits)
+- **1 credit = $0.10** at retail
+
+For technical details on token-to-credit conversion, see [Credit System](./credit-system.md).
 
 ---
 
 ## Pricing Tiers
 
-| | **Free** | **Starter** | **Pro** | **Business** |
-|---|:---:|:---:|:---:|:---:|
-| **Price** | $0 | **$10**/seat/mo | **$24**/seat/mo | **$49**/seat/mo |
-| **Annual** | - | $8/seat/mo | $20/seat/mo | $40/seat/mo |
-| **Credits** | 100 (one-time) | 200/seat/mo | 500/seat/mo | 1,200/seat/mo |
-| **Max Seats** | 1 | 10 | 50 | Unlimited |
+| | **Free** | **Starter** | **Pro** |
+|---|:---:|:---:|:---:|
+| **Price** | $0 | **$10**/seat/mo | **$24**/seat/mo |
+| **Annual** | - | $8/seat/mo | $20/seat/mo |
+| **Credits** | 100 (one-time) | 200/seat/mo | 500/seat/mo |
+| **Max Seats** | 1 | 10 | 50 |
+
+### Enterprise
+
+For organizations with advanced needs (SSO, unlimited seats, custom integrations, dedicated support, SLA guarantees), contact sales for custom pricing.
 
 ### Annual Billing Savings
 
@@ -27,7 +34,6 @@ Zeno uses a **tiered subscription model with credits**:
 |------|---------|-------------------|---------|
 | Starter | $10/seat | $8/seat | 20% |
 | Pro | $24/seat | $20/seat | 17% |
-| Business | $49/seat | $40/seat | 18% |
 
 ---
 
@@ -35,8 +41,8 @@ Zeno uses a **tiered subscription model with credits**:
 
 ### Dashboards & Content
 
-| Feature | Free | Starter | Pro | Business |
-|---------|:----:|:-------:|:---:|:--------:|
+| Feature | Free | Starter | Pro | Enterprise |
+|---------|:----:|:-------:|:---:|:----------:|
 | Dashboard limit | 3 | Unlimited | Unlimited | Unlimited |
 | Public sharing (anyone with link) | ✓ | ✓ | ✓ | ✓ |
 | Private sharing (specific emails) | ✗ | ✓ | ✓ | ✓ |
@@ -46,8 +52,8 @@ Zeno uses a **tiered subscription model with credits**:
 
 ### Branding & Customization
 
-| Feature | Free | Starter | Pro | Business |
-|---------|:----:|:-------:|:---:|:--------:|
+| Feature | Free | Starter | Pro | Enterprise |
+|---------|:----:|:-------:|:---:|:----------:|
 | Zeno branding on shared dashboards | Required | Required | **Removable** | **Removable** |
 | Custom subdomain (you.zeno.fyi) | ✗ | ✓ | ✓ | ✓ |
 | Custom domain (dashboard.yourco.com) | ✗ | ✗ | ✓ | ✓ |
@@ -55,19 +61,19 @@ Zeno uses a **tiered subscription model with credits**:
 
 ### Data Sources
 
-| Feature | Free | Starter | Pro | Business |
-|---------|:----:|:-------:|:---:|:--------:|
+| Feature | Free | Starter | Pro | Enterprise |
+|---------|:----:|:-------:|:---:|:----------:|
 | Paste data | ✓ | ✓ | ✓ | ✓ |
 | Upload CSV/Excel | ✓ | ✓ | ✓ | ✓ |
 | Google Sheets integration | ✗ | ✗ | ✓ | ✓ |
-| Airtable integration | ✗ | ✗ | ✗ | ✓ |
+| Airtable integration | ✗ | ✗ | ✓ | ✓ |
 | Other integrations (future) | ✗ | ✗ | ✗ | ✓ |
 | Scheduled auto-refresh | ✗ | ✗ | ✓ | ✓ |
 
 ### Team & Collaboration
 
-| Feature | Free | Starter | Pro | Business |
-|---------|:----:|:-------:|:---:|:--------:|
+| Feature | Free | Starter | Pro | Enterprise |
+|---------|:----:|:-------:|:---:|:----------:|
 | Maximum seats | 1 | 10 | 50 | Unlimited |
 | Shared workspaces | ✗ | ✗ | ✓ | ✓ |
 | Admin controls | ✗ | ✗ | ✗ | ✓ |
@@ -76,8 +82,8 @@ Zeno uses a **tiered subscription model with credits**:
 
 ### Support & Security
 
-| Feature | Free | Starter | Pro | Business |
-|---------|:----:|:-------:|:---:|:--------:|
+| Feature | Free | Starter | Pro | Enterprise |
+|---------|:----:|:-------:|:---:|:----------:|
 | Community support | ✓ | ✓ | ✗ | ✗ |
 | Email support | ✗ | ✓ | ✓ | ✗ |
 | Priority support | ✗ | ✗ | ✓ | ✓ |
@@ -91,24 +97,25 @@ Zeno uses a **tiered subscription model with credits**:
 
 ### Credit Fundamentals
 
-- **1 credit ≈ $0.05** retail value
+- **1 credit = $0.10** retail value
 - Credits are consumed by AI-powered actions
 - Credits **pool at the workspace level** (all team members share)
 - Credits **do not roll over** to the next month
 - Credit usage is shown after each action
 
+For full technical details, see [Credit System](./credit-system.md).
+
 ### Credit Costs by Action
 
-Actions cost **2-20 credits** based on AI compute complexity:
+Actions cost **5-50 credits** based on AI compute complexity:
 
-| Action | Typical Credits | Cost Equivalent |
-|--------|:---------------:|-----------------|
-| Create dashboard (simple data, basic layout) | 3-5 | $0.15-0.25 |
-| Create dashboard (complex data, rich visualizations) | 10-20 | $0.50-1.00 |
-| AI edit (minor change - colors, labels) | 2-4 | $0.10-0.20 |
-| AI edit (major restructure - new charts, layout) | 8-15 | $0.40-0.75 |
-| Data refresh (small data delta) | 2-5 | $0.10-0.25 |
-| Data refresh (significant data changes) | 8-15 | $0.40-0.75 |
+| Action | Typical Credits | User Cost |
+|--------|:---------------:|-----------|
+| Simple dashboard (small data) | 9 | $0.90 |
+| Medium dashboard | 25 | $2.50 |
+| Large/complex dashboard | 50 | $5.00 |
+| Quick AI edit | 6 | $0.60 |
+| Data refresh | 16 | $1.60 |
 
 ### What Determines Credit Cost?
 
@@ -120,20 +127,20 @@ The credit cost of an action depends on:
 
 ### Credit Allocation Examples
 
-| Plan | Seats | Monthly Credits | Typical Usage |
-|------|:-----:|:---------------:|---------------|
-| Starter | 1 | 200 | ~15-40 dashboards or ~50+ edits |
-| Starter | 3 | 600 | ~45-120 dashboards (pooled) |
-| Pro | 1 | 500 | ~35-100 dashboards or ~100+ edits |
-| Pro | 5 | 2,500 | ~175-500 dashboards (pooled) |
-| Business | 10 | 12,000 | ~800-2,400 dashboards (pooled) |
+| Plan | Seats | Monthly Credits | Est. Dashboards |
+|------|:-----:|:---------------:|-----------------|
+| Free | 1 | 100 (one-time) | 4-10 total |
+| Starter | 1 | 200 | 8-20 |
+| Starter | 3 | 600 | 24-60 (pooled) |
+| Pro | 1 | 500 | 20-50 |
+| Pro | 5 | 2,500 | 100-250 (pooled) |
 
 ### User Experience
 
 After each AI action, users see:
 ```
 ✓ Dashboard created successfully
-  This action used 7 credits. You have 193 credits remaining this month.
+  25 credits used · 475 credits remaining
 ```
 
 ---
@@ -199,8 +206,8 @@ Free users are prompted to upgrade when they:
 |------|-----------|
 | **Free** | Trying Zeno, occasional personal use, students |
 | **Starter** | Solo creators, freelancers, individual professionals |
-| **Pro** | Small teams, agencies, power users needing integrations |
-| **Business** | Organizations, enterprises, security-conscious teams |
+| **Pro** | Small teams, agencies, power users needing integrations & branding |
+| **Enterprise** | Organizations needing SSO, admin controls, dedicated support |
 
 ### Upgrade Paths
 
@@ -215,9 +222,9 @@ Starter ($10/seat)
   ▼
 Pro ($24/seat)
   │
-  │ Need: SSO, admin controls, more integrations, dedicated support
+  │ Need: SSO, admin controls, unlimited seats, dedicated support
   ▼
-Business ($49/seat)
+Enterprise (Contact Sales)
 ```
 
 ---
