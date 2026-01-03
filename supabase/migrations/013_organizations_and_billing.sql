@@ -2,9 +2,6 @@
 -- Transforms from workspace-centric to organization-centric model
 -- Organizations are billing entities, dashboards are user-owned
 
--- Enable pgcrypto for token generation
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
 -- ============================================
 -- PLAN LIMITS TABLE (Configurable via admin)
 -- ============================================
@@ -99,7 +96,8 @@ CREATE TABLE public.organization_invitations (
   organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   role VARCHAR(20) NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
-  token TEXT NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(32), 'hex'),
+  -- Use concatenated UUIDs for token generation (compatible with all Supabase instances)
+  token TEXT NOT NULL UNIQUE DEFAULT replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
 
   invited_by UUID NOT NULL REFERENCES auth.users(id),
   expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '7 days'),
