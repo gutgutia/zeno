@@ -20,11 +20,11 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get dashboard
+    // Get dashboard with workspace ownership info
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: dashboard, error: fetchError } = await (supabase as any)
       .from('dashboards')
-      .select('id, owner_id, title')
+      .select('id, owner_id, title, workspaces!inner(owner_id)')
       .eq('id', id)
       .single();
 
@@ -32,8 +32,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dashboard not found' }, { status: 404 });
     }
 
-    // Only owner can transfer
-    if (dashboard.owner_id !== user.id) {
+    // Only owner can transfer - check both dashboard.owner_id and workspace.owner_id for consistency
+    const isOwner = dashboard.owner_id === user.id || dashboard.workspaces?.owner_id === user.id;
+    if (!isOwner) {
       return NextResponse.json(
         { error: 'Only the dashboard owner can transfer ownership' },
         { status: 403 }
