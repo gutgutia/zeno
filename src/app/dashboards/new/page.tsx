@@ -67,7 +67,6 @@ function NewDashboardPageContent() {
 
   // Instructions state
   const [instructions, setInstructions] = useState('');
-  const [notifyEmail, setNotifyEmail] = useState(false);
   const [enableSync, setEnableSync] = useState(true);
 
   // UI state
@@ -434,7 +433,7 @@ function NewDashboardPageContent() {
           data: parsedData?.rows || null,
           dataSource,
           userInstructions: instructions || null,
-          notifyEmail,
+          notifyEmail: true, // Always send email notification when ready
           // Google Sheets specific
           googleSheetId: dataSource?.type === 'google_sheets' ? dataSource.spreadsheetId : null,
           googleSheetName: dataSource?.type === 'google_sheets' && dataSource.selectedSheets
@@ -883,28 +882,10 @@ function NewDashboardPageContent() {
             />
           </div>
 
-          {/* Options */}
-          <div className="bg-white rounded-xl border border-[var(--color-gray-200)] shadow-sm p-6 space-y-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={notifyEmail}
-                onChange={(e) => setNotifyEmail(e.target.checked)}
-                className="mt-1 w-4 h-4 rounded border-[var(--color-gray-300)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-              />
-              <div>
-                <span className="font-medium text-[var(--color-gray-900)]">
-                  Email me when ready
-                </span>
-                <p className="text-sm text-[var(--color-gray-500)] mt-0.5">
-                  Generation may take a minute. We&apos;ll send you an email when your dashboard is ready.
-                </p>
-              </div>
-            </label>
-
-            {/* Auto-sync option for Google Sheets */}
-            {dataSource?.type === 'google_sheets' && (
-              <label className="flex items-start gap-3 cursor-pointer pt-4 border-t border-[var(--color-gray-200)]">
+          {/* Options - only show for Google Sheets */}
+          {dataSource?.type === 'google_sheets' && (
+            <div className="bg-white rounded-xl border border-[var(--color-gray-200)] shadow-sm p-6">
+              <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={enableSync}
@@ -920,8 +901,8 @@ function NewDashboardPageContent() {
                   </p>
                 </div>
               </label>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3">
@@ -946,9 +927,7 @@ function NewDashboardPageContent() {
             Our AI is analyzing your content and designing a beautiful page...
           </p>
           <p className="text-sm text-[var(--color-gray-500)]">
-            {notifyEmail
-              ? "We'll email you when it's ready. Feel free to close this page."
-              : "This may take a minute. Please wait..."}
+            We&apos;ll email you when it&apos;s ready. Feel free to close this page.
           </p>
         </div>
       )}

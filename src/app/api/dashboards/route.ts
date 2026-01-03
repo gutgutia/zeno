@@ -63,7 +63,6 @@ export async function POST(request: Request) {
       data,
       dataSource,
       userInstructions,
-      notifyEmail,
       // Google Sheets specific fields
       googleSheetId,
       googleSheetName,
@@ -194,7 +193,7 @@ export async function POST(request: Request) {
         generation_completed_at: null,
         raw_content: rawContent || null,
         user_instructions: userInstructions || null,
-        notify_email: notifyEmail || false,
+        notify_email: true, // Always send email notification when dashboard is ready
         created_by: user.id,
         // Google Sheets fields
         google_connection_id: googleConnectionId,
