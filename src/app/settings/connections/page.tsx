@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
@@ -12,7 +12,7 @@ interface GoogleConnection {
   created_at: string;
 }
 
-export default function ConnectionsPage() {
+function ConnectionsPageContent() {
   const [connection, setConnection] = useState<GoogleConnection | null>(null);
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -270,6 +270,22 @@ export default function ConnectionsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ConnectionsPage() {
+  return (
+    <Suspense fallback={
+      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6">
+        <div className="animate-pulse">
+          <div className="h-6 bg-[var(--color-gray-100)] rounded w-48 mb-4"></div>
+          <div className="h-4 bg-[var(--color-gray-100)] rounded w-full mb-2"></div>
+          <div className="h-4 bg-[var(--color-gray-100)] rounded w-3/4"></div>
+        </div>
+      </div>
+    }>
+      <ConnectionsPageContent />
+    </Suspense>
   );
 }
 
