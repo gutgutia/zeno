@@ -46,19 +46,13 @@ if (dashboard.workspace.owner_id !== user.id) {
 ### 2. Inconsistent Ownership Check Pattern
 
 **Severity:** Medium
-**Status:** Needs Review
+**Status:** ✅ FIXED
 
 **Description:**
-The `/api/dashboards/[id]/transfer/route.ts` endpoint uses `dashboard.owner_id` directly on the dashboard table instead of checking through `workspaces.owner_id` like other endpoints. While this may be intentional (dashboards have their own `owner_id` field added in migration 013), the inconsistency could lead to authorization bypass if these values become out of sync.
+The `/api/dashboards/[id]/transfer/route.ts` endpoint was using `dashboard.owner_id` directly on the dashboard table instead of checking through `workspaces.owner_id` like other endpoints.
 
-**Locations:**
-- `src/app/api/dashboards/[id]/transfer/route.ts:36` - Uses `dashboard.owner_id !== user.id`
-- All other endpoints use `workspaces.owner_id`
-
-**Recommendation:**
-Standardize on one approach. Either:
-1. Always check via `workspaces.owner_id` for consistency
-2. Or ensure `owner_id` on dashboards is always kept in sync and check `dashboard.owner_id OR workspaces.owner_id`
+**Fix Applied:**
+Updated to check both `dashboard.owner_id` and `workspaces.owner_id` for defense in depth, matching the RLS policy pattern from migration 016.
 
 ### 3. Admin Client Bypass of RLS
 
@@ -155,7 +149,7 @@ The following security measures are properly implemented:
 | GET /api/dashboards/[id]/versions | ✅ | ✅ workspaces.owner_id | Secure |
 | POST /api/dashboards/[id]/restore | ✅ | ✅ workspaces.owner_id | Secure |
 | DELETE /api/dashboards/[id]/permanent | ✅ | ✅ workspaces.owner_id | Secure |
-| POST /api/dashboards/[id]/transfer | ✅ | ⚠️ dashboard.owner_id | Review |
+| POST /api/dashboards/[id]/transfer | ✅ | ✅ both owner_id fields | **FIXED** |
 | GET /api/dashboards/[id]/shares | ✅ | ✅ workspaces.owner_id | Secure |
 | POST /api/dashboards/[id]/shares | ✅ | ✅ workspaces.owner_id | Secure |
 | DELETE /api/dashboards/[id]/shares/[shareId] | ✅ | ✅ workspaces.owner_id | Secure |
@@ -200,7 +194,7 @@ User visits /d/[slug]
 
 ### Immediate Actions
 1. ~~Fix the refresh endpoint~~ ✅ DONE
-2. Review `/api/dashboards/[id]/transfer` for consistency
+2. ~~Fix the transfer endpoint~~ ✅ DONE
 
 ### Short-term
 3. Add audit logging for share operations
