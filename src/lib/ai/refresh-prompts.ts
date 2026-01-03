@@ -76,6 +76,12 @@ ${branding ? JSON.stringify(branding, null, 2) : 'No specific branding configure
 - The layout, colors, fonts, and structure must NOT change
 - Only update the DATA POINTS and VALUES
 - If you're unsure about a value, compute it from the new data
+
+## DO NOT INCLUDE (handled by the application)
+- Page-level headers, navigation bars, or footers
+- Logo or branding elements
+- Fixed or absolute positioned elements
+Your output is embedded inside an existing application shell.
 `;
 }
 

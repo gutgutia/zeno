@@ -77,12 +77,12 @@ Generate a COMPLETE, SELF-CONTAINED HTML page. Everything must be inline - no ex
    </div>
 
 5. DESIGN ELEMENTS TO INCLUDE:
-   - Gradient header/hero section
    - Stat cards with large numbers, labels, and context (e.g., "↑ 12% from last month")
    - Colored status indicators (dots, badges)
    - Insight callout boxes with background colors
    - Clean data tables with alternating row colors
    - Visual charts using SVG or CSS
+   - Section headings to organize the content
 
 IMPORTANT:
 - DO NOT use any external libraries or placeholder elements
@@ -90,7 +90,15 @@ IMPORTANT:
 - Make it look like a professional executive dashboard
 - Include actual data values from the input, not placeholder text
 - Calculate percentages, totals, and other derived metrics
-- The HTML should render beautifully with zero JavaScript`;
+- The HTML should render beautifully with zero JavaScript
+
+DO NOT INCLUDE (these are provided by the application shell):
+- Page-level headers, navigation bars, or footers
+- Logo or branding elements in headers
+- Fixed or absolute positioned elements that cover the viewport
+- <header> elements with navigation or logos
+- Any "hero" sections with company branding
+Your output will be embedded inside an existing application - generate only the dashboard CONTENT.`;
 }
 
 /**
@@ -342,11 +350,19 @@ table:
 }
 
 IMPORTANT:
-- Create a complete, beautiful page - not just charts
-- Include headers, sections, and context
+- Create beautiful dashboard content - not a full page
+- Include section headings and context within the content
 - Add insights as callout boxes or highlighted text
 - Use the brand colors throughout
-- Make it visually impressive and professional`;
+- Make it visually impressive and professional
+
+DO NOT INCLUDE (these are provided by the application shell):
+- Page-level headers, navigation bars, or footers
+- Logo or branding elements in headers
+- Fixed or absolute positioned elements that cover the viewport
+- <header> elements with navigation or logos
+- Any "hero" sections with company branding
+Your output will be embedded inside an existing application - generate only the dashboard CONTENT.`;
 }
 
 /**

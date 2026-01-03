@@ -9,11 +9,13 @@
  */
 
 // Allowed HTML tags - covers semantic HTML and common layout elements
+// Note: header, footer, nav are intentionally EXCLUDED to prevent AI-generated
+// content from conflicting with the application shell
 const ALLOWED_TAGS = new Set([
-  // Document structure
+  // Document structure (stripped by sanitizer, but allowed for parsing)
   'html', 'head', 'body',
-  // Semantic sections
-  'header', 'footer', 'main', 'section', 'article', 'aside', 'nav',
+  // Semantic sections (header, footer, nav excluded - provided by app shell)
+  'main', 'section', 'article', 'aside',
   // Headings
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
   // Text content
@@ -75,6 +77,25 @@ const DANGEROUS_PATTERNS = [
   /-moz-binding/gi,
 ];
 
+// Patterns for AI-generated content that should be stripped
+// These elements conflict with the application shell
+const AI_SHELL_PATTERNS = [
+  // Remove <header> elements entirely (the app provides its own header)
+  /<header\b[^>]*>[\s\S]*?<\/header>/gi,
+  // Remove <nav> elements (navigation is provided by the app)
+  /<nav\b[^>]*>[\s\S]*?<\/nav>/gi,
+  // Remove <footer> elements (footer is provided by the app for public views)
+  /<footer\b[^>]*>[\s\S]*?<\/footer>/gi,
+];
+
+// CSS patterns that could break the app shell layout
+const DANGEROUS_CSS_PATTERNS = [
+  // Fixed positioning that covers the viewport
+  /position\s*:\s*fixed/gi,
+  // Absolute positioning with top: 0 (likely a header)
+  /position\s*:\s*absolute[^;]*;\s*top\s*:\s*0/gi,
+];
+
 /**
  * Sanitize HTML content for safe rendering
  * This is a server-side compatible sanitization function
@@ -85,6 +106,18 @@ export function sanitizeHTML(html: string): string {
   // Remove dangerous patterns first
   for (const pattern of DANGEROUS_PATTERNS) {
     sanitized = sanitized.replace(pattern, '');
+  }
+
+  // Remove AI-generated shell elements (header, nav, footer)
+  // These conflict with the application shell
+  for (const pattern of AI_SHELL_PATTERNS) {
+    sanitized = sanitized.replace(pattern, '');
+  }
+
+  // Remove dangerous CSS patterns that could break the app layout
+  // We replace position: fixed with position: relative to preserve layout intent
+  for (const pattern of DANGEROUS_CSS_PATTERNS) {
+    sanitized = sanitized.replace(pattern, 'position: relative');
   }
 
   // Remove comments that might contain malicious content

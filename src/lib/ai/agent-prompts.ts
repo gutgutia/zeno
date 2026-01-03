@@ -105,7 +105,15 @@ IMPORTANT:
 - ALWAYS use Python to compute numbers for tabular data - never estimate
 - Print Python results as JSON for easy use
 - The HTML must render beautifully with zero JavaScript
-- Include actual computed values, not placeholders`;
+- Include actual computed values, not placeholders
+
+DO NOT INCLUDE (these are provided by the application shell):
+- Page-level headers, navigation bars, or footers
+- Logo or branding elements in headers
+- Fixed or absolute positioned elements that cover the viewport
+- <header> elements with navigation or logos
+- Any "hero" sections with company branding
+Your output will be embedded inside an existing application - generate only the dashboard CONTENT.`;
 }
 
 /**
