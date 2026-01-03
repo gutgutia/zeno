@@ -3,9 +3,15 @@ import { NextResponse } from 'next/server';
 import { generateWithAgent } from '@/lib/ai/agent';
 import type { Dashboard, BrandingConfig } from '@/types/database';
 import { createVersion } from '@/lib/versions';
+import { getCreditBalance, deductCredits, hasEnoughCredits } from '@/lib/credits';
 
 // Allow long-running requests for agent loops
 export const maxDuration = 300; // 5 minutes
+
+// Estimated credits for dashboard generation (based on typical token usage)
+// Simple: ~9 credits, Medium: ~25 credits, Complex: ~50 credits
+// We use the medium estimate as default
+const ESTIMATED_GENERATION_CREDITS = 25;
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -20,6 +26,18 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check credit balance before generation
+    const hasCredits = await hasEnoughCredits(user.id, ESTIMATED_GENERATION_CREDITS);
+    if (!hasCredits) {
+      const balance = await getCreditBalance(user.id);
+      return NextResponse.json({
+        error: 'Insufficient credits',
+        credits_required: ESTIMATED_GENERATION_CREDITS,
+        credits_available: balance?.balance || 0,
+        upgrade_url: '/settings/billing',
+      }, { status: 402 }); // 402 Payment Required
     }
 
     // Get the dashboard with workspace branding
@@ -124,6 +142,26 @@ export async function POST(request: Request, { params }: RouteParams) {
         throw new Error(`Failed to save dashboard: ${updateError.message}`);
       }
 
+      // Deduct credits for successful generation
+      // TODO: Replace estimated tokens with actual usage from AI response
+      const estimatedInputTokens = 150000; // ~150K input tokens typical
+      const estimatedOutputTokens = 20000;  // ~20K output tokens typical
+      const deductionResult = await deductCredits(
+        user.id,
+        estimatedInputTokens,
+        estimatedOutputTokens,
+        'dashboard_create',
+        id,
+        `Generated dashboard: ${dashboard.title}`
+      );
+
+      if (!deductionResult.success) {
+        console.warn(`[${id}] Failed to deduct credits:`, deductionResult.error);
+        // Don't fail the generation if credit deduction fails
+      } else {
+        console.log(`[${id}] Deducted ${deductionResult.credits_used} credits. Remaining: ${deductionResult.balance_after}`);
+      }
+
       // Create initial version (1.0)
       try {
         await createVersion(supabase, {
@@ -154,6 +192,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({
         dashboard: updatedDashboard as Dashboard,
         generated: true,
+        credits: deductionResult.success ? {
+          used: deductionResult.credits_used,
+          remaining: deductionResult.balance_after,
+        } : undefined,
       });
 
     } catch (generationError) {
