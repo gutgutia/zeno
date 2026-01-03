@@ -136,31 +136,56 @@ export default async function DashboardsPage() {
 
 function EmptyState() {
   return (
-    <div className="text-center py-16">
-      <div className="w-16 h-16 bg-[var(--color-gray-100)] rounded-2xl flex items-center justify-center mx-auto mb-4">
-        <svg
-          className="w-8 h-8 text-[var(--color-gray-400)]"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
-          />
-        </svg>
+    <div className="flex flex-col items-center justify-center py-20 px-4">
+      {/* Decorative background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-[var(--color-primary-light)] rounded-full blur-3xl opacity-30" />
+        <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-[var(--color-accent-light)] rounded-full blur-3xl opacity-30" />
       </div>
-      <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-2">
-        No dashboards yet
-      </h2>
-      <p className="text-[var(--color-gray-600)] mb-6 max-w-sm mx-auto">
-        Create your first dashboard by pasting data or uploading a file.
-      </p>
-      <Link href="/dashboards/new">
-        <Button>Create Your First Dashboard</Button>
-      </Link>
+      
+      <div className="relative z-10 text-center max-w-lg">
+        {/* Icon with gradient background */}
+        <div className="w-20 h-20 bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-accent)] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+          <svg
+            className="w-10 h-10 text-white"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+            />
+          </svg>
+        </div>
+        
+        {/* Headline */}
+        <h2 className="text-2xl font-bold text-[var(--color-gray-900)] mb-3">
+          Create something beautiful
+        </h2>
+        
+        {/* Subheadline */}
+        <p className="text-[var(--color-gray-600)] mb-8 text-lg leading-relaxed">
+          Paste your spreadsheet data and watch it transform into a stunning, shareable dashboard in seconds.
+        </p>
+        
+        {/* CTA */}
+        <Link href="/dashboards/new">
+          <Button size="lg" className="px-8 py-3 text-base">
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create Your First Dashboard
+          </Button>
+        </Link>
+        
+        {/* Trust signal */}
+        <p className="mt-6 text-sm text-[var(--color-gray-500)]">
+          100 free credits included · No credit card required
+        </p>
+      </div>
     </div>
   );
 }
