@@ -248,17 +248,17 @@ export function Pricing() {
 
         {/* Enterprise Callout */}
         <div className="max-w-5xl mx-auto mb-12">
-          <div className="bg-[var(--color-gray-900)] rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="bg-[#0D1327] rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="text-center md:text-left">
-              <h3 className="text-xl font-bold text-white mb-2">
+              <h3 className="text-xl font-bold mb-2" style={{ color: '#FFFFFF' }}>
                 Need enterprise features?
               </h3>
-              <p className="text-[var(--color-gray-400)]">
+              <p style={{ color: '#94A3B8' }}>
                 SSO, unlimited seats, custom integrations, dedicated support, and SLA guarantees.
               </p>
             </div>
             <Link href="/contact" className="flex-shrink-0">
-              <Button variant="outline" className="bg-transparent border-white text-white hover:bg-white hover:text-[var(--color-gray-900)]">
+              <Button variant="outline" className="bg-transparent border-white text-white hover:bg-white hover:text-[#0D1327]">
                 Contact Sales
               </Button>
             </Link>
