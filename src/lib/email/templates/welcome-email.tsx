@@ -6,6 +6,7 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Link,
   Preview,
   Section,
@@ -29,7 +30,13 @@ export function WelcomeEmail({
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
-            <Text style={logo}>Zeno</Text>
+            <Img
+              src={`${appUrl}/brand/logo-inverted.svg`}
+              width="120"
+              height="52"
+              alt="Zeno"
+              style={logo}
+            />
             <Text style={tagline}>
               Paste data. Get a dashboard. Share in seconds.
             </Text>
@@ -137,11 +144,8 @@ const header = {
 };
 
 const logo = {
-  fontSize: '32px',
-  fontWeight: '700',
-  color: '#ffffff',
-  letterSpacing: '-0.5px',
-  margin: '0 0 8px 0',
+  display: 'block',
+  margin: '0 auto 12px auto',
 };
 
 const tagline = {

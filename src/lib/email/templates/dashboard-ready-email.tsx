@@ -6,6 +6,7 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Link,
   Preview,
   Section,
@@ -32,7 +33,13 @@ export function DashboardReadyEmail({
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
-            <Text style={logo}>Zeno</Text>
+            <Img
+              src={`${appUrl}/brand/logo-inverted.svg`}
+              width="100"
+              height="44"
+              alt="Zeno"
+              style={logo}
+            />
             <Text style={tagline}>Your dashboard is ready!</Text>
           </Section>
 
@@ -118,11 +125,8 @@ const header = {
 };
 
 const logo = {
-  fontSize: '28px',
-  fontWeight: '700',
-  color: '#ffffff',
-  letterSpacing: '-0.5px',
-  margin: '0 0 8px 0',
+  display: 'block',
+  margin: '0 auto 12px auto',
 };
 
 const tagline = {
