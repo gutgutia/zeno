@@ -42,6 +42,22 @@ export default function SettingsLayout({
                     Connections
                   </Link>
                 </li>
+                <li>
+                  <Link
+                    href="/settings/team"
+                    className="block px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
+                  >
+                    Team
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/settings/billing"
+                    className="block px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
+                  >
+                    Billing
+                  </Link>
+                </li>
               </ul>
             </div>
           </nav>
