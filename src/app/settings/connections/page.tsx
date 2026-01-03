@@ -78,8 +78,42 @@ export default function ConnectionsPage() {
   }
 
   async function handleConnect() {
-    // Redirect to Google OAuth flow
-    window.location.href = '/api/auth/google';
+    try {
+      const supabase = createClient();
+      
+      // Get user's workspace
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please log in first');
+        return;
+      }
+
+      const { data: workspace } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('owner_id', user.id)
+        .eq('type', 'personal')
+        .single();
+
+      if (!workspace) {
+        toast.error('Workspace not found');
+        return;
+      }
+
+      // Get the Google OAuth URL
+      const response = await fetch(`/api/auth/google?workspace_id=${workspace.id}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to start Google authentication');
+      }
+
+      // Redirect to Google OAuth
+      window.location.href = data.authUrl;
+    } catch (error) {
+      console.error('Error connecting Google:', error);
+      toast.error('Failed to connect Google account');
+    }
   }
 
   if (loading) {
