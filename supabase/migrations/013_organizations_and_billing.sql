@@ -2,6 +2,9 @@
 -- Transforms from workspace-centric to organization-centric model
 -- Organizations are billing entities, dashboards are user-owned
 
+-- Enable pgcrypto for token generation
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- ============================================
 -- PLAN LIMITS TABLE (Configurable via admin)
 -- ============================================

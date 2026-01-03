@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import type { Dashboard, BrandingConfig, DashboardShare } from '@/types/database';
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import Link from 'next/link';
 import { PublicPageRenderer } from './PublicPageRenderer';
+import { SharedDashboardAuthGate, AccessRevoked } from '@/components/dashboard/SharedDashboardAuthGate';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -28,8 +29,8 @@ function checkShareAccess(shares: DashboardShare[], userEmail: string): boolean 
   });
 }
 
-// Access Denied component
-function AccessDenied({ userEmail }: { userEmail: string }) {
+// Access Denied component - for users signed in but without access
+function AccessDenied({ userEmail, dashboardTitle }: { userEmail: string; dashboardTitle: string }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--color-gray-50)]">
       <div className="text-center max-w-md px-4">
@@ -41,11 +42,14 @@ function AccessDenied({ userEmail }: { userEmail: string }) {
         <h1 className="text-xl font-semibold text-[var(--color-gray-900)] mb-2">
           Access Denied
         </h1>
-        <p className="text-[var(--color-gray-600)] mb-4">
-          You don&apos;t have permission to view this dashboard.
+        <p className="text-[var(--color-gray-600)] mb-2">
+          You don&apos;t have permission to view <span className="font-medium">&quot;{dashboardTitle}&quot;</span>.
+        </p>
+        <p className="text-sm text-[var(--color-gray-500)] mb-4">
+          Signed in as <span className="font-medium">{userEmail}</span>
         </p>
         <p className="text-sm text-[var(--color-gray-500)] mb-6">
-          Signed in as <span className="font-medium">{userEmail}</span>
+          Please contact the dashboard owner to request access.
         </p>
         <Link
           href="/dashboards"
@@ -119,17 +123,22 @@ export default async function PublicDashboardPage({ params }: PageProps) {
         notFound();
       }
 
-      // If not authenticated, redirect to login
+      // If not authenticated, show auth gate with blurred placeholder
       if (!user) {
-        redirect(`/auth?redirect=/d/${slug}`);
+        return (
+          <SharedDashboardAuthGate
+            dashboardTitle={dashboardData.title}
+            slug={slug}
+          />
+        );
       }
 
       // Check if user's email matches any share
       const hasAccess = checkShareAccess(dashboardShares, user.email || '');
 
       if (!hasAccess) {
-        // User is authenticated but doesn't have access
-        return <AccessDenied userEmail={user.email || ''} />;
+        // User is authenticated but doesn't have access (access may have been revoked)
+        return <AccessDenied userEmail={user.email || ''} dashboardTitle={dashboardData.title} />;
       }
     }
   }

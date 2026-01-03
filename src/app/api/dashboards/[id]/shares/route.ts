@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { DashboardShare } from '@/types/database';
+import { resend, FROM_EMAIL } from '@/lib/email/resend';
+import { ShareNotificationEmail } from '@/lib/email/templates/share-notification-email';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -90,10 +92,11 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
     }
 
-    // Verify ownership via workspace
-    const { data: dashboard } = await supabase
+    // Verify ownership via workspace and get dashboard details for email
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: dashboard } = await (supabase as any)
       .from('dashboards')
-      .select('workspace_id, workspaces!inner(owner_id)')
+      .select('workspace_id, title, slug, workspaces!inner(owner_id)')
       .eq('id', id)
       .single();
 
@@ -101,7 +104,12 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dashboard not found' }, { status: 404 });
     }
 
-    const dashboardData = dashboard as { workspace_id: string; workspaces: { owner_id: string } };
+    const dashboardData = dashboard as {
+      workspace_id: string;
+      title: string;
+      slug: string;
+      workspaces: { owner_id: string }
+    };
     if (dashboardData.workspaces.owner_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -124,6 +132,38 @@ export async function POST(request: Request, { params }: RouteParams) {
         return NextResponse.json({ error: 'This share already exists' }, { status: 409 });
       }
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Send email notification for email shares (not domain shares)
+    if (share_type === 'email') {
+      try {
+        // Get owner's profile name for the email
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: profile } = await (supabase as any)
+          .from('profiles')
+          .select('name')
+          .eq('id', user.id)
+          .single();
+
+        const ownerName = profile?.name || user.email?.split('@')[0] || 'Someone';
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://zeno.fyi';
+        const dashboardUrl = `${appUrl}/d/${dashboardData.slug}`;
+
+        await resend.emails.send({
+          from: FROM_EMAIL,
+          to: normalizedValue,
+          subject: `${ownerName} shared "${dashboardData.title}" with you`,
+          react: ShareNotificationEmail({
+            dashboardTitle: dashboardData.title,
+            dashboardUrl,
+            sharedByName: ownerName,
+            appUrl,
+          }),
+        });
+      } catch (emailError) {
+        // Log but don't fail the request if email fails
+        console.error('Failed to send share notification email:', emailError);
+      }
     }
 
     return NextResponse.json({ share: share as DashboardShare }, { status: 201 });
