@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PageRenderer } from '@/components/dashboard/PageRenderer';
 import { ShareDialog } from '@/components/dashboard/ShareDialog';
+import { UpdateDataModal } from '@/components/dashboard/UpdateDataModal';
+import { VersionHistoryPanel } from '@/components/dashboard/VersionHistoryPanel';
 import { toast } from 'sonner';
 import type { Dashboard, BrandingConfig } from '@/types/database';
 import type { DashboardConfig, GenerationStatus } from '@/types/dashboard';
@@ -35,6 +37,9 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Version history state
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
 
   // Compute CSS variables for branding
   const brandingStyles = useMemo(() => {
@@ -218,6 +223,17 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     toast.success('Link copied to clipboard!');
   };
 
+  const handleVersionRestore = (restoredDashboard: Dashboard) => {
+    setDashboard(restoredDashboard);
+    setIsVersionHistoryOpen(false);
+  };
+
+  const handleDataRefresh = (result: { config?: DashboardConfig }) => {
+    if (result.config) {
+      setDashboard((prev) => prev ? { ...prev, config: result.config } : null);
+    }
+  };
+
   const handleRetryGeneration = async () => {
     try {
       const response = await fetch(`/api/dashboards/${id}/generate`, {
@@ -333,23 +349,30 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                     </Button>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => setIsEditingTitle(true)}
-                    className="group flex items-center gap-2 text-left"
-                    title="Click to edit title"
-                  >
-                    <h1 className="text-lg font-semibold text-[var(--color-gray-900)] truncate">
-                      {dashboard.title}
-                    </h1>
-                    <svg
-                      className="w-4 h-4 text-[var(--color-gray-400)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                  <div className="flex flex-col">
+                    <button
+                      onClick={() => setIsEditingTitle(true)}
+                      className="group flex items-center gap-2 text-left"
+                      title="Click to edit title"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </button>
+                      <h1 className="text-lg font-semibold text-[var(--color-gray-900)] truncate">
+                        {dashboard.title}
+                      </h1>
+                      <svg
+                        className="w-4 h-4 text-[var(--color-gray-400)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </button>
+                    {isComplete && dashboard.current_major_version !== undefined && (
+                      <span className="text-xs text-[var(--color-gray-500)]">
+                        v{dashboard.current_major_version}.{dashboard.current_minor_version || 0}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -365,7 +388,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
             {/* Right side - Actions */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Edit with AI Button */}
+              {/* Modify with AI Button */}
               {isComplete && (
                 <Button
                   variant="outline"
@@ -376,7 +399,39 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
-                  Edit with AI
+                  Modify with AI
+                </Button>
+              )}
+
+              {/* Update Data Button */}
+              {isComplete && (
+                <UpdateDataModal
+                  dashboardId={id}
+                  hasGoogleConnection={Boolean(dashboard.google_connection_id)}
+                  onRefreshComplete={handleDataRefresh}
+                  trigger={
+                    <Button variant="outline" size="sm" className="hidden sm:flex items-center gap-1.5">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Update Data
+                    </Button>
+                  }
+                />
+              )}
+
+              {/* Version History Button */}
+              {isComplete && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsVersionHistoryOpen(true)}
+                  className="hidden md:flex items-center gap-1.5"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  History
                 </Button>
               )}
 
@@ -487,12 +542,12 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
         </div>
       </main>
 
-      {/* Mobile Edit with AI FAB */}
+      {/* Mobile Modify with AI FAB */}
       {isComplete && !isChatOpen && (
         <button
           onClick={() => setIsChatOpen(true)}
           className="sm:hidden fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 bg-[var(--color-primary)] text-white rounded-full shadow-lg hover:shadow-xl transition-all"
-          title="Edit dashboard with AI"
+          title="Modify dashboard with AI"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -509,7 +564,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
         {/* Chat Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--color-gray-200)] bg-[var(--color-gray-50)]">
           <div>
-            <h2 className="font-semibold text-[var(--color-gray-900)]">Edit Dashboard</h2>
+            <h2 className="font-semibold text-[var(--color-gray-900)]">Modify Dashboard</h2>
             <p className="text-sm text-[var(--color-gray-500)]">
               Describe changes you&apos;d like to make
             </p>
@@ -614,6 +669,20 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
         <div
           className="fixed inset-0 bg-black/20 z-40 lg:hidden"
           onClick={() => setIsChatOpen(false)}
+        />
+      )}
+
+      {/* Version History Panel */}
+      {isComplete && (
+        <VersionHistoryPanel
+          dashboardId={id}
+          currentVersion={{
+            major: dashboard.current_major_version || 1,
+            minor: dashboard.current_minor_version || 0,
+          }}
+          isOpen={isVersionHistoryOpen}
+          onClose={() => setIsVersionHistoryOpen(false)}
+          onRestore={handleVersionRestore}
         />
       )}
     </div>
