@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import type { Dashboard, DashboardVersion, VersionChangeType } from '@/types/database';
 import { toast } from 'sonner';
@@ -31,7 +31,7 @@ function formatTimeAgo(dateString: string): string {
   return date.toLocaleDateString();
 }
 
-function getChangeTypeInfo(changeType: VersionChangeType): { label: string; color: string; icon: JSX.Element } {
+function getChangeTypeInfo(changeType: VersionChangeType): { label: string; color: string; icon: React.ReactNode } {
   switch (changeType) {
     case 'initial':
       return {

@@ -102,7 +102,8 @@ export async function POST(request: Request) {
     const logoUrl = urlData.publicUrl;
 
     // Update the workspace branding with the new logo URL
-    const { data: currentWorkspace } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: currentWorkspace } = await (supabase as any)
       .from('workspaces')
       .select('branding')
       .eq('id', workspace.id)
@@ -110,7 +111,8 @@ export async function POST(request: Request) {
 
     const currentBranding = (currentWorkspace?.branding as Record<string, unknown>) || {};
 
-    const { error: updateError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: updateError } = await (supabase as any)
       .from('workspaces')
       .update({
         branding: {
@@ -177,7 +179,8 @@ export async function DELETE() {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { logoUrl: _, ...brandingWithoutLogo } = currentBranding;
 
-    await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any)
       .from('workspaces')
       .update({
         branding: Object.keys(brandingWithoutLogo).length > 0 ? brandingWithoutLogo : null,

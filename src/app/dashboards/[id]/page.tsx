@@ -247,9 +247,10 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     setIsVersionHistoryOpen(false);
   };
 
-  const handleDataRefresh = (result: { config?: DashboardConfig }) => {
-    if (result.config) {
-      setDashboard((prev) => prev ? { ...prev, config: result.config } : null);
+  const handleDataRefresh = async (result: { success: boolean; refreshed: boolean }) => {
+    if (result.success && result.refreshed) {
+      // Refetch the dashboard to get the updated config
+      await fetchDashboard();
     }
   };
 

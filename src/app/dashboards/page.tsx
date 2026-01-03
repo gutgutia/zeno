@@ -75,27 +75,29 @@ export default async function DashboardsPage() {
   let dashboards: DashboardWithShares[] = [];
   if (workspace?.id) {
     // First get dashboards
-    const { data: dashboardData } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: dashboardData } = await (supabase as any)
       .from('dashboards')
       .select('*')
       .eq('workspace_id', workspace.id)
-      .order('updated_at', { ascending: false });
-    
+      .order('updated_at', { ascending: false }) as { data: Dashboard[] | null };
+
     if (dashboardData) {
       // Get share counts for all dashboards
       const dashboardIds = dashboardData.map(d => d.id);
-      const { data: shareData } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: shareData } = await (supabase as any)
         .from('dashboard_shares')
         .select('dashboard_id')
-        .in('dashboard_id', dashboardIds);
-      
+        .in('dashboard_id', dashboardIds) as { data: { dashboard_id: string }[] | null };
+
       // Count shares per dashboard
       const shareCounts = new Map<string, number>();
       shareData?.forEach(share => {
         const count = shareCounts.get(share.dashboard_id) || 0;
         shareCounts.set(share.dashboard_id, count + 1);
       });
-      
+
       dashboards = dashboardData.map(d => ({
         ...d,
         share_count: shareCounts.get(d.id) || 0,
