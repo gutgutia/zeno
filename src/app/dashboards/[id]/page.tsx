@@ -271,12 +271,12 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
   const data = (dashboard.data as Record<string, unknown>[]) || [];
 
   return (
-    <div className="min-h-screen bg-[var(--color-gray-50)]" style={brandingStyles}>
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[var(--color-gray-200)] shadow-sm">
-        <div className="px-4 sm:px-6 py-3">
-          <div className="flex items-center justify-between">
-            {/* Left side - Back button and title */}
+    <div style={brandingStyles}>
+      {/* Dashboard Title Bar - Constrained width */}
+      <div className="bg-white border-b border-[var(--color-gray-200)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-4 gap-4">
+            {/* Left side - Back + Title */}
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <Link
                 href="/dashboards"
@@ -288,7 +288,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                 </svg>
               </Link>
 
-              {/* Company Logo */}
+              {/* Company Logo (from branding) */}
               {branding?.logoUrl && (
                 <div className="flex-shrink-0 hidden sm:block">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -310,7 +310,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                     <Input
                       value={editedTitle}
                       onChange={(e) => setEditedTitle(e.target.value)}
-                      className="text-base font-semibold max-w-xs"
+                      className="text-lg font-semibold max-w-sm"
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleTitleSave();
@@ -335,14 +335,14 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                 ) : (
                   <button
                     onClick={() => setIsEditingTitle(true)}
-                    className="group flex items-center gap-1.5 text-left"
+                    className="group flex items-center gap-2 text-left"
                     title="Click to edit title"
                   >
-                    <h1 className="text-base font-semibold text-[var(--color-gray-900)] truncate">
+                    <h1 className="text-lg font-semibold text-[var(--color-gray-900)] truncate">
                       {dashboard.title}
                     </h1>
                     <svg
-                      className="w-3.5 h-3.5 text-[var(--color-gray-400)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                      className="w-4 h-4 text-[var(--color-gray-400)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -364,30 +364,19 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
             </div>
 
             {/* Right side - Actions */}
-            <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-              {/* Published Status */}
-              {dashboard.is_published && (
-                <div className="hidden sm:flex items-center gap-1.5 text-[var(--color-success)]">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                  </svg>
-                  <span className="text-sm font-medium">Published</span>
-                </div>
-              )}
-
-              {/* Copy Link Button */}
-              {dashboard.is_published && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Edit with AI Button */}
+              {isComplete && (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  onClick={handleCopyLink}
+                  onClick={() => setIsChatOpen(true)}
                   className="hidden sm:flex items-center gap-1.5"
-                  title="Copy public link"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
-                  <span className="hidden md:inline">Copy Link</span>
+                  Edit with AI
                 </Button>
               )}
 
@@ -406,14 +395,29 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
               >
                 {dashboard.is_published ? 'Unpublish' : 'Publish'}
               </Button>
+
+              {/* Copy Link Button (only when published) */}
+              {dashboard.is_published && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopyLink}
+                  className="hidden md:flex items-center gap-1.5"
+                  title="Copy public link"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </Button>
+              )}
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <main className={`transition-all duration-300 ${isChatOpen ? 'mr-96' : ''}`}>
-        <div className="p-4 sm:p-6">
+      {/* Main Content - Constrained width */}
+      <main className={`transition-all duration-300 ${isChatOpen ? 'lg:mr-96' : ''}`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Generating State */}
           {isGenerating && (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-center bg-white rounded-xl shadow-sm p-8">
@@ -483,23 +487,22 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
         </div>
       </main>
 
-      {/* Floating Edit Button */}
+      {/* Mobile Edit with AI FAB */}
       {isComplete && !isChatOpen && (
         <button
           onClick={() => setIsChatOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-[var(--color-primary)] text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
+          className="sm:hidden fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 bg-[var(--color-primary)] text-white rounded-full shadow-lg hover:shadow-xl transition-all"
           title="Edit dashboard with AI"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <span className="font-medium">Edit with AI</span>
         </button>
       )}
 
       {/* Chat Panel - Slide in from right */}
       <div
-        className={`fixed right-0 top-0 bottom-0 w-96 bg-white border-l border-[var(--color-gray-200)] shadow-xl flex flex-col z-50 transform transition-transform duration-300 ${
+        className={`fixed right-0 top-0 bottom-0 w-full sm:w-96 bg-white border-l border-[var(--color-gray-200)] shadow-xl flex flex-col z-50 transform transition-transform duration-300 ${
           isChatOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >

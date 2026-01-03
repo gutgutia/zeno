@@ -8,6 +8,50 @@ import type { Dashboard, Workspace } from '@/types/database';
 // Force dynamic rendering - this page requires authentication
 export const dynamic = 'force-dynamic';
 
+// Extended dashboard type with share count
+interface DashboardWithShares extends Dashboard {
+  share_count: number;
+}
+
+// Sharing status types
+type SharingStatus = 'private' | 'public' | 'shared';
+
+function getSharingStatus(dashboard: DashboardWithShares): SharingStatus {
+  if (!dashboard.is_published) return 'private';
+  if (dashboard.share_count > 0) return 'shared';
+  return 'public';
+}
+
+const SHARING_STATUS_CONFIG: Record<SharingStatus, { label: string; icon: React.ReactNode; className: string }> = {
+  private: {
+    label: 'Private',
+    icon: (
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    ),
+    className: 'text-[var(--color-gray-500)] bg-[var(--color-gray-100)]',
+  },
+  public: {
+    label: 'Public',
+    icon: (
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    className: 'text-[var(--color-primary)] bg-[var(--color-primary-light)]',
+  },
+  shared: {
+    label: 'Shared',
+    icon: (
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+      </svg>
+    ),
+    className: 'text-[var(--color-accent)] bg-[var(--color-accent-light)]',
+  },
+};
+
 export default async function DashboardsPage() {
   const supabase = await createClient();
 
@@ -27,15 +71,36 @@ export default async function DashboardsPage() {
 
   const workspace = workspaceData as Workspace | null;
 
-  // Get dashboards (only if workspace exists)
-  let dashboards: Dashboard[] = [];
+  // Get dashboards with share counts (only if workspace exists)
+  let dashboards: DashboardWithShares[] = [];
   if (workspace?.id) {
-    const { data } = await supabase
+    // First get dashboards
+    const { data: dashboardData } = await supabase
       .from('dashboards')
       .select('*')
       .eq('workspace_id', workspace.id)
       .order('updated_at', { ascending: false });
-    dashboards = (data as Dashboard[]) || [];
+    
+    if (dashboardData) {
+      // Get share counts for all dashboards
+      const dashboardIds = dashboardData.map(d => d.id);
+      const { data: shareData } = await supabase
+        .from('dashboard_shares')
+        .select('dashboard_id')
+        .in('dashboard_id', dashboardIds);
+      
+      // Count shares per dashboard
+      const shareCounts = new Map<string, number>();
+      shareData?.forEach(share => {
+        const count = shareCounts.get(share.dashboard_id) || 0;
+        shareCounts.set(share.dashboard_id, count + 1);
+      });
+      
+      dashboards = dashboardData.map(d => ({
+        ...d,
+        share_count: shareCounts.get(d.id) || 0,
+      })) as DashboardWithShares[];
+    }
   }
 
   return (
@@ -59,7 +124,7 @@ export default async function DashboardsPage() {
       {!dashboards || dashboards.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {dashboards.map((dashboard) => (
             <DashboardCard key={dashboard.id} dashboard={dashboard} />
           ))}
@@ -100,40 +165,40 @@ function EmptyState() {
   );
 }
 
-function DashboardCard({ dashboard }: { dashboard: Dashboard }) {
-  const config = dashboard.config as { charts?: Record<string, unknown> } | null;
-  const chartCount = config?.charts ? Object.keys(config.charts).length : 0;
+function DashboardCard({ dashboard }: { dashboard: DashboardWithShares }) {
+  const sharingStatus = getSharingStatus(dashboard);
+  const statusConfig = SHARING_STATUS_CONFIG[sharingStatus];
 
   return (
     <Link
       href={`/dashboards/${dashboard.id}`}
-      className="block bg-white rounded-xl border border-[var(--color-gray-200)] shadow-sm hover:shadow-md hover:border-[var(--color-gray-300)] transition-all p-6"
+      className="group block bg-white rounded-xl border border-[var(--color-gray-200)] hover:border-[var(--color-gray-300)] hover:shadow-md transition-all overflow-hidden"
     >
-      {/* Preview placeholder */}
-      <div className="h-32 bg-[var(--color-gray-50)] rounded-lg mb-4 flex items-center justify-center">
-        {chartCount > 0 ? (
-          <span className="text-sm text-[var(--color-gray-500)]">
-            {chartCount} chart{chartCount !== 1 ? 's' : ''}
+      <div className="p-5">
+        {/* Header: Title + Status */}
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <h3 className="font-semibold text-[var(--color-gray-900)] group-hover:text-[var(--color-primary)] transition-colors line-clamp-1">
+            {dashboard.title}
+          </h3>
+          
+          {/* Sharing status badge */}
+          <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.className}`}>
+            {statusConfig.icon}
+            {statusConfig.label}
           </span>
-        ) : (
-          <span className="text-sm text-[var(--color-gray-400)]">No charts yet</span>
-        )}
-      </div>
-
-      {/* Title */}
-      <h3 className="font-semibold text-[var(--color-gray-900)] mb-1 truncate">
-        {dashboard.title}
-      </h3>
-
-      {/* Meta */}
-      <div className="flex items-center gap-2 text-sm text-[var(--color-gray-500)]">
-        <span>{formatRelativeTime(dashboard.updated_at)}</span>
-        {dashboard.is_published && (
-          <>
-            <span>•</span>
-            <span className="text-[var(--color-success)]">Published</span>
-          </>
-        )}
+        </div>
+        
+        {/* Description */}
+        <p className="text-sm text-[var(--color-gray-600)] line-clamp-2 mb-4 min-h-[40px]">
+          {dashboard.description || (
+            <span className="text-[var(--color-gray-400)] italic">No description</span>
+          )}
+        </p>
+        
+        {/* Footer: Meta info */}
+        <div className="text-xs text-[var(--color-gray-500)]">
+          <span>Updated {formatRelativeTime(dashboard.updated_at)}</span>
+        </div>
       </div>
     </Link>
   );
