@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthUrl } from '@/lib/google/auth';
 
+// Force dynamic to ensure cookies are read fresh
+export const dynamic = 'force-dynamic';
+
 // GET /api/auth/google - Initiate Google OAuth flow
 export async function GET(request: NextRequest) {
   try {
@@ -17,9 +20,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get workspace_id from query params
+    // Get workspace_id and optional return_url from query params
     const { searchParams } = new URL(request.url);
     const workspaceId = searchParams.get('workspace_id');
+    const returnUrl = searchParams.get('return_url') || '/settings/connections';
 
     if (!workspaceId) {
       return NextResponse.json(
@@ -49,6 +53,7 @@ export async function GET(request: NextRequest) {
       JSON.stringify({
         userId: user.id,
         workspaceId,
+        returnUrl,
         timestamp: Date.now(),
       })
     ).toString('base64url');

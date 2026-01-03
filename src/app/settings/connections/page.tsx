@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -15,6 +16,24 @@ export default function ConnectionsPage() {
   const [connection, setConnection] = useState<GoogleConnection | null>(null);
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
+  const searchParams = useSearchParams();
+
+  // Handle OAuth callback results
+  useEffect(() => {
+    const googleConnected = searchParams.get('google_connected');
+    const googleError = searchParams.get('google_error');
+    const googleEmail = searchParams.get('google_email');
+
+    if (googleConnected === 'true' && googleEmail) {
+      toast.success(`Connected to Google as ${googleEmail}`);
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings/connections');
+    } else if (googleError) {
+      toast.error(googleError);
+      // Clean up URL
+      window.history.replaceState({}, '', '/settings/connections');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchConnection();
@@ -102,7 +121,7 @@ export default function ConnectionsPage() {
       }
 
       // Get the Google OAuth URL
-      const response = await fetch(`/api/auth/google?workspace_id=${(workspace as any).id}`);
+      const response = await fetch(`/api/auth/google?workspace_id=${(workspace as any).id}&return_url=/settings/connections`);
       const data = await response.json();
 
       if (!response.ok) {

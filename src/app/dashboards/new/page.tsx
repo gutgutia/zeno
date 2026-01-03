@@ -129,7 +129,7 @@ function NewDashboardPageContent() {
     if (!workspaceId) return;
 
     try {
-      const response = await fetch(`/api/auth/google?workspace_id=${workspaceId}`);
+      const response = await fetch(`/api/auth/google?workspace_id=${workspaceId}&return_url=/dashboards/new`);
       if (response.ok) {
         const { authUrl } = await response.json();
         window.location.href = authUrl;
