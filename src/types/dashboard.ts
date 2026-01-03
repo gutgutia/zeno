@@ -77,7 +77,6 @@ export interface GenerationRequest {
   rawContent: string;
   contentType?: ContentType;
   userInstructions?: string;
-  notifyEmail?: boolean;
 }
 
 // Layout config (keeping for reference, may be used later)

@@ -569,11 +569,9 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                   ? 'Creating a beautiful, insightful dashboard based on your content.'
                   : 'Your dashboard generation will begin shortly.'}
               </p>
-              {dashboard.notify_email && (
-                <p className="text-sm text-[var(--color-gray-500)] mt-4">
-                  We&apos;ll email you when it&apos;s ready. Feel free to close this page.
-                </p>
-              )}
+              <p className="text-sm text-[var(--color-gray-500)] mt-4">
+                We&apos;ll email you when it&apos;s ready. Feel free to close this page.
+              </p>
             </div>
           )}
 
