@@ -38,10 +38,11 @@ export default function ConnectionsPage() {
       if (!workspace) return;
 
       // Get Google connection
-      const { data: connectionData } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: connectionData } = await (supabase as any)
         .from('google_connections')
         .select('id, google_email, created_at')
-        .eq('workspace_id', workspace.id)
+        .eq('workspace_id', (workspace as any).id)
         .single();
 
       setConnection(connectionData);
@@ -101,7 +102,7 @@ export default function ConnectionsPage() {
       }
 
       // Get the Google OAuth URL
-      const response = await fetch(`/api/auth/google?workspace_id=${workspace.id}`);
+      const response = await fetch(`/api/auth/google?workspace_id=${(workspace as any).id}`);
       const data = await response.json();
 
       if (!response.ok) {
