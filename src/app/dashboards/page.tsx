@@ -105,30 +105,31 @@ export default async function DashboardsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">
-            My Dashboards
-          </h1>
-          <p className="text-[var(--color-gray-600)] mt-1">
-            Create and manage your data visualizations
-          </p>
-        </div>
-        <Link href="/dashboards/new">
-          <Button>+ New Dashboard</Button>
-        </Link>
-      </div>
-
       {/* Dashboard Grid or Empty State */}
       {!dashboards || dashboards.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {dashboards.map((dashboard) => (
-            <DashboardCard key={dashboard.id} dashboard={dashboard} />
-          ))}
-        </div>
+        <>
+          {/* Header - only show when dashboards exist */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">
+                My Dashboards
+              </h1>
+              <p className="text-[var(--color-gray-600)] mt-1">
+                Create and manage your data visualizations
+              </p>
+            </div>
+            <Link href="/dashboards/new">
+              <Button>+ New Dashboard</Button>
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {dashboards.map((dashboard) => (
+              <DashboardCard key={dashboard.id} dashboard={dashboard} />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
