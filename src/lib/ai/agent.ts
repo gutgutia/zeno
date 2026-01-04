@@ -211,28 +211,34 @@ export async function generateWithAgent(
     }
 
     // Run the agent loop
-    for await (const message of query({
-      prompt: userPrompt,
-      options: queryOptions,
-    })) {
-      if (message.type === 'assistant') {
-        turnCount++;
-        console.log(`[Agent] Turn ${turnCount}: Assistant message`);
-      } else if (message.type === 'tool_progress') {
-        console.log(`[Agent] Tool progress: ${message.tool_name}`);
-      } else if (message.type === 'result') {
-        console.log(`[Agent] Completed after ${turnCount} turns`);
-        if (message.subtype === 'success') {
-          console.log(`[Agent] Total cost: $${message.total_cost_usd?.toFixed(4) || 'unknown'}`);
-          finalResult = extractJsonFromResult(message.result);
-        } else {
-          // Error result
-          const errorResult = message as { errors?: string[] };
-          throw new Error(`Agent error: ${errorResult.errors?.join(', ') || 'Unknown error'}`);
+    try {
+      for await (const message of query({
+        prompt: userPrompt,
+        options: queryOptions,
+      })) {
+        if (message.type === 'assistant') {
+          turnCount++;
+          console.log(`[Agent] Turn ${turnCount}: Assistant message`);
+        } else if (message.type === 'tool_progress') {
+          console.log(`[Agent] Tool progress: ${message.tool_name}`);
+        } else if (message.type === 'result') {
+          console.log(`[Agent] Completed after ${turnCount} turns`);
+          if (message.subtype === 'success') {
+            console.log(`[Agent] Total cost: $${message.total_cost_usd?.toFixed(4) || 'unknown'}`);
+            finalResult = extractJsonFromResult(message.result);
+          } else {
+            // Error result
+            const errorResult = message as { errors?: string[] };
+            throw new Error(`Agent error: ${errorResult.errors?.join(', ') || 'Unknown error'}`);
+          }
+        } else if (message.type === 'system') {
+          console.log(`[Agent] System message: ${message.subtype}`);
         }
-      } else if (message.type === 'system') {
-        console.log(`[Agent] System message: ${message.subtype}`);
       }
+    } catch (agentError) {
+      console.error('[Agent] SDK Error:', agentError);
+      console.error('[Agent] Error details:', JSON.stringify(agentError, Object.getOwnPropertyNames(agentError)));
+      throw agentError;
     }
 
     if (!finalResult?.html) {
