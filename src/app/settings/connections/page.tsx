@@ -14,14 +14,10 @@ interface GoogleConnection {
   created_at: string;
 }
 
-<<<<<<< HEAD
-function ConnectionsPageContent() {
-=======
 function ConnectionsContent() {
   const { features, isLoading: isPlanLoading } = usePlan();
   const canUseGoogleSheets = features.google_sheets;
 
->>>>>>> claude/update-email-templates-branding-LiFt0
   const [connection, setConnection] = useState<GoogleConnection | null>(null);
   const [loading, setLoading] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -51,7 +47,7 @@ function ConnectionsContent() {
   async function fetchConnection() {
     try {
       const supabase = createClient();
-      
+
       // Get user's workspace
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -109,7 +105,7 @@ function ConnectionsContent() {
   async function handleConnect() {
     try {
       const supabase = createClient();
-      
+
       // Get user's workspace
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -199,7 +195,7 @@ function ConnectionsContent() {
               <h3 className="text-lg font-semibold text-[var(--color-gray-900)]">
                 Google Sheets
               </h3>
-              
+
               {connection ? (
                 <div className="mt-1">
                   <div className="flex items-center gap-2">
@@ -298,20 +294,6 @@ function ConnectionsContent() {
   );
 }
 
-<<<<<<< HEAD
-export default function ConnectionsPage() {
-  return (
-    <Suspense fallback={
-      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-[var(--color-gray-100)] rounded w-48 mb-4"></div>
-          <div className="h-4 bg-[var(--color-gray-100)] rounded w-full mb-2"></div>
-          <div className="h-4 bg-[var(--color-gray-100)] rounded w-3/4"></div>
-        </div>
-      </div>
-    }>
-      <ConnectionsPageContent />
-=======
 function ConnectionsLoadingFallback() {
   return (
     <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6">
@@ -328,8 +310,6 @@ export default function ConnectionsPage() {
   return (
     <Suspense fallback={<ConnectionsLoadingFallback />}>
       <ConnectionsContent />
->>>>>>> claude/update-email-templates-branding-LiFt0
     </Suspense>
   );
 }
-
