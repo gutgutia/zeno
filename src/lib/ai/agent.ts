@@ -1,10 +1,32 @@
 import { query, tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import { Sandbox } from '@e2b/code-interpreter';
 import { z } from 'zod';
+import path from 'path';
 import { getAgentSystemPrompt, getAgentUserPrompt } from './agent-prompts';
 import { getRefreshSystemPrompt, getRefreshUserPrompt } from './refresh-prompts';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig } from '@/types/database';
+
+// Determine the path to the Claude Agent SDK executable
+// This varies by deployment environment (Vercel uses /var/task, Railway uses /app, local uses node_modules)
+const getClaudeExecutablePath = () => {
+  // Try to resolve from node_modules
+  try {
+    const sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');
+    return path.join(path.dirname(sdkPath), 'cli.js');
+  } catch {
+    // Fallback paths for different environments
+    const possiblePaths = [
+      '/app/node_modules/@anthropic-ai/claude-agent-sdk/cli.js', // Railway
+      '/var/task/node_modules/@anthropic-ai/claude-agent-sdk/cli.js', // Vercel
+      path.join(process.cwd(), 'node_modules/@anthropic-ai/claude-agent-sdk/cli.js'), // Local
+    ];
+    return possiblePaths[0]; // Default to Railway path
+  }
+};
+
+const CLAUDE_EXECUTABLE_PATH = getClaudeExecutablePath();
+console.log('[Agent SDK] Resolved executable path:', CLAUDE_EXECUTABLE_PATH);
 
 export interface RefreshResult {
   html: string;
@@ -161,6 +183,7 @@ export async function generateWithAgent(
         python: pythonToolServer,
       },
       allowedTools: ['mcp__python__execute_python'],
+      pathToClaudeCodeExecutable: CLAUDE_EXECUTABLE_PATH,
     };
 
     // Add extended thinking if enabled
@@ -325,6 +348,7 @@ export async function refreshDashboardWithAgent(
         python: pythonToolServer,
       },
       allowedTools: ['mcp__python__execute_python'],
+      pathToClaudeCodeExecutable: CLAUDE_EXECUTABLE_PATH,
     };
 
     // Add extended thinking with reduced budget
