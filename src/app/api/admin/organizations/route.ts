@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { SupabaseClient } from '@supabase/supabase-js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AdminSupabase = SupabaseClient<any, any, any>;
 
 // GET /api/admin/organizations - List all organizations
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
+  const supabase = await createClient() as AdminSupabase;
 
   // Check if user is admin
   const { data: { user } } = await supabase.auth.getUser();

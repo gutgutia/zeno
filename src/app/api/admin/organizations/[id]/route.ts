@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createClient as createAdminClient, SupabaseClient } from '@supabase/supabase-js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AdminSupabase = SupabaseClient<any, any, any>;
 
 // GET /api/admin/organizations/[id] - Get organization details
 export async function GET(
@@ -8,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: orgId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient() as AdminSupabase;
 
   // Check if user is admin
   const { data: { user } } = await supabase.auth.getUser();
@@ -38,6 +41,14 @@ export async function GET(
   }
 
   // Get members with profiles
+  interface MemberWithProfile {
+    id: string;
+    user_id: string;
+    role: string;
+    invited_at: string;
+    accepted_at: string | null;
+    profile: { id: string; name: string | null; avatar_url: string | null; plan_type: string | null } | null;
+  }
   const { data: members } = await supabase
     .from('organization_members')
     .select(`
@@ -49,7 +60,7 @@ export async function GET(
       profile:profiles(id, name, avatar_url, plan_type)
     `)
     .eq('organization_id', orgId)
-    .order('role', { ascending: true });
+    .order('role', { ascending: true }) as { data: MemberWithProfile[] | null };
 
   // Get member emails from auth
   let emailMap: Record<string, string> = {};
@@ -144,7 +155,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: orgId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient() as AdminSupabase;
 
   // Check if user is admin
   const { data: { user } } = await supabase.auth.getUser();
@@ -177,7 +188,7 @@ export async function PATCH(
         .from('organization_credits')
         .select('balance, lifetime_credits')
         .eq('organization_id', orgId)
-        .single();
+        .single() as { data: { balance: number; lifetime_credits: number } | null };
 
       const currentBalance = currentCredits?.balance || 0;
       const newBalance = currentBalance + amount;

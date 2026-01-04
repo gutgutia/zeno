@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createClient as createAdminClient, SupabaseClient } from '@supabase/supabase-js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AdminSupabase = SupabaseClient<any, any, any>;
 
 // GET /api/admin/users/[id] - Get user details
 export async function GET(
@@ -8,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: userId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient() as AdminSupabase;
 
   // Check if user is admin
   const { data: { user } } = await supabase.auth.getUser();
@@ -120,7 +123,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: userId } = await params;
-  const supabase = await createClient();
+  const supabase = await createClient() as AdminSupabase;
 
   // Check if user is admin
   const { data: { user } } = await supabase.auth.getUser();

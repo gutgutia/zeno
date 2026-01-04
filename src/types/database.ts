@@ -308,6 +308,41 @@ export interface Database {
         Insert: Omit<PlanLimits, 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Omit<PlanLimits, 'id' | 'plan_type'>>;
       };
+      admin_users: {
+        Row: AdminUser;
+        Insert: Omit<AdminUser, 'id' | 'created_at'>;
+        Update: Partial<Omit<AdminUser, 'id' | 'user_id'>>;
+      };
+      user_plan_overrides: {
+        Row: UserPlanOverride;
+        Insert: Omit<UserPlanOverride, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<UserPlanOverride, 'id'>>;
+      };
+      global_settings: {
+        Row: GlobalSetting;
+        Insert: Omit<GlobalSetting, 'updated_at'>;
+        Update: Partial<Omit<GlobalSetting, 'key'>>;
+      };
+      admin_audit_log: {
+        Row: AdminAuditLog;
+        Insert: Omit<AdminAuditLog, 'id' | 'created_at'>;
+        Update: never;
+      };
+      user_credits: {
+        Row: UserCredits;
+        Insert: Omit<UserCredits, 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<UserCredits, 'user_id'>>;
+      };
+      organization_credits: {
+        Row: OrganizationCredits;
+        Insert: Omit<OrganizationCredits, 'updated_at'>;
+        Update: Partial<Omit<OrganizationCredits, 'organization_id'>>;
+      };
+      credit_transactions: {
+        Row: CreditTransaction;
+        Insert: Omit<CreditTransaction, 'id' | 'created_at'>;
+        Update: never;
+      };
     };
   };
 }

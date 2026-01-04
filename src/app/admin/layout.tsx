@@ -33,7 +33,7 @@ export default function AdminLayout({
         .from('admin_users')
         .select('role')
         .eq('user_id', user.id)
-        .single();
+        .single<{ role: string }>();
 
       console.log('[Admin] Query result:', { adminUser, error });
 

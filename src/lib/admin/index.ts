@@ -1,6 +1,9 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/database';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AdminSupabaseClient = SupabaseClient<any, any, any>;
+
 export type AdminRole = 'super_admin' | 'support' | 'billing_admin';
 
 export interface AdminUser {
@@ -15,7 +18,7 @@ export interface AdminUser {
  * Check if a user is an admin
  */
 export async function isAdmin(
-  supabase: SupabaseClient<Database>,
+  supabase: AdminSupabaseClient,
   userId: string
 ): Promise<boolean> {
   const { data, error } = await supabase
@@ -31,7 +34,7 @@ export async function isAdmin(
  * Get admin role for a user
  */
 export async function getAdminRole(
-  supabase: SupabaseClient<Database>,
+  supabase: AdminSupabaseClient,
   userId: string
 ): Promise<AdminRole | null> {
   const { data, error } = await supabase
@@ -48,7 +51,7 @@ export async function getAdminRole(
  * Get full admin user record
  */
 export async function getAdminUser(
-  supabase: SupabaseClient<Database>,
+  supabase: AdminSupabaseClient,
   userId: string
 ): Promise<AdminUser | null> {
   const { data, error } = await supabase
@@ -65,7 +68,7 @@ export async function getAdminUser(
  * Require admin access - throws if not admin
  */
 export async function requireAdmin(
-  supabase: SupabaseClient<Database>,
+  supabase: AdminSupabaseClient,
   userId: string,
   requiredRoles?: AdminRole[]
 ): Promise<AdminUser> {
@@ -88,7 +91,7 @@ export async function requireAdmin(
  * Log an admin action
  */
 export async function logAdminAction(
-  supabase: SupabaseClient<Database>,
+  supabase: AdminSupabaseClient,
   params: {
     action: string;
     targetType: 'user' | 'organization' | 'settings' | 'credits';
@@ -113,7 +116,7 @@ export async function logAdminAction(
  * Get global settings
  */
 export async function getGlobalSettings(
-  supabase: SupabaseClient<Database>
+  supabase: AdminSupabaseClient
 ): Promise<Record<string, unknown>> {
   const { data, error } = await supabase
     .from('global_settings')
@@ -132,7 +135,7 @@ export async function getGlobalSettings(
  * Update a global setting
  */
 export async function updateGlobalSetting(
-  supabase: SupabaseClient<Database>,
+  supabase: AdminSupabaseClient,
   key: string,
   value: unknown,
   reason?: string
@@ -169,7 +172,7 @@ export async function updateGlobalSetting(
  * Add credits to a user or organization
  */
 export async function adminAddCredits(
-  supabase: SupabaseClient<Database>,
+  supabase: AdminSupabaseClient,
   params: {
     userId?: string;
     organizationId?: string;
@@ -192,7 +195,7 @@ export async function adminAddCredits(
  * Get all users with admin view (includes credits, plan, etc.)
  */
 export async function getAdminUserList(
-  supabase: SupabaseClient<Database>,
+  supabase: AdminSupabaseClient,
   params: {
     search?: string;
     planType?: string;
@@ -270,7 +273,7 @@ export interface AdminUserView {
  * Get detailed user info for admin view
  */
 export async function getAdminUserDetail(
-  supabase: SupabaseClient<Database>,
+  supabase: AdminSupabaseClient,
   userId: string
 ): Promise<AdminUserDetail | null> {
   // Get profile
@@ -360,7 +363,7 @@ export interface AdminUserDetail {
  * Set plan override for a user
  */
 export async function setUserPlanOverride(
-  supabase: SupabaseClient<Database>,
+  supabase: AdminSupabaseClient,
   userId: string,
   override: {
     planType?: string;
@@ -404,7 +407,7 @@ export async function setUserPlanOverride(
  * Remove plan override for a user
  */
 export async function removeUserPlanOverride(
-  supabase: SupabaseClient<Database>,
+  supabase: AdminSupabaseClient,
   userId: string
 ): Promise<void> {
   const { error } = await supabase

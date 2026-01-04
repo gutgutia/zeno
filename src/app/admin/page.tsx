@@ -48,14 +48,14 @@ export default function AdminOverviewPage() {
       const { data: creditData } = await supabase
         .from('credit_transactions')
         .select('amount')
-        .lt('amount', 0);
+        .lt('amount', 0) as { data: { amount: number }[] | null };
 
       const totalCreditsUsed = creditData?.reduce((sum, t) => sum + Math.abs(t.amount), 0) || 0;
 
       // Get plan distribution
       const { data: planData } = await supabase
         .from('profiles')
-        .select('plan_type');
+        .select('plan_type') as { data: { plan_type: string | null }[] | null };
 
       const planDistribution = {
         free: 0,
