@@ -1,12 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Keep claude-agent-sdk as external to preserve the cli.js file
-  // This prevents Next.js from bundling it and losing the executable
-  serverExternalPackages: [
-    '@anthropic-ai/claude-agent-sdk',
-    '@e2b/code-interpreter',
-  ],
+  // Ensure claude-agent-sdk cli.js is included in the serverless function
+  outputFileTracingIncludes: {
+    '/api/dashboards/[id]/generate': [
+      './node_modules/@anthropic-ai/claude-agent-sdk/**/*',
+    ],
+    '/api/dashboards/[id]/refresh': [
+      './node_modules/@anthropic-ai/claude-agent-sdk/**/*',
+    ],
+  },
 };
 
 export default nextConfig;
