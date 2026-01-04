@@ -60,10 +60,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Check credit balance before generation
-    const hasCredits = await hasEnoughCredits(userId, ESTIMATED_GENERATION_CREDITS);
+    // Check credit balance before generation (pass service client for internal calls)
+    const hasCredits = await hasEnoughCredits(userId, ESTIMATED_GENERATION_CREDITS, supabase);
     if (!hasCredits) {
-      const balance = await getCreditBalance(userId);
+      const balance = await getCreditBalance(userId, supabase);
       return NextResponse.json({
         error: 'Insufficient credits',
         credits_required: ESTIMATED_GENERATION_CREDITS,
@@ -184,7 +184,8 @@ export async function POST(request: Request, { params }: RouteParams) {
         estimatedOutputTokens,
         'dashboard_create',
         id,
-        `Generated dashboard: ${dashboard.title}`
+        `Generated dashboard: ${dashboard.title}`,
+        supabase
       );
 
       if (!deductionResult.success) {

@@ -5,6 +5,10 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { SupabaseClient } from '@supabase/supabase-js';
+
+// Type for optional supabase client parameter
+type OptionalClient = SupabaseClient | null;
 
 // ============================================
 // Types
@@ -82,9 +86,11 @@ export function calculateCredits(inputTokens: number, outputTokens: number): num
 
 /**
  * Get user's credit balance (from org if member, else personal)
+ * @param userId - The user ID to check credits for
+ * @param client - Optional supabase client (uses server client if not provided)
  */
-export async function getCreditBalance(userId: string): Promise<CreditBalance | null> {
-  const supabase = await createClient();
+export async function getCreditBalance(userId: string, client?: OptionalClient): Promise<CreditBalance | null> {
+  const supabase = client || await createClient();
 
   // First check if user is in any organization
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -139,12 +145,16 @@ export async function getCreditBalance(userId: string): Promise<CreditBalance | 
 
 /**
  * Check if user has enough credits
+ * @param userId - The user ID to check credits for
+ * @param requiredCredits - Number of credits required
+ * @param client - Optional supabase client (uses server client if not provided)
  */
 export async function hasEnoughCredits(
   userId: string,
-  requiredCredits: number
+  requiredCredits: number,
+  client?: OptionalClient
 ): Promise<boolean> {
-  const balance = await getCreditBalance(userId);
+  const balance = await getCreditBalance(userId, client);
   return balance !== null && balance.balance >= requiredCredits;
 }
 
@@ -157,13 +167,14 @@ export async function deductCredits(
   outputTokens: number,
   transactionType: 'dashboard_create' | 'dashboard_update' | 'dashboard_refresh',
   dashboardId?: string,
-  description?: string
+  description?: string,
+  client?: OptionalClient
 ): Promise<DeductionResult> {
-  const supabase = await createClient();
+  const supabase = client || await createClient();
   const creditsToDeduct = calculateCredits(inputTokens, outputTokens);
 
   // Get current balance info
-  const balance = await getCreditBalance(userId);
+  const balance = await getCreditBalance(userId, supabase);
 
   if (!balance) {
     return {
