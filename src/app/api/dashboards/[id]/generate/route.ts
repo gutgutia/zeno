@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { generateWithAgent } from '@/lib/ai/agent';
 import type { Dashboard, BrandingConfig } from '@/types/database';
@@ -21,17 +22,48 @@ export async function POST(request: Request, { params }: RouteParams) {
   const { id } = await params;
 
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    // Check for internal service call (from dashboard creation)
+    const internalUserId = request.headers.get('x-internal-user-id');
+    const internalSecret = request.headers.get('x-internal-secret');
+    const expectedSecret = process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(-20); // Use last 20 chars as internal secret
+    
+    let userId: string;
+    let userEmail: string | undefined;
+    
+    if (internalUserId && internalSecret === expectedSecret) {
+      // Internal service call - trust the provided user ID
+      console.log(`[${id}] Internal service call for user ${internalUserId}`);
+      userId = internalUserId;
+      
+      // Get user email from database for notifications
+      const serviceClient = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { data: userData } = await serviceClient.auth.admin.getUserById(internalUserId);
+      userEmail = userData.user?.email || undefined;
+    } else {
+      // Normal user request - require authentication
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      userId = user.id;
+      userEmail = user.email;
     }
+    
+    // Create service client for all database operations (bypasses RLS)
+    const supabase = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // Check credit balance before generation
-    const hasCredits = await hasEnoughCredits(user.id, ESTIMATED_GENERATION_CREDITS);
+    const hasCredits = await hasEnoughCredits(userId, ESTIMATED_GENERATION_CREDITS);
     if (!hasCredits) {
-      const balance = await getCreditBalance(user.id);
+      const balance = await getCreditBalance(userId);
       return NextResponse.json({
         error: 'Insufficient credits',
         credits_required: ESTIMATED_GENERATION_CREDITS,
@@ -56,7 +88,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     };
 
     // Check ownership
-    if (dashboard.workspaces.owner_id !== user.id) {
+    if (dashboard.workspaces.owner_id !== userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -147,7 +179,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       const estimatedInputTokens = 150000; // ~150K input tokens typical
       const estimatedOutputTokens = 20000;  // ~20K output tokens typical
       const deductionResult = await deductCredits(
-        user.id,
+        userId,
         estimatedInputTokens,
         estimatedOutputTokens,
         'dashboard_create',
@@ -172,7 +204,7 @@ export async function POST(request: Request, { params }: RouteParams) {
           rawContent: dashboard.raw_content,
           data: dashboard.data,
           dataSource: dashboard.data_source,
-          userId: user.id,
+          userId: userId,
         });
       } catch (versionError) {
         console.error(`[${id}] Failed to create initial version:`, versionError);
@@ -180,9 +212,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
 
       // Send email notification if requested
-      if (dashboard.notify_email) {
+      if (dashboard.notify_email && userEmail) {
         try {
-          await sendDashboardReadyEmail(user.email!, dashboard.title, id);
+          await sendDashboardReadyEmail(userEmail, dashboard.title, id);
         } catch (emailError) {
           console.error('Failed to send email notification:', emailError);
           // Don't fail the generation if email fails

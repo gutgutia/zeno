@@ -211,14 +211,17 @@ export async function POST(request: Request) {
     }
 
     // Trigger async generation in the background
-    // We use fetch to call our own API endpoint without waiting for it
+    // We use fetch to call our own API endpoint with internal auth headers
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const internalSecret = process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(-20) || '';
+    
     fetch(`${baseUrl}/api/dashboards/${dashboard.id}/generate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Pass the auth cookie for authentication
-        'Cookie': request.headers.get('cookie') || '',
+        // Use internal service authentication instead of cookies
+        'x-internal-user-id': user.id,
+        'x-internal-secret': internalSecret,
       },
       body: JSON.stringify({ async: true }),
     }).catch(err => {
