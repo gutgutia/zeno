@@ -1,15 +1,10 @@
 import { query, tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import { Sandbox } from '@e2b/code-interpreter';
 import { z } from 'zod';
-import { createRequire } from 'module';
 import { getAgentSystemPrompt, getAgentUserPrompt } from './agent-prompts';
 import { getRefreshSystemPrompt, getRefreshUserPrompt } from './refresh-prompts';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig } from '@/types/database';
-
-// Resolve the path to cli.js - this helps with file tracing in serverless environments
-const require = createRequire(import.meta.url);
-const CLAUDE_CLI_PATH = require.resolve('@anthropic-ai/claude-agent-sdk/cli.js');
 
 export interface RefreshResult {
   html: string;
@@ -166,8 +161,6 @@ export async function generateWithAgent(
         python: pythonToolServer,
       },
       allowedTools: ['mcp__python__execute_python'],
-      // Explicitly set the CLI path to help with serverless file tracing
-      pathToClaudeCodeExecutable: CLAUDE_CLI_PATH,
     };
 
     // Add extended thinking if enabled
@@ -332,8 +325,6 @@ export async function refreshDashboardWithAgent(
         python: pythonToolServer,
       },
       allowedTools: ['mcp__python__execute_python'],
-      // Explicitly set the CLI path to help with serverless file tracing
-      pathToClaudeCodeExecutable: CLAUDE_CLI_PATH,
     };
 
     // Add extended thinking with reduced budget
