@@ -345,3 +345,106 @@ export interface OrganizationWithRole extends Organization {
 export interface FolderWithCount extends Folder {
   dashboard_count: number;
 }
+
+// ============================================
+// ADMIN SYSTEM TYPES
+// ============================================
+
+export type AdminRole = 'super_admin' | 'support' | 'billing_admin';
+
+export interface AdminUser {
+  id: string;
+  user_id: string;
+  role: AdminRole;
+  permissions: Record<string, boolean>;
+  created_at: string;
+  created_by: string | null;
+}
+
+export interface UserPlanOverride {
+  id: string;
+  user_id: string | null;
+  organization_id: string | null;
+  plan_type: 'free' | 'starter' | 'pro' | 'enterprise' | 'custom' | null;
+  plan_expires_at: string | null;
+  max_dashboards: number | null;
+  max_folders: number | null;
+  max_data_rows: number | null;
+  monthly_credits: number | null;
+  price_override_cents: number | null;
+  price_reason: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+}
+
+export interface GlobalSetting {
+  key: string;
+  value: Record<string, unknown>;
+  description: string | null;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  admin_user_id: string;
+  action: string;
+  target_type: 'user' | 'organization' | 'settings' | 'credits';
+  target_id: string | null;
+  old_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  reason: string | null;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export interface UserCredits {
+  user_id: string;
+  balance: number;
+  lifetime_credits: number;
+  lifetime_used: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrganizationCredits {
+  organization_id: string;
+  balance: number;
+  lifetime_credits: number;
+  lifetime_used: number;
+  last_refill_at: string | null;
+  updated_at: string;
+}
+
+export interface CreditTransaction {
+  id: string;
+  organization_id: string | null;
+  user_id: string | null;
+  amount: number;
+  balance_after: number;
+  transaction_type: 'signup_bonus' | 'monthly_refill' | 'credit_pack' | 'dashboard_create' | 'dashboard_update' | 'dashboard_refresh' | 'manual_adjustment' | 'refund';
+  dashboard_id: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+// Global settings value types
+export interface PlanPricing {
+  free: { monthly_cents: number; annual_cents: number };
+  starter: { monthly_cents: number; annual_cents: number };
+  pro: { monthly_cents: number; annual_cents: number };
+  enterprise: { monthly_cents: number; annual_cents: number };
+}
+
+export interface PlanCredits {
+  free: { credits_per_month: number; is_one_time: boolean };
+  starter: { credits_per_month: number; is_one_time: boolean };
+  pro: { credits_per_month: number; is_one_time: boolean };
+  enterprise: { credits_per_month: number; is_one_time: boolean };
+}
