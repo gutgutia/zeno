@@ -2,6 +2,7 @@ import { query, tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk'
 import { Sandbox } from '@e2b/code-interpreter';
 import { z } from 'zod';
 import path from 'path';
+import fs from 'fs';
 import { getAgentSystemPrompt, getAgentUserPrompt } from './agent-prompts';
 import { getRefreshSystemPrompt, getRefreshUserPrompt } from './refresh-prompts';
 import type { DashboardConfig } from '@/types/dashboard';
@@ -10,23 +11,37 @@ import type { BrandingConfig } from '@/types/database';
 // Determine the path to the Claude Agent SDK executable
 // This varies by deployment environment (Vercel uses /var/task, Railway uses /app, local uses node_modules)
 const getClaudeExecutablePath = () => {
-  // Try to resolve from node_modules
-  try {
-    const sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');
-    return path.join(path.dirname(sdkPath), 'cli.js');
-  } catch {
-    // Fallback paths for different environments
-    const possiblePaths = [
-      '/app/node_modules/@anthropic-ai/claude-agent-sdk/cli.js', // Railway
-      '/var/task/node_modules/@anthropic-ai/claude-agent-sdk/cli.js', // Vercel
-      path.join(process.cwd(), 'node_modules/@anthropic-ai/claude-agent-sdk/cli.js'), // Local
-    ];
-    return possiblePaths[0]; // Default to Railway path
+  const possiblePaths = [
+    // Try to resolve from node_modules first
+    (() => {
+      try {
+        const sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');
+        return path.join(path.dirname(sdkPath), 'cli.js');
+      } catch {
+        return null;
+      }
+    })(),
+    '/app/node_modules/@anthropic-ai/claude-agent-sdk/cli.js', // Railway/DO
+    '/var/task/node_modules/@anthropic-ai/claude-agent-sdk/cli.js', // Vercel
+    path.join(process.cwd(), 'node_modules/@anthropic-ai/claude-agent-sdk/cli.js'), // Local
+  ].filter(Boolean) as string[];
+
+  console.log('[Agent SDK] Checking possible paths:');
+  for (const p of possiblePaths) {
+    const exists = fs.existsSync(p);
+    console.log(`  ${p}: ${exists ? 'EXISTS' : 'NOT FOUND'}`);
+    if (exists) {
+      return p;
+    }
   }
+
+  // Return first path even if not found (will error later with clear message)
+  console.error('[Agent SDK] WARNING: No cli.js found at any expected path!');
+  return possiblePaths[0];
 };
 
 const CLAUDE_EXECUTABLE_PATH = getClaudeExecutablePath();
-console.log('[Agent SDK] Resolved executable path:', CLAUDE_EXECUTABLE_PATH);
+console.log('[Agent SDK] Using executable path:', CLAUDE_EXECUTABLE_PATH);
 
 export interface RefreshResult {
   html: string;
