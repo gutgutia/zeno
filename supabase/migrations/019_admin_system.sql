@@ -19,8 +19,13 @@ CREATE TABLE public.admin_users (
 -- Enable RLS
 ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
 
--- Only admins can view admin users
-CREATE POLICY "Admins can view admin users"
+-- Users can check their own admin status
+CREATE POLICY "Users can check own admin status"
+  ON public.admin_users FOR SELECT
+  USING (user_id = auth.uid());
+
+-- Admins can view all admin users
+CREATE POLICY "Admins can view all admin users"
   ON public.admin_users FOR SELECT
   USING (
     auth.uid() IN (SELECT user_id FROM public.admin_users)
