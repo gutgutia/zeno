@@ -14,6 +14,8 @@ import {
 import { toast } from 'sonner';
 import Link from 'next/link';
 import type { OrganizationWithRole } from '@/types/database';
+import { usePlan } from '@/lib/hooks';
+import { UpgradePrompt } from '@/components/billing/UpgradePrompt';
 
 interface Member {
   id: string;
@@ -45,6 +47,10 @@ export default function TeamPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Check user's plan for team_members feature
+  const { features, isLoading: isPlanLoading } = usePlan();
+  const canAddTeamMembers = features.team_members;
 
   useEffect(() => {
     fetchOrganization();
@@ -224,7 +230,7 @@ export default function TeamPage() {
   const canManageMembers = organization?.role === 'owner' || organization?.role === 'admin';
   const isOwner = organization?.role === 'owner';
 
-  if (isLoading || isCreatingOrg) {
+  if (isLoading || isCreatingOrg || isPlanLoading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-8">
@@ -295,11 +301,21 @@ export default function TeamPage() {
         </div>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">Team</h1>
-          {canManageMembers && (
+          {canManageMembers && canAddTeamMembers && (
             <Button onClick={() => setIsInviteDialogOpen(true)}>Invite Team Member</Button>
           )}
         </div>
       </div>
+
+      {/* Upgrade prompt for free users */}
+      {!canAddTeamMembers && (
+        <UpgradePrompt
+          title="Team Collaboration"
+          description="Invite team members to collaborate on dashboards, share access, and manage your workspace together."
+          requiredPlan="starter"
+          className="mb-6"
+        />
+      )}
 
       {/* Members Section */}
       <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-6">
@@ -310,9 +326,11 @@ export default function TeamPage() {
         {members.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-[var(--color-gray-500)] mb-4">
-              You're the only member. Invite your team to collaborate!
+              {canAddTeamMembers
+                ? "You're the only member. Invite your team to collaborate!"
+                : "You're the only member."}
             </p>
-            {canManageMembers && (
+            {canManageMembers && canAddTeamMembers && (
               <Button onClick={() => setIsInviteDialogOpen(true)}>
                 Invite Your First Team Member
               </Button>
