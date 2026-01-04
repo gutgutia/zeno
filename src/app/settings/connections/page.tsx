@@ -142,15 +142,7 @@ function ConnectionsContent() {
   }
 
   if (loading || isPlanLoading) {
-    return (
-      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-[var(--color-gray-100)] rounded w-48 mb-4"></div>
-          <div className="h-4 bg-[var(--color-gray-100)] rounded w-full mb-2"></div>
-          <div className="h-4 bg-[var(--color-gray-100)] rounded w-3/4"></div>
-        </div>
-      </div>
-    );
+    return <ConnectionsLoadingFallback />;
   }
 
   return (
