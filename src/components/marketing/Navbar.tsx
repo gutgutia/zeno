@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Container, Button } from '@/components/ui';
+import { createClient } from '@/lib/supabase/client';
 
 const navLinks = [
   { href: '#features', label: 'Features' },
@@ -12,6 +13,23 @@ const navLinks = [
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        setIsLoggedIn(!!user);
+      } catch {
+        setIsLoggedIn(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    checkAuth();
+  }, []);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-[var(--color-gray-100)]">
@@ -41,16 +59,28 @@ export function Navbar() {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
-            <Link href="/auth">
-              <Button variant="ghost" size="sm" className="hover:bg-gray-100 hover:text-gray-900">
-                Sign In
-              </Button>
-            </Link>
-            <Link href="/auth">
-              <Button size="sm">
-                Get Started
-              </Button>
-            </Link>
+            {isLoading ? (
+              <div className="w-24 h-9 bg-[var(--color-gray-100)] rounded-lg animate-pulse" />
+            ) : isLoggedIn ? (
+              <Link href="/dashboards">
+                <Button size="sm">
+                  Dashboard
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link href="/auth">
+                  <Button variant="ghost" size="sm" className="hover:bg-gray-100 hover:text-gray-900">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link href="/auth">
+                  <Button size="sm">
+                    Get Started
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -87,16 +117,26 @@ export function Navbar() {
                 </Link>
               ))}
               <div className="flex flex-col gap-2 pt-4 border-t border-[var(--color-gray-100)]">
-                <Link href="/auth" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="ghost" className="w-full hover:bg-gray-100 hover:text-gray-900">
-                    Sign In
-                  </Button>
-                </Link>
-                <Link href="/auth" onClick={() => setMobileMenuOpen(false)}>
-                  <Button className="w-full">
-                    Get Started
-                  </Button>
-                </Link>
+                {isLoggedIn ? (
+                  <Link href="/dashboards" onClick={() => setMobileMenuOpen(false)}>
+                    <Button className="w-full">
+                      Dashboard
+                    </Button>
+                  </Link>
+                ) : (
+                  <>
+                    <Link href="/auth" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className="w-full hover:bg-gray-100 hover:text-gray-900">
+                        Sign In
+                      </Button>
+                    </Link>
+                    <Link href="/auth" onClick={() => setMobileMenuOpen(false)}>
+                      <Button className="w-full">
+                        Get Started
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>
