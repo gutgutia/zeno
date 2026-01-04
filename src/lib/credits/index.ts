@@ -246,10 +246,24 @@ export async function addCredits(
 // ============================================
 
 /**
- * Get user's effective plan
+ * Get user's effective plan (checks overrides first, then org, then defaults to free)
  */
 export async function getUserPlan(userId: string): Promise<PlanType> {
   const supabase = await createClient();
+
+  // First check for active plan override
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: override } = await (supabase as any)
+    .from('user_plan_overrides')
+    .select('plan_type')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .or('plan_expires_at.is.null,plan_expires_at.gt.now()')
+    .single();
+
+  if (override?.plan_type) {
+    return override.plan_type as PlanType;
+  }
 
   // Check org memberships
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
