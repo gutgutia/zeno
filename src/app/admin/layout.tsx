@@ -21,7 +21,10 @@ export default function AdminLayout({
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
+      console.log('[Admin] Checking admin access for user:', user?.id, user?.email);
+
       if (!user) {
+        console.log('[Admin] No user found, redirecting to login');
         router.push('/auth/login');
         return;
       }
@@ -32,12 +35,15 @@ export default function AdminLayout({
         .eq('user_id', user.id)
         .single();
 
+      console.log('[Admin] Query result:', { adminUser, error });
+
       if (error || !adminUser) {
-        // Not an admin, redirect to dashboards
+        console.log('[Admin] Not an admin, redirecting to dashboards. Error:', error?.message);
         router.push('/dashboards');
         return;
       }
 
+      console.log('[Admin] Admin verified with role:', adminUser.role);
       setIsAdmin(true);
       setAdminRole(adminUser.role);
     }
