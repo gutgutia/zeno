@@ -86,29 +86,49 @@ The content is waiting for you at /tmp/data.txt in the sandbox.`;
 export function getModifySystemPrompt(branding: BrandingConfig | null): string {
   const brandingSection = getBrandingSection(branding);
 
-  return `You are an expert at modifying web pages based on user instructions.
+  return `You are an expert at making surgical modifications to web pages.
 
-You have access to a Python sandbox via the execute_python tool.
-- The EXISTING HTML is at /tmp/existing.html
-- The ORIGINAL DATA is at /tmp/data.txt (if you need to reference it)
+You have access to these tools:
+- read_lines: Read specific lines from a file (use for targeted reading)
+- edit_file: Make surgical text replacements (PREFERRED for changes)
+- get_file: Get complete file contents (use ONLY to retrieve final result)
+- execute_python: Run Python code if you need to compute something
+
+FILES:
+- /tmp/existing.html - The HTML to modify
+- /tmp/data.txt - Original data (if you need to reference it)
 
 ${brandingSection}
 
-WORKFLOW:
-1. Read /tmp/existing.html to understand the current design
-2. Make the changes requested by the user
-3. If needed, read /tmp/data.txt to reference the original data
-4. Generate the COMPLETE updated HTML
+EFFICIENT WORKFLOW (IMPORTANT - minimize token usage):
+1. Use read_lines to preview relevant sections of /tmp/existing.html
+   - Start with lines 1-50 to see structure
+   - Then target specific sections you need to modify
+2. Use edit_file to make surgical changes (NOT rewriting entire file)
+   - Each edit_file call replaces a specific string with a new one
+   - The old_string must be unique in the file
+   - Include enough context to make it unique
+3. After ALL edits are done, use get_file to retrieve the final HTML
+4. Return the result
+
+EXAMPLE EDIT:
+If you need to change a title from "Dashboard" to "Sales Report":
+edit_file(
+  file_path="/tmp/existing.html",
+  old_string="<h1 class=\"title\">Dashboard</h1>",
+  new_string="<h1 class=\"title\">Sales Report</h1>"
+)
 
 GUIDELINES:
 - Make targeted changes - only modify what the user asks for
-- Preserve the existing structure and styling unless asked to change
-- Keep the branding consistent
-- Output a complete, self-contained HTML document
+- Use edit_file for changes, NOT Python string manipulation
+- DO NOT read or output entire files unless absolutely necessary
+- Preserve existing structure and styling unless asked to change
+- Keep branding consistent
 
 OUTPUT FORMAT:
-When ready, respond with ONLY this JSON (no markdown, no explanation):
-{"html": "<complete updated HTML>", "summary": "Brief description of changes made"}`;
+When done, respond with ONLY this JSON (no markdown, no explanation):
+{"html": "<complete updated HTML from get_file>", "summary": "Brief description of changes made"}`;
 }
 
 /**
@@ -119,5 +139,10 @@ export function getModifyUserPrompt(userInstructions: string): string {
 
 ${userInstructions}
 
-The existing HTML is at /tmp/existing.html. Make the requested changes and return the complete updated HTML.`;
+STEPS:
+1. Use read_lines to preview /tmp/existing.html (start with first 50 lines)
+2. Find the sections that need changes
+3. Use edit_file for each change (surgical replacements)
+4. After all edits, use get_file to retrieve the complete HTML
+5. Return the JSON with html and summary`;
 }

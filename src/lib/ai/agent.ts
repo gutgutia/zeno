@@ -141,6 +141,138 @@ function printAgentLog(log: AgentLogEntry[], totalCost?: number) {
 }
 
 /**
+ * Tool for reading specific lines from a file (surgical reading)
+ */
+const readLinesTool = tool(
+  'read_lines',
+  'Read specific lines from a file. Use this for surgical reading instead of loading entire files. If no line numbers specified, returns first 50 lines as a preview.',
+  {
+    file_path: z.string().describe('Path to the file (e.g., /tmp/existing.html)'),
+    start_line: z.number().optional().describe('Starting line number (1-indexed, inclusive). Defaults to 1.'),
+    end_line: z.number().optional().describe('Ending line number (1-indexed, inclusive). If not specified, reads 50 lines from start.'),
+  },
+  async ({ file_path, start_line, end_line }) => {
+    if (!activeSandbox) {
+      return {
+        content: [{ type: 'text' as const, text: 'Error: Sandbox not initialized' }],
+      };
+    }
+
+    try {
+      const fileContent = await activeSandbox.files.read(file_path);
+      const lines = fileContent.split('\n');
+      const totalLines = lines.length;
+
+      const start = (start_line ?? 1) - 1; // Convert to 0-indexed
+      const end = end_line ?? Math.min(start + 50, totalLines);
+
+      const selectedLines = lines.slice(start, end);
+      const result = selectedLines.map((line, i) => `${start + i + 1}: ${line}`).join('\n');
+
+      console.log(`[read_lines] Read lines ${start + 1}-${end} of ${totalLines} from ${file_path}`);
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: `Lines ${start + 1}-${end} of ${totalLines} total:\n\n${result}`
+        }],
+      };
+    } catch (error) {
+      console.error('[read_lines] Error:', error);
+      return {
+        content: [{ type: 'text' as const, text: `Error reading file: ${error instanceof Error ? error.message : String(error)}` }],
+      };
+    }
+  }
+);
+
+/**
+ * Tool for surgical file editing via string replacement
+ */
+const editFileTool = tool(
+  'edit_file',
+  'Make surgical edits to a file by replacing specific text. More efficient than rewriting entire files. The old_string must match exactly (including whitespace and indentation).',
+  {
+    file_path: z.string().describe('Path to the file (e.g., /tmp/existing.html)'),
+    old_string: z.string().describe('The exact text to find and replace. Must be unique in the file.'),
+    new_string: z.string().describe('The text to replace it with.'),
+  },
+  async ({ file_path, old_string, new_string }) => {
+    if (!activeSandbox) {
+      return {
+        content: [{ type: 'text' as const, text: 'Error: Sandbox not initialized' }],
+      };
+    }
+
+    try {
+      const fileContent = await activeSandbox.files.read(file_path);
+
+      // Check if old_string exists
+      const occurrences = fileContent.split(old_string).length - 1;
+
+      if (occurrences === 0) {
+        return {
+          content: [{ type: 'text' as const, text: `Error: Could not find the specified text in ${file_path}. Make sure it matches exactly including whitespace.` }],
+        };
+      }
+
+      if (occurrences > 1) {
+        return {
+          content: [{ type: 'text' as const, text: `Error: Found ${occurrences} occurrences of the text. The old_string must be unique. Add more context to make it unique.` }],
+        };
+      }
+
+      // Perform replacement
+      const newContent = fileContent.replace(old_string, new_string);
+      await activeSandbox.files.write(file_path, newContent);
+
+      console.log(`[edit_file] Replaced text in ${file_path} (${old_string.length} chars -> ${new_string.length} chars)`);
+
+      return {
+        content: [{ type: 'text' as const, text: `Successfully edited ${file_path}. Replaced ${old_string.length} characters with ${new_string.length} characters.` }],
+      };
+    } catch (error) {
+      console.error('[edit_file] Error:', error);
+      return {
+        content: [{ type: 'text' as const, text: `Error editing file: ${error instanceof Error ? error.message : String(error)}` }],
+      };
+    }
+  }
+);
+
+/**
+ * Tool for getting the complete modified file after edits
+ */
+const getFileTool = tool(
+  'get_file',
+  'Get the complete contents of a file. Use this ONLY after making all edits with edit_file to retrieve the final result.',
+  {
+    file_path: z.string().describe('Path to the file (e.g., /tmp/existing.html)'),
+  },
+  async ({ file_path }) => {
+    if (!activeSandbox) {
+      return {
+        content: [{ type: 'text' as const, text: 'Error: Sandbox not initialized' }],
+      };
+    }
+
+    try {
+      const fileContent = await activeSandbox.files.read(file_path);
+      console.log(`[get_file] Retrieved ${file_path} (${fileContent.length} chars)`);
+
+      return {
+        content: [{ type: 'text' as const, text: fileContent }],
+      };
+    } catch (error) {
+      console.error('[get_file] Error:', error);
+      return {
+        content: [{ type: 'text' as const, text: `Error reading file: ${error instanceof Error ? error.message : String(error)}` }],
+      };
+    }
+  }
+);
+
+/**
  * Tool for executing Python code in E2B sandbox
  */
 const executePythonTool = tool(
@@ -194,12 +326,22 @@ const executePythonTool = tool(
 );
 
 /**
- * Create MCP server with the Python tool
+ * Create MCP server with the Python tool (for generation)
  */
 const pythonToolServer = createSdkMcpServer({
   name: 'python',
   version: '1.0.0',
   tools: [executePythonTool],
+});
+
+/**
+ * Create MCP server with file editing tools (for modification)
+ * Includes surgical read/edit tools for efficient modifications
+ */
+const modifyToolServer = createSdkMcpServer({
+  name: 'filetools',
+  version: '1.0.0',
+  tools: [readLinesTool, editFileTool, getFileTool, executePythonTool],
 });
 
 /**
@@ -632,24 +774,29 @@ export async function modifyDashboardWithAgent(
     let totalCost: number | undefined;
     const agentLog: AgentLogEntry[] = [];
 
-    // Build query options
+    // Build query options - use Sonnet 4.5 for modifications (cheaper than Opus)
     const queryOptions: Parameters<typeof query>[0]['options'] = {
-      model: 'claude-opus-4-5-20251101',
+      model: 'claude-sonnet-4-5',
       systemPrompt,
       maxTurns: AGENT_CONFIG.maxTurns,
       mcpServers: {
-        python: pythonToolServer,
+        filetools: modifyToolServer,
       },
-      allowedTools: ['mcp__python__execute_python'],
+      allowedTools: [
+        'mcp__filetools__read_lines',
+        'mcp__filetools__edit_file',
+        'mcp__filetools__get_file',
+        'mcp__filetools__execute_python',
+      ],
       pathToClaudeCodeExecutable: CLAUDE_EXECUTABLE_PATH,
     };
 
-    // Add extended thinking
+    // Add extended thinking with reduced budget for modifications
     if (AGENT_CONFIG.extendedThinking) {
       // @ts-expect-error - thinking option may not be in SDK types yet
       queryOptions.thinking = {
         type: 'enabled',
-        budget_tokens: AGENT_CONFIG.thinkingBudgetTokens,
+        budget_tokens: 5000, // Less thinking needed for modifications
       };
     }
 
