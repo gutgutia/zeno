@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useMemo, useCallback, useState } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { sanitizeHTML } from '@/lib/rendering/sanitize';
 import { ChartRenderer } from '@/components/charts/ChartRenderer';
@@ -14,29 +14,102 @@ interface PageRendererProps {
 }
 
 /**
+ * Check if HTML contains JavaScript or Chart.js that needs iframe rendering
+ */
+function needsIframeRendering(html: string): boolean {
+  // Check for script tags or Chart.js references
+  return /<script\b/i.test(html) || /chart\.js/i.test(html) || /new Chart\(/i.test(html);
+}
+
+/**
+ * IframeRenderer - Renders full HTML in a sandboxed iframe
+ * Used when the HTML contains JavaScript/Chart.js that needs to execute
+ */
+function IframeRenderer({ html, className }: { html: string; className: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(800);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    // Set up resize observer to adjust iframe height
+    const resizeObserver = new ResizeObserver(() => {
+      if (iframe.contentDocument?.body) {
+        const newHeight = iframe.contentDocument.body.scrollHeight;
+        if (newHeight > 0 && newHeight !== height) {
+          setHeight(Math.max(newHeight + 32, 400)); // Add padding, min 400px
+        }
+      }
+    });
+
+    // Wait for iframe to load then observe
+    const handleLoad = () => {
+      if (iframe.contentDocument?.body) {
+        resizeObserver.observe(iframe.contentDocument.body);
+        // Initial height adjustment
+        const initialHeight = iframe.contentDocument.body.scrollHeight;
+        if (initialHeight > 0) {
+          setHeight(Math.max(initialHeight + 32, 400));
+        }
+      }
+    };
+
+    iframe.addEventListener('load', handleLoad);
+
+    return () => {
+      iframe.removeEventListener('load', handleLoad);
+      resizeObserver.disconnect();
+    };
+  }, [html, height]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      srcDoc={html}
+      className={className}
+      style={{
+        width: '100%',
+        height: `${height}px`,
+        border: 'none',
+        overflow: 'hidden',
+      }}
+      sandbox="allow-scripts allow-same-origin"
+      title="Dashboard Content"
+    />
+  );
+}
+
+/**
  * PageRenderer - Renders HTML content with hydrated React chart components
  *
  * This component:
- * 1. Sanitizes the HTML for security
- * 2. Injects the HTML into the DOM
- * 3. Finds chart placeholder elements (data-chart="...")
- * 4. Hydrates each placeholder with the appropriate React chart component
+ * 1. Detects if HTML needs iframe rendering (contains JavaScript/Chart.js)
+ * 2. For iframe mode: renders full HTML in sandboxed iframe
+ * 3. For legacy mode: sanitizes HTML and hydrates chart placeholders
  */
 export function PageRenderer({ html, charts, data, className = '' }: PageRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRootsRef = useRef<Map<string, Root>>(new Map());
 
-  // Extract body styles and content from the HTML
+  // Check if we need iframe rendering
+  const useIframe = useMemo(() => needsIframeRendering(html), [html]);
+
+  // Extract body styles and content from the HTML (legacy mode)
   const { bodyStyles, bodyContent } = useMemo(() => {
+    if (useIframe) {
+      return { bodyStyles: '', bodyContent: '' };
+    }
+
     let sanitized = sanitizeHTML(html);
-    
+
     // Try to extract body styles
     const bodyMatch = sanitized.match(/<body[^>]*style=["']([^"']*)["'][^>]*>/i);
     const extractedStyles = bodyMatch ? bodyMatch[1] : '';
-    
+
     // Extract just the body content (remove DOCTYPE, html, head, body tags)
     let content = sanitized;
-    
+
     // Remove DOCTYPE
     content = content.replace(/<!DOCTYPE[^>]*>/gi, '');
     // Remove html opening/closing
@@ -46,12 +119,12 @@ export function PageRenderer({ html, charts, data, className = '' }: PageRendere
     // Remove body tags but keep content
     content = content.replace(/<body[^>]*>/gi, '');
     content = content.replace(/<\/body>/gi, '');
-    
+
     return {
       bodyStyles: extractedStyles,
       bodyContent: content.trim(),
     };
-  }, [html]);
+  }, [html, useIframe]);
 
   // Cleanup function for chart roots
   const cleanupChartRoots = useCallback(() => {
@@ -66,9 +139,9 @@ export function PageRenderer({ html, charts, data, className = '' }: PageRendere
     chartRootsRef.current.clear();
   }, []);
 
-  // Hydrate chart placeholders with React components
+  // Hydrate chart placeholders with React components (legacy mode)
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (useIframe || !containerRef.current) return;
 
     // Clean up previous chart roots
     cleanupChartRoots();
@@ -110,8 +183,14 @@ export function PageRenderer({ html, charts, data, className = '' }: PageRendere
     return () => {
       cleanupChartRoots();
     };
-  }, [bodyContent, charts, data, cleanupChartRoots]);
+  }, [useIframe, bodyContent, charts, data, cleanupChartRoots]);
 
+  // Use iframe for HTML with JavaScript/Chart.js
+  if (useIframe) {
+    return <IframeRenderer html={html} className={`page-renderer ${className}`} />;
+  }
+
+  // Legacy mode: sanitized HTML with React chart hydration
   return (
     <div
       ref={containerRef}
