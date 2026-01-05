@@ -14,11 +14,18 @@ interface PageRendererProps {
 }
 
 /**
- * Check if HTML contains JavaScript or Chart.js that needs iframe rendering
+ * Check if HTML needs iframe rendering (has scripts, Chart.js, or style blocks in head)
  */
 function needsIframeRendering(html: string): boolean {
-  // Check for script tags or Chart.js references
-  return /<script\b/i.test(html) || /chart\.js/i.test(html) || /new Chart\(/i.test(html);
+  // Check for script tags, Chart.js, or style blocks in the head
+  // The legacy path strips <head> which removes all CSS, so any complete HTML document
+  // with styles should use iframe rendering
+  return (
+    /<script\b/i.test(html) ||
+    /chart\.js/i.test(html) ||
+    /new Chart\(/i.test(html) ||
+    /<head[^>]*>[\s\S]*<style/i.test(html)
+  );
 }
 
 /**
