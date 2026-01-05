@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import type { Dashboard, BrandingConfig } from '@/types/database';
 import { createVersion } from '@/lib/versions';
 import { getCreditBalance, deductCredits, hasEnoughCredits } from '@/lib/credits';
+import { logUsage } from '@/lib/costs';
 
 // Lazy load the agent to prevent startup issues
 const getAgent = async () => {
@@ -158,12 +159,15 @@ export async function POST(request: Request, { params }: RouteParams) {
       console.log(`[${id}] About to load agent module...`);
       const generateWithAgent = await getAgent();
       console.log(`[${id}] Agent module loaded, calling generateWithAgent...`);
-      const config = await generateWithAgent(
+      const result = await generateWithAgent(
         rawContent,
         effectiveBranding,
         dashboard.user_instructions || undefined
       );
+      const config = result.config;
+      const agentUsage = result.usage;
       console.log(`[${id}] Generation complete. HTML length: ${config.html?.length || 0}`);
+      console.log(`[${id}] Usage: ${agentUsage.usage.inputTokens} input, ${agentUsage.usage.outputTokens} output, cost: $${agentUsage.costUsd.toFixed(4)}`);
 
       // Update the dashboard with the generated config
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -184,14 +188,15 @@ export async function POST(request: Request, { params }: RouteParams) {
         throw new Error(`Failed to save dashboard: ${updateError.message}`);
       }
 
+      // Use actual token counts from agent for credit deduction
+      const actualInputTokens = agentUsage.usage.inputTokens || 0;
+      const actualOutputTokens = agentUsage.usage.outputTokens || 0;
+
       // Deduct credits for successful generation
-      // TODO: Replace estimated tokens with actual usage from AI response
-      const estimatedInputTokens = 150000; // ~150K input tokens typical
-      const estimatedOutputTokens = 20000;  // ~20K output tokens typical
       const deductionResult = await deductCredits(
         userId,
-        estimatedInputTokens,
-        estimatedOutputTokens,
+        actualInputTokens,
+        actualOutputTokens,
         'dashboard_create',
         id,
         `Generated dashboard: ${dashboard.title}`,
@@ -204,6 +209,35 @@ export async function POST(request: Request, { params }: RouteParams) {
       } else {
         console.log(`[${id}] Deducted ${deductionResult.credits_used} credits. Remaining: ${deductionResult.balance_after}`);
       }
+
+      // Get user's organization for logging
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: membership } = await (supabase as any)
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .not('accepted_at', 'is', null)
+        .limit(1)
+        .single();
+
+      // Log usage to ai_usage_logs
+      await logUsage(supabase, {
+        dashboardId: id,
+        userId,
+        organizationId: membership?.organization_id || null,
+        operationType: 'generation',
+        modelId: 'opus-4-5',
+        usage: agentUsage.usage,
+        agentReportedCost: agentUsage.costUsd,
+        durationMs: agentUsage.durationMs,
+        turnCount: agentUsage.turnCount,
+        creditsDeducted: deductionResult.success ? deductionResult.credits_used : 0,
+        status: 'success',
+        metadata: {
+          userInstructions: dashboard.user_instructions,
+          extendedThinking: true,
+        },
+      });
 
       // Create initial version (1.0)
       try {

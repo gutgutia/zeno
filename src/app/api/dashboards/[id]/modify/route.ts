@@ -5,6 +5,8 @@ import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import { modifyDashboardWithAgent } from '@/lib/ai/agent';
 import { createVersion } from '@/lib/versions';
+import { deductCredits, hasEnoughCredits, getCreditBalance } from '@/lib/credits';
+import { logUsage } from '@/lib/costs';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -54,6 +56,19 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Check credit balance (estimated 10 credits for modifications)
+    const ESTIMATED_MODIFY_CREDITS = 10;
+    const hasCredits = await hasEnoughCredits(user.id, ESTIMATED_MODIFY_CREDITS);
+    if (!hasCredits) {
+      const balance = await getCreditBalance(user.id);
+      return NextResponse.json({
+        error: 'Insufficient credits',
+        credits_required: ESTIMATED_MODIFY_CREDITS,
+        credits_available: balance?.balance || 0,
+        upgrade_url: '/settings/billing',
+      }, { status: 402 });
+    }
+
     // Get the current config
     const currentConfig = dashboard.config as DashboardConfig | null;
 
@@ -84,6 +99,56 @@ export async function POST(request: Request, { params }: RouteParams) {
     );
 
     console.log('[Modify API] Agent modification complete');
+    console.log(`[Modify API] Usage: ${modifyResult.usage.usage.inputTokens} input, ${modifyResult.usage.usage.outputTokens} output, cost: $${modifyResult.usage.costUsd.toFixed(4)}`);
+
+    // Deduct credits based on actual usage
+    const actualInputTokens = modifyResult.usage.usage.inputTokens || 0;
+    const actualOutputTokens = modifyResult.usage.usage.outputTokens || 0;
+
+    const deductionResult = await deductCredits(
+      user.id,
+      actualInputTokens,
+      actualOutputTokens,
+      'dashboard_update',
+      id,
+      `Modified dashboard: ${instructions.slice(0, 50)}...`,
+      supabase
+    );
+
+    if (!deductionResult.success) {
+      console.warn(`[Modify API] Failed to deduct credits:`, deductionResult.error);
+    } else {
+      console.log(`[Modify API] Deducted ${deductionResult.credits_used} credits. Remaining: ${deductionResult.balance_after}`);
+    }
+
+    // Get user's organization for logging
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: membership } = await (supabase as any)
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', user.id)
+      .not('accepted_at', 'is', null)
+      .limit(1)
+      .single();
+
+    // Log usage to ai_usage_logs
+    await logUsage(supabase, {
+      dashboardId: id,
+      userId: user.id,
+      organizationId: membership?.organization_id || null,
+      operationType: 'modification',
+      modelId: 'sonnet-4-5',
+      usage: modifyResult.usage.usage,
+      agentReportedCost: modifyResult.usage.costUsd,
+      durationMs: modifyResult.usage.durationMs,
+      turnCount: modifyResult.usage.turnCount,
+      creditsDeducted: deductionResult.success ? deductionResult.credits_used : 0,
+      status: 'success',
+      metadata: {
+        instructions,
+        extendedThinking: true,
+      },
+    });
 
     // Build updated config
     const updatedConfig: DashboardConfig = {
@@ -91,7 +156,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       html: modifyResult.html,
       metadata: {
         ...currentConfig.metadata,
-        // Track that this was modified via AI
+        lastModifiedAt: new Date().toISOString(),
       },
     };
 
@@ -134,6 +199,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       success: true,
       summary: modifyResult.summary,
       config: updatedConfig,
+      credits: deductionResult.success ? {
+        used: deductionResult.credits_used,
+        remaining: deductionResult.balance_after,
+      } : undefined,
     });
   } catch (error) {
     console.error('[Modify API] Error:', error);

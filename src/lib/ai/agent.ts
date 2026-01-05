@@ -89,6 +89,26 @@ export interface RefreshResult {
 }
 
 // ============================================================================
+// USAGE TRACKING TYPES
+// ============================================================================
+
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  thinkingTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+}
+
+export interface AgentUsageResult {
+  usage: TokenUsage;
+  costUsd: number;
+  turnCount: number;
+  durationMs: number;
+  modelId: string;
+}
+
+// ============================================================================
 // EXPERIMENTATION TOGGLES
 // ============================================================================
 export const AGENT_CONFIG = {
@@ -384,13 +404,19 @@ function extractJsonFromResult(result: string): { html: string; summary: string 
  * 3. Runs an agent loop that can execute Python to analyze the content
  * 4. Returns the generated HTML
  */
+export interface GenerateResult {
+  config: DashboardConfig;
+  usage: AgentUsageResult;
+}
+
 export async function generateWithAgent(
   rawContent: string,
   branding: BrandingConfig | null,
   userInstructions?: string
-): Promise<DashboardConfig> {
+): Promise<GenerateResult> {
   console.log('[Agent] Starting agentic generation...');
   console.log('[Agent] Content length:', rawContent.length, 'characters');
+  const startTime = Date.now();
 
   // Create E2B sandbox
   console.log('[Agent] Creating E2B sandbox...');
@@ -411,7 +437,8 @@ export async function generateWithAgent(
     console.log(`[Agent] Extended thinking: ${AGENT_CONFIG.extendedThinking ? 'ENABLED' : 'DISABLED'}`);
     let finalResult: { html: string; summary: string } | null = null;
     let turnCount = 0;
-    let totalCost: number | undefined;
+    let totalCost: number = 0;
+    let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, thinkingTokens: 0 };
     const agentLog: AgentLogEntry[] = [];
 
     // Build query options
@@ -479,8 +506,30 @@ export async function generateWithAgent(
         } else if (message.type === 'result') {
           console.log(`[Agent] Completed after ${turnCount} turns`);
           if (message.subtype === 'success') {
-            totalCost = message.total_cost_usd;
+            totalCost = message.total_cost_usd || 0;
+            // Extract token usage from SDK result if available
+            const resultWithUsage = message as {
+              total_cost_usd?: number;
+              result: string;
+              usage?: {
+                input_tokens?: number;
+                output_tokens?: number;
+                thinking_tokens?: number;
+                cache_read_tokens?: number;
+                cache_write_tokens?: number;
+              };
+            };
+            if (resultWithUsage.usage) {
+              tokenUsage = {
+                inputTokens: resultWithUsage.usage.input_tokens || 0,
+                outputTokens: resultWithUsage.usage.output_tokens || 0,
+                thinkingTokens: resultWithUsage.usage.thinking_tokens || 0,
+                cacheReadTokens: resultWithUsage.usage.cache_read_tokens || 0,
+                cacheWriteTokens: resultWithUsage.usage.cache_write_tokens || 0,
+              };
+            }
             console.log(`[Agent] Total cost: $${totalCost?.toFixed(4) || 'unknown'}`);
+            console.log(`[Agent] Token usage: input=${tokenUsage.inputTokens}, output=${tokenUsage.outputTokens}, thinking=${tokenUsage.thinkingTokens}`);
             finalResult = extractJsonFromResult(message.result);
           } else {
             // Error result
@@ -511,9 +560,10 @@ export async function generateWithAgent(
     }
 
     console.log('[Agent] Generation complete. HTML length:', finalResult.html.length);
+    const durationMs = Date.now() - startTime;
 
-    // Build and return the config
-    return {
+    // Build and return the config with usage
+    const config: DashboardConfig = {
       contentType: 'data',
       html: finalResult.html,
       charts: {}, // All visualizations are inline
@@ -530,6 +580,17 @@ export async function generateWithAgent(
         summary: finalResult.summary || 'Content transformed',
         insights: [],
         suggestedVisualizations: [],
+      },
+    };
+
+    return {
+      config,
+      usage: {
+        usage: tokenUsage,
+        costUsd: totalCost,
+        turnCount,
+        durationMs,
+        modelId: 'opus-4-5',
       },
     };
   } finally {
@@ -584,6 +645,10 @@ function extractRefreshResult(result: string): RefreshResult | null {
   return null;
 }
 
+export interface RefreshResultWithUsage extends RefreshResult {
+  usage: AgentUsageResult;
+}
+
 /**
  * Refresh a dashboard with new data while preserving its structure.
  *
@@ -597,10 +662,11 @@ export async function refreshDashboardWithAgent(
   newRawContent: string,
   existingConfig: DashboardConfig,
   branding: BrandingConfig | null
-): Promise<RefreshResult> {
+): Promise<RefreshResultWithUsage> {
   console.log('[Refresh Agent] Starting dashboard refresh...');
   console.log('[Refresh Agent] New content length:', newRawContent.length, 'characters');
   console.log('[Refresh Agent] Existing HTML length:', existingConfig.html.length, 'characters');
+  const startTime = Date.now();
 
   // Create E2B sandbox
   console.log('[Refresh Agent] Creating E2B sandbox...');
@@ -624,6 +690,8 @@ export async function refreshDashboardWithAgent(
     console.log('[Refresh Agent] Starting agent loop...');
     let refreshResult: RefreshResult | null = null;
     let turnCount = 0;
+    let totalCost: number = 0;
+    let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, thinkingTokens: 0 };
 
     // Build query options - use less thinking budget for refresh (simpler task)
     const queryOptions: Parameters<typeof query>[0]['options'] = {
@@ -659,7 +727,30 @@ export async function refreshDashboardWithAgent(
       } else if (message.type === 'result') {
         console.log(`[Refresh Agent] Completed after ${turnCount} turns`);
         if (message.subtype === 'success') {
-          console.log(`[Refresh Agent] Total cost: $${message.total_cost_usd?.toFixed(4) || 'unknown'}`);
+          totalCost = message.total_cost_usd || 0;
+          // Extract token usage from SDK result if available
+          const resultWithUsage = message as {
+            total_cost_usd?: number;
+            result: string;
+            usage?: {
+              input_tokens?: number;
+              output_tokens?: number;
+              thinking_tokens?: number;
+              cache_read_tokens?: number;
+              cache_write_tokens?: number;
+            };
+          };
+          if (resultWithUsage.usage) {
+            tokenUsage = {
+              inputTokens: resultWithUsage.usage.input_tokens || 0,
+              outputTokens: resultWithUsage.usage.output_tokens || 0,
+              thinkingTokens: resultWithUsage.usage.thinking_tokens || 0,
+              cacheReadTokens: resultWithUsage.usage.cache_read_tokens || 0,
+              cacheWriteTokens: resultWithUsage.usage.cache_write_tokens || 0,
+            };
+          }
+          console.log(`[Refresh Agent] Total cost: $${totalCost?.toFixed(4) || 'unknown'}`);
+          console.log(`[Refresh Agent] Token usage: input=${tokenUsage.inputTokens}, output=${tokenUsage.outputTokens}, thinking=${tokenUsage.thinkingTokens}`);
           refreshResult = extractRefreshResult(message.result);
         } else {
           const errorResult = message as { errors?: string[] };
@@ -676,8 +767,18 @@ export async function refreshDashboardWithAgent(
 
     console.log('[Refresh Agent] Refresh complete. HTML length:', refreshResult.html.length);
     console.log('[Refresh Agent] Changes detected:', refreshResult.changes.length);
+    const durationMs = Date.now() - startTime;
 
-    return refreshResult;
+    return {
+      ...refreshResult,
+      usage: {
+        usage: tokenUsage,
+        costUsd: totalCost,
+        turnCount,
+        durationMs,
+        modelId: 'opus-4-5',
+      },
+    };
   } finally {
     console.log('[Refresh Agent] Closing E2B sandbox...');
     if (activeSandbox) {
@@ -693,6 +794,10 @@ export async function refreshDashboardWithAgent(
 export interface ModifyResult {
   html: string;
   summary: string;
+}
+
+export interface ModifyResultWithUsage extends ModifyResult {
+  usage: AgentUsageResult;
 }
 
 /**
@@ -747,10 +852,11 @@ export async function modifyDashboardWithAgent(
   rawContent: string,
   instructions: string,
   branding: BrandingConfig | null
-): Promise<ModifyResult> {
+): Promise<ModifyResultWithUsage> {
   console.log('[Modify Agent] Starting dashboard modification...');
   console.log('[Modify Agent] Instructions:', instructions);
   console.log('[Modify Agent] Existing HTML length:', existingHtml.length, 'characters');
+  const startTime = Date.now();
 
   // Create E2B sandbox
   console.log('[Modify Agent] Creating E2B sandbox...');
@@ -771,7 +877,8 @@ export async function modifyDashboardWithAgent(
     console.log('[Modify Agent] Starting agent loop...');
     let modifyResult: ModifyResult | null = null;
     let turnCount = 0;
-    let totalCost: number | undefined;
+    let totalCost: number = 0;
+    let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, thinkingTokens: 0 };
     const agentLog: AgentLogEntry[] = [];
 
     // Build query options - use Sonnet 4.5 for modifications (cheaper than Opus)
@@ -840,8 +947,30 @@ export async function modifyDashboardWithAgent(
       } else if (message.type === 'result') {
         console.log(`[Modify Agent] Completed after ${turnCount} turns`);
         if (message.subtype === 'success') {
-          totalCost = message.total_cost_usd;
+          totalCost = message.total_cost_usd || 0;
+          // Extract token usage from SDK result if available
+          const resultWithUsage = message as {
+            total_cost_usd?: number;
+            result: string;
+            usage?: {
+              input_tokens?: number;
+              output_tokens?: number;
+              thinking_tokens?: number;
+              cache_read_tokens?: number;
+              cache_write_tokens?: number;
+            };
+          };
+          if (resultWithUsage.usage) {
+            tokenUsage = {
+              inputTokens: resultWithUsage.usage.input_tokens || 0,
+              outputTokens: resultWithUsage.usage.output_tokens || 0,
+              thinkingTokens: resultWithUsage.usage.thinking_tokens || 0,
+              cacheReadTokens: resultWithUsage.usage.cache_read_tokens || 0,
+              cacheWriteTokens: resultWithUsage.usage.cache_write_tokens || 0,
+            };
+          }
           console.log(`[Modify Agent] Total cost: $${totalCost?.toFixed(4) || 'unknown'}`);
+          console.log(`[Modify Agent] Token usage: input=${tokenUsage.inputTokens}, output=${tokenUsage.outputTokens}, thinking=${tokenUsage.thinkingTokens}`);
           modifyResult = extractModifyResult(message.result);
         } else {
           const errorResult = message as { errors?: string[] };
@@ -860,8 +989,18 @@ export async function modifyDashboardWithAgent(
     }
 
     console.log('[Modify Agent] Modification complete. HTML length:', modifyResult.html.length);
+    const durationMs = Date.now() - startTime;
 
-    return modifyResult;
+    return {
+      ...modifyResult,
+      usage: {
+        usage: tokenUsage,
+        costUsd: totalCost,
+        turnCount,
+        durationMs,
+        modelId: 'sonnet-4-5',  // Modify uses Sonnet
+      },
+    };
   } finally {
     console.log('[Modify Agent] Closing E2B sandbox...');
     if (activeSandbox) {
