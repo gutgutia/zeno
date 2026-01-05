@@ -26,9 +26,31 @@ export function PageRenderer({ html, charts, data, className = '' }: PageRendere
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRootsRef = useRef<Map<string, Root>>(new Map());
 
-  // Memoize sanitized HTML to avoid re-sanitizing on every render
-  const sanitizedHTML = useMemo(() => {
-    return sanitizeHTML(html);
+  // Extract body styles and content from the HTML
+  const { bodyStyles, bodyContent } = useMemo(() => {
+    let sanitized = sanitizeHTML(html);
+    
+    // Try to extract body styles
+    const bodyMatch = sanitized.match(/<body[^>]*style=["']([^"']*)["'][^>]*>/i);
+    const extractedStyles = bodyMatch ? bodyMatch[1] : '';
+    
+    // Extract just the body content (remove DOCTYPE, html, head, body tags)
+    let content = sanitized;
+    
+    // Remove DOCTYPE
+    content = content.replace(/<!DOCTYPE[^>]*>/gi, '');
+    // Remove html opening/closing
+    content = content.replace(/<\/?html[^>]*>/gi, '');
+    // Remove head section entirely
+    content = content.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
+    // Remove body tags but keep content
+    content = content.replace(/<body[^>]*>/gi, '');
+    content = content.replace(/<\/body>/gi, '');
+    
+    return {
+      bodyStyles: extractedStyles,
+      bodyContent: content.trim(),
+    };
   }, [html]);
 
   // Cleanup function for chart roots
@@ -88,13 +110,14 @@ export function PageRenderer({ html, charts, data, className = '' }: PageRendere
     return () => {
       cleanupChartRoots();
     };
-  }, [sanitizedHTML, charts, data, cleanupChartRoots]);
+  }, [bodyContent, charts, data, cleanupChartRoots]);
 
   return (
     <div
       ref={containerRef}
       className={`page-renderer ${className}`}
-      dangerouslySetInnerHTML={{ __html: sanitizedHTML }}
+      style={bodyStyles ? undefined : { padding: '24px' }}
+      dangerouslySetInnerHTML={{ __html: bodyStyles ? `<div style="${bodyStyles}">${bodyContent}</div>` : bodyContent }}
     />
   );
 }
