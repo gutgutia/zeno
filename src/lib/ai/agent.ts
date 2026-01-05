@@ -42,6 +42,26 @@ const getClaudeExecutablePath = () => {
 
 const CLAUDE_EXECUTABLE_PATH = getClaudeExecutablePath();
 console.log('[Agent SDK] Using executable path:', CLAUDE_EXECUTABLE_PATH);
+console.log('[Agent SDK] Environment:', {
+  NODE_ENV: process.env.NODE_ENV,
+  cwd: process.cwd(),
+  platform: process.platform,
+  nodeVersion: process.version,
+  hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
+  hasE2BKey: !!process.env.E2B_API_KEY,
+});
+
+// Check if cli.js is actually executable
+try {
+  const stats = fs.statSync(CLAUDE_EXECUTABLE_PATH);
+  console.log('[Agent SDK] cli.js stats:', {
+    size: stats.size,
+    mode: stats.mode.toString(8),
+    isFile: stats.isFile(),
+  });
+} catch (e) {
+  console.error('[Agent SDK] Failed to stat cli.js:', e);
+}
 
 export interface RefreshResult {
   html: string;
