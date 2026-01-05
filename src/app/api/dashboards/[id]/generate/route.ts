@@ -1,10 +1,17 @@
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { generateWithAgent } from '@/lib/ai/agent';
 import type { Dashboard, BrandingConfig } from '@/types/database';
 import { createVersion } from '@/lib/versions';
 import { getCreditBalance, deductCredits, hasEnoughCredits } from '@/lib/credits';
+
+// Lazy load the agent to prevent startup issues
+const getAgent = async () => {
+  console.log('[Generate] Lazy loading agent module...');
+  const { generateWithAgent } = await import('@/lib/ai/agent');
+  console.log('[Generate] Agent module loaded successfully');
+  return generateWithAgent;
+};
 
 // Allow long-running requests for agent loops
 export const maxDuration = 300; // 5 minutes
@@ -148,6 +155,9 @@ export async function POST(request: Request, { params }: RouteParams) {
     try {
       // Agentic generation with E2B Python sandbox
       console.log(`[${id}] Starting agentic generation with E2B sandbox...`);
+      console.log(`[${id}] About to load agent module...`);
+      const generateWithAgent = await getAgent();
+      console.log(`[${id}] Agent module loaded, calling generateWithAgent...`);
       const config = await generateWithAgent(
         rawContent,
         effectiveBranding,
