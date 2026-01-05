@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getValidAccessToken } from '@/lib/google/auth';
 import { fetchSheetData, fetchMultipleSheets, computeContentHash } from '@/lib/google/sheets';
-import { refreshDashboardWithAgent } from '@/lib/ai/agent';
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig, Dashboard, Workspace, DataSource } from '@/types/database';
 import { createVersion } from '@/lib/versions';
+
+// Lazy load the agent to prevent startup issues with subprocess spawning
+const getRefreshAgent = async () => {
+  console.log('[Refresh] Lazy loading agent module...');
+  const { refreshDashboardWithAgent } = await import('@/lib/ai/agent');
+  console.log('[Refresh] Agent module loaded successfully');
+  return refreshDashboardWithAgent;
+};
 
 export const maxDuration = 300; // 5 minutes for agent refresh
 
@@ -193,7 +200,8 @@ export async function POST(
         dashboard.branding_override as Partial<BrandingConfig> | null
       );
 
-      // Refresh using Agent SDK
+      // Refresh using Agent SDK (lazy loaded)
+      const refreshDashboardWithAgent = await getRefreshAgent();
       const refreshResult = await refreshDashboardWithAgent(
         newContent,
         config,
