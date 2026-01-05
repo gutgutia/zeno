@@ -18,13 +18,11 @@ import { EMAIL_LOGO_URL, EMAIL_LOGO_SMALL_WIDTH, EMAIL_LOGO_SMALL_HEIGHT } from 
 interface DashboardReadyEmailProps {
   dashboardTitle: string;
   dashboardUrl: string;
-  appUrl?: string;
 }
 
 export function DashboardReadyEmail({
   dashboardTitle,
   dashboardUrl,
-  appUrl = 'https://zeno.fyi',
 }: DashboardReadyEmailProps) {
   return (
     <Html>
@@ -46,9 +44,19 @@ export function DashboardReadyEmail({
 
           {/* Content */}
           <Section style={content}>
-            <Section style={successIcon}>
-              <Text style={checkmark}>&#10003;</Text>
-            </Section>
+            <table cellPadding="0" cellSpacing="0" border={0} style={successIconTable}>
+              <tr>
+                <td style={successIconCell}>
+                  <Img
+                    src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='none' stroke='%230055FF' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E"
+                    width="32"
+                    height="32"
+                    alt="Success"
+                    style={checkmarkIcon}
+                  />
+                </td>
+              </tr>
+            </table>
 
             <Heading style={title}>Dashboard Generated</Heading>
 
@@ -91,7 +99,7 @@ export function DashboardReadyEmail({
               You received this email because you requested notification when
               your dashboard was ready.
               <br />
-              <Link href={appUrl} style={footerLink}>
+              <Link href="https://zeno.fyi" style={footerLink}>
                 Zeno
               </Link>{' '}
               - Create beautiful dashboards in seconds.
@@ -142,23 +150,22 @@ const content = {
   textAlign: 'center' as const,
 };
 
-const successIcon = {
+const successIconTable = {
+  margin: '0 auto 24px auto',
+};
+
+const successIconCell = {
   width: '64px',
   height: '64px',
   borderRadius: '50%',
   backgroundColor: '#e0ecff',
-  margin: '0 auto 24px auto',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
+  textAlign: 'center' as const,
+  verticalAlign: 'middle' as const,
 };
 
-const checkmark = {
-  fontSize: '32px',
-  color: '#0055FF',
-  margin: 0,
-  lineHeight: '64px',
-  textAlign: 'center' as const,
+const checkmarkIcon = {
+  display: 'inline-block',
+  verticalAlign: 'middle',
 };
 
 const title = {

@@ -24,8 +24,11 @@ interface ChatResponse {
 }
 
 export async function POST(request: Request, { params }: RouteParams) {
+  console.log('[Chat] Received chat request');
+
   try {
     const { id } = await params;
+    console.log('[Chat] Dashboard ID:', id);
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -84,6 +87,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       message
     );
 
+    console.log('[Chat] Calling Claude Sonnet...');
+    console.log('[Chat] User message:', message);
+
     // Call Claude API (using Sonnet for chat - faster response)
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -117,11 +123,16 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
     }
 
+    console.log('[Chat] Response received');
+    console.log('[Chat] Has HTML update:', !!aiResponse.html);
+    console.log('[Chat] Has charts update:', !!aiResponse.charts);
+
     // If there's updated HTML/charts, update the dashboard config
     if (aiResponse.html || aiResponse.charts) {
       const updatedConfig: DashboardConfig = {
         ...currentConfig,
-        html: aiResponse.html ? sanitizeHTML(aiResponse.html) : currentConfig.html,
+        // Don't sanitize - we want to preserve styles in <head>
+        html: aiResponse.html || currentConfig.html,
         charts: aiResponse.charts
           ? (aiResponse.charts as DashboardConfig['charts'])
           : currentConfig.charts,

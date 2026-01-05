@@ -72,7 +72,7 @@ export async function sendDashboardReadyEmail({
     from: FROM_EMAIL,
     to,
     subject: `Your dashboard "${dashboardTitle}" is ready`,
-    react: DashboardReadyEmail({ dashboardTitle, dashboardUrl, appUrl }),
+    react: DashboardReadyEmail({ dashboardTitle, dashboardUrl }),
   });
 
   if (error) {

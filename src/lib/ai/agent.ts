@@ -4,7 +4,7 @@ import { z } from 'zod';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
-import { getAgentSystemPrompt, getAgentUserPrompt } from './agent-prompts';
+import { getAgentSystemPrompt, getAgentUserPrompt, getModifySystemPrompt, getModifyUserPrompt } from './agent-prompts';
 import { getRefreshSystemPrompt, getRefreshUserPrompt } from './refresh-prompts';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig } from '@/types/database';
@@ -538,6 +538,185 @@ export async function refreshDashboardWithAgent(
     return refreshResult;
   } finally {
     console.log('[Refresh Agent] Closing E2B sandbox...');
+    if (activeSandbox) {
+      await activeSandbox.kill();
+      activeSandbox = null;
+    }
+  }
+}
+
+/**
+ * Result from modifying a dashboard
+ */
+export interface ModifyResult {
+  html: string;
+  summary: string;
+}
+
+/**
+ * Extract modify JSON result from agent's response
+ */
+function extractModifyResult(result: string): ModifyResult | null {
+  try {
+    const parsed = JSON.parse(result);
+    if (parsed.html) {
+      return {
+        html: parsed.html,
+        summary: parsed.summary || 'Dashboard modified',
+      };
+    }
+  } catch {
+    // Not pure JSON, try to extract
+  }
+
+  const jsonMatch = result.match(/\{[\s\S]*"html"[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      let jsonStr = jsonMatch[0];
+      if (jsonStr.includes('```')) {
+        jsonStr = jsonStr.replace(/```json?\s*/g, '').replace(/```/g, '');
+      }
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.html) {
+        return {
+          html: parsed.html,
+          summary: parsed.summary || 'Dashboard modified',
+        };
+      }
+    } catch {
+      // Failed to parse
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Modify a dashboard based on user instructions.
+ *
+ * This function:
+ * 1. Creates an E2B sandbox
+ * 2. Writes the existing HTML and data to the sandbox
+ * 3. Runs an agent loop to make the requested modifications
+ * 4. Returns the updated HTML
+ */
+export async function modifyDashboardWithAgent(
+  existingHtml: string,
+  rawContent: string,
+  instructions: string,
+  branding: BrandingConfig | null
+): Promise<ModifyResult> {
+  console.log('[Modify Agent] Starting dashboard modification...');
+  console.log('[Modify Agent] Instructions:', instructions);
+  console.log('[Modify Agent] Existing HTML length:', existingHtml.length, 'characters');
+
+  // Create E2B sandbox
+  console.log('[Modify Agent] Creating E2B sandbox...');
+  activeSandbox = await Sandbox.create({
+    timeoutMs: 300000, // 5 minute max
+  });
+
+  try {
+    // Write existing HTML and data to sandbox
+    console.log('[Modify Agent] Writing files to sandbox...');
+    await activeSandbox.files.write('/tmp/existing.html', existingHtml);
+    await activeSandbox.files.write('/tmp/data.txt', rawContent);
+
+    // Get prompts
+    const systemPrompt = getModifySystemPrompt(branding);
+    const userPrompt = getModifyUserPrompt(instructions);
+
+    console.log('[Modify Agent] Starting agent loop...');
+    let modifyResult: ModifyResult | null = null;
+    let turnCount = 0;
+    let totalCost: number | undefined;
+    const agentLog: AgentLogEntry[] = [];
+
+    // Build query options
+    const queryOptions: Parameters<typeof query>[0]['options'] = {
+      model: 'claude-opus-4-5-20251101',
+      systemPrompt,
+      maxTurns: AGENT_CONFIG.maxTurns,
+      mcpServers: {
+        python: pythonToolServer,
+      },
+      allowedTools: ['mcp__python__execute_python'],
+      pathToClaudeCodeExecutable: CLAUDE_EXECUTABLE_PATH,
+    };
+
+    // Add extended thinking
+    if (AGENT_CONFIG.extendedThinking) {
+      // @ts-expect-error - thinking option may not be in SDK types yet
+      queryOptions.thinking = {
+        type: 'enabled',
+        budget_tokens: AGENT_CONFIG.thinkingBudgetTokens,
+      };
+    }
+
+    // Run the agent loop
+    for await (const message of query({
+      prompt: userPrompt,
+      options: queryOptions,
+    })) {
+      const timestamp = new Date().toISOString();
+
+      if (message.type === 'assistant') {
+        turnCount++;
+        console.log(`[Modify Agent] Turn ${turnCount}: Assistant message`);
+        const msg = message as { content?: Array<{ type: string; text?: string; name?: string; input?: unknown }> };
+        if (msg.content) {
+          for (const block of msg.content) {
+            if (block.type === 'text' && block.text) {
+              agentLog.push({
+                turn: turnCount,
+                type: 'assistant',
+                timestamp,
+                content: block.text,
+              });
+            } else if (block.type === 'tool_use') {
+              agentLog.push({
+                turn: turnCount,
+                type: 'tool_call',
+                timestamp,
+                content: `Tool: ${block.name}\nInput: ${JSON.stringify(block.input, null, 2)}`,
+              });
+            }
+          }
+        }
+      } else if (message.type === 'tool_progress') {
+        agentLog.push({
+          turn: turnCount,
+          type: 'tool_result',
+          timestamp,
+          content: `Tool: ${message.tool_name} (in progress)`,
+        });
+      } else if (message.type === 'result') {
+        console.log(`[Modify Agent] Completed after ${turnCount} turns`);
+        if (message.subtype === 'success') {
+          totalCost = message.total_cost_usd;
+          console.log(`[Modify Agent] Total cost: $${totalCost?.toFixed(4) || 'unknown'}`);
+          modifyResult = extractModifyResult(message.result);
+        } else {
+          const errorResult = message as { errors?: string[] };
+          throw new Error(`Modify agent error: ${errorResult.errors?.join(', ') || 'Unknown error'}`);
+        }
+      } else if (message.type === 'system') {
+        console.log(`[Modify Agent] System message: ${message.subtype}`);
+      }
+    }
+
+    // Print consolidated log
+    printAgentLog(agentLog, totalCost);
+
+    if (!modifyResult?.html) {
+      throw new Error('Modify agent did not produce HTML output');
+    }
+
+    console.log('[Modify Agent] Modification complete. HTML length:', modifyResult.html.length);
+
+    return modifyResult;
+  } finally {
+    console.log('[Modify Agent] Closing E2B sandbox...');
     if (activeSandbox) {
       await activeSandbox.kill();
       activeSandbox = null;

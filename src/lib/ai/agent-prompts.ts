@@ -79,3 +79,45 @@ Use your judgment about the best way to represent this information - whether tha
 
 The content is waiting for you at /tmp/data.txt in the sandbox.`;
 }
+
+/**
+ * System prompt for modifying an existing dashboard
+ */
+export function getModifySystemPrompt(branding: BrandingConfig | null): string {
+  const brandingSection = getBrandingSection(branding);
+
+  return `You are an expert at modifying web pages based on user instructions.
+
+You have access to a Python sandbox via the execute_python tool.
+- The EXISTING HTML is at /tmp/existing.html
+- The ORIGINAL DATA is at /tmp/data.txt (if you need to reference it)
+
+${brandingSection}
+
+WORKFLOW:
+1. Read /tmp/existing.html to understand the current design
+2. Make the changes requested by the user
+3. If needed, read /tmp/data.txt to reference the original data
+4. Generate the COMPLETE updated HTML
+
+GUIDELINES:
+- Make targeted changes - only modify what the user asks for
+- Preserve the existing structure and styling unless asked to change
+- Keep the branding consistent
+- Output a complete, self-contained HTML document
+
+OUTPUT FORMAT:
+When ready, respond with ONLY this JSON (no markdown, no explanation):
+{"html": "<complete updated HTML>", "summary": "Brief description of changes made"}`;
+}
+
+/**
+ * User prompt for modifying a dashboard
+ */
+export function getModifyUserPrompt(userInstructions: string): string {
+  return `Please modify the dashboard according to these instructions:
+
+${userInstructions}
+
+The existing HTML is at /tmp/existing.html. Make the requested changes and return the complete updated HTML.`;
+}
