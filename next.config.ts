@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     '@anthropic-ai/claude-agent-sdk',
     '@e2b/code-interpreter',
     'e2b',
+    'chalk',  // ESM-only, used by e2b
   ],
 
   // Ensure the Agent SDK and e2b files are included in the server output

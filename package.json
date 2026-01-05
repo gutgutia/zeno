@@ -2,6 +2,11 @@
   "name": "zeno",
   "version": "0.1.0",
   "private": true,
+  "overrides": {
+    "e2b": {
+      "chalk": "^4.1.2"
+    }
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
