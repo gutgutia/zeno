@@ -6,6 +6,7 @@ import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig, Dashboard, Workspace, DataSource } from '@/types/database';
 import { createVersion } from '@/lib/versions';
+import { computeDataDiff, condenseDiff, type DataDiff } from '@/lib/data/diff';
 
 // Lazy load the agent to prevent startup issues with subprocess spawning
 const getRefreshAgent = async () => {
@@ -200,12 +201,60 @@ export async function POST(
         dashboard.branding_override as Partial<BrandingConfig> | null
       );
 
-      // Refresh using Agent SDK (lazy loaded)
+      // Get old raw_content for diff computation
+      const oldRawContent = dashboard.raw_content || '';
+
+      // Compute diff between old and new data
+      console.log('[Refresh] Computing data diff...');
+      const diff: DataDiff = computeDataDiff(oldRawContent, newContent);
+      console.log('[Refresh] Diff result:', condenseDiff(diff));
+
+      // Early exit if no changes detected (in addition to hash check for Google Sheets)
+      if (diff.unchanged) {
+        console.log('[Refresh] No data changes detected, skipping AI refresh');
+
+        // Update last_synced_at if Google Sheets
+        if (isGoogleSheetSync) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any)
+            .from('dashboards')
+            .update({
+              generation_status: 'completed',
+              last_synced_at: new Date().toISOString(),
+            })
+            .eq('id', id);
+        } else {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any)
+            .from('dashboards')
+            .update({ generation_status: 'completed' })
+            .eq('id', id);
+        }
+
+        return NextResponse.json({
+          success: true,
+          refreshed: false,
+          message: 'No changes detected in the data',
+          diff: condenseDiff(diff),
+        });
+      }
+
+      // Log if domain changed (will trigger regeneration)
+      if (diff.domainChanged) {
+        console.log('[Refresh] Domain change detected:', diff.domainChangeReason);
+        console.log('[Refresh] Will use regeneration approach instead of surgical');
+      }
+
+      // Refresh using Agent SDK (lazy loaded) with diff info
       const refreshDashboardWithAgent = await getRefreshAgent();
       const refreshResult = await refreshDashboardWithAgent(
         newContent,
         config,
-        branding
+        branding,
+        {
+          oldRawContent,
+          diff,
+        }
       );
 
       // Update dashboard with new HTML
@@ -296,6 +345,9 @@ export async function POST(
         warnings: refreshResult.warnings,
         version: versionInfo,
         config: updatedConfig,
+        // Include diff info for debugging/transparency
+        diff: condenseDiff(diff),
+        approach: diff.recommendedApproach,
       });
     } catch (error) {
       // Update status to failed
