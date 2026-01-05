@@ -81,13 +81,24 @@ async function clearDashboardsForUser(userId: string, email: string): Promise<vo
     return;
   }
 
+  // Get dashboard IDs first
+  const { data: dashboards } = await supabase
+    .from('dashboards')
+    .select('id')
+    .eq('owner_id', userId);
+
+  const dashboardIds = dashboards?.map(d => d.id) || [];
+
+  if (dashboardIds.length === 0) {
+    console.log('No dashboards found for this user.');
+    return;
+  }
+
   // Delete dashboard versions first (foreign key constraint)
   const { error: versionsError } = await supabase
     .from('dashboard_versions')
     .delete()
-    .in('dashboard_id',
-      supabase.from('dashboards').select('id').eq('owner_id', userId)
-    );
+    .in('dashboard_id', dashboardIds);
 
   if (versionsError) {
     console.error('Error deleting dashboard versions:', versionsError.message);
@@ -97,9 +108,7 @@ async function clearDashboardsForUser(userId: string, email: string): Promise<vo
   const { error: sharesError } = await supabase
     .from('dashboard_shares')
     .delete()
-    .in('dashboard_id',
-      supabase.from('dashboards').select('id').eq('owner_id', userId)
-    );
+    .in('dashboard_id', dashboardIds);
 
   if (sharesError) {
     console.error('Error deleting dashboard shares:', sharesError.message);
@@ -109,9 +118,7 @@ async function clearDashboardsForUser(userId: string, email: string): Promise<vo
   const { error: chatError } = await supabase
     .from('chat_messages')
     .delete()
-    .in('dashboard_id',
-      supabase.from('dashboards').select('id').eq('owner_id', userId)
-    );
+    .in('dashboard_id', dashboardIds);
 
   if (chatError) {
     console.error('Error deleting chat messages:', chatError.message);
