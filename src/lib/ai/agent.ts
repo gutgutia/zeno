@@ -107,6 +107,39 @@ export const AGENT_CONFIG = {
 // Store sandbox reference for tool execution
 let activeSandbox: Sandbox | null = null;
 
+// Agent execution log entry
+interface AgentLogEntry {
+  turn: number;
+  type: 'tool_call' | 'tool_result' | 'assistant' | 'system';
+  timestamp: string;
+  content: string;
+}
+
+// Print consolidated log at the end
+function printAgentLog(log: AgentLogEntry[], totalCost?: number) {
+  console.log('\n' + '='.repeat(80));
+  console.log('AGENT EXECUTION LOG');
+  console.log('='.repeat(80));
+
+  for (const entry of log) {
+    const prefix = `[Turn ${entry.turn}] [${entry.type.toUpperCase()}]`;
+    console.log(`\n${prefix}`);
+    console.log('-'.repeat(40));
+    // Truncate long content for readability
+    const content = entry.content.length > 500
+      ? entry.content.slice(0, 500) + '... (truncated)'
+      : entry.content;
+    console.log(content);
+  }
+
+  console.log('\n' + '='.repeat(80));
+  console.log(`SUMMARY: ${log.length} log entries, ${log.filter(e => e.type === 'tool_call').length} tool calls`);
+  if (totalCost) {
+    console.log(`COST: $${totalCost.toFixed(4)}`);
+  }
+  console.log('='.repeat(80) + '\n');
+}
+
 /**
  * Tool for executing Python code in E2B sandbox
  */
@@ -124,25 +157,35 @@ const executePythonTool = tool(
     }
 
     try {
-      console.log('[Agent] Executing Python code...');
+      // Log the Python code being executed (truncated for readability)
+      const codePreview = code.length > 300 ? code.slice(0, 300) + '\n... (truncated)' : code;
+      console.log('[Python] Executing:\n' + '-'.repeat(40));
+      console.log(codePreview);
+      console.log('-'.repeat(40));
+
       const execution = await activeSandbox.runCode(code);
 
       const stdout = execution.logs.stdout.join('\n');
       const stderr = execution.logs.stderr.join('\n');
 
       if (stderr && !stdout) {
-        console.log('[Agent] Python stderr:', stderr);
+        console.log('[Python] Error:', stderr);
         return {
           content: [{ type: 'text' as const, text: `Error: ${stderr}` }],
         };
       }
 
-      console.log('[Agent] Python output:', stdout.slice(0, 200) + (stdout.length > 200 ? '...' : ''));
+      // Log the output (truncated for readability)
+      const outputPreview = stdout.length > 500 ? stdout.slice(0, 500) + '\n... (truncated)' : stdout;
+      console.log('[Python] Output:\n' + '-'.repeat(40));
+      console.log(outputPreview || '(no output)');
+      console.log('-'.repeat(40));
+
       return {
         content: [{ type: 'text' as const, text: stdout || 'Code executed successfully (no output)' }],
       };
     } catch (error) {
-      console.error('[Agent] Python execution error:', error);
+      console.error('[Python] Execution error:', error);
       return {
         content: [{ type: 'text' as const, text: `Execution error: ${error instanceof Error ? error.message : String(error)}` }],
       };
@@ -226,6 +269,8 @@ export async function generateWithAgent(
     console.log(`[Agent] Extended thinking: ${AGENT_CONFIG.extendedThinking ? 'ENABLED' : 'DISABLED'}`);
     let finalResult: { html: string; summary: string } | null = null;
     let turnCount = 0;
+    let totalCost: number | undefined;
+    const agentLog: AgentLogEntry[] = [];
 
     // Build query options
     const queryOptions: Parameters<typeof query>[0]['options'] = {
@@ -254,15 +299,46 @@ export async function generateWithAgent(
         prompt: userPrompt,
         options: queryOptions,
       })) {
+        const timestamp = new Date().toISOString();
+
         if (message.type === 'assistant') {
           turnCount++;
           console.log(`[Agent] Turn ${turnCount}: Assistant message`);
+          // Try to extract text content from assistant message
+          const msg = message as { content?: Array<{ type: string; text?: string; name?: string; input?: unknown }> };
+          if (msg.content) {
+            for (const block of msg.content) {
+              if (block.type === 'text' && block.text) {
+                agentLog.push({
+                  turn: turnCount,
+                  type: 'assistant',
+                  timestamp,
+                  content: block.text,
+                });
+              } else if (block.type === 'tool_use') {
+                agentLog.push({
+                  turn: turnCount,
+                  type: 'tool_call',
+                  timestamp,
+                  content: `Tool: ${block.name}\nInput: ${JSON.stringify(block.input, null, 2)}`,
+                });
+              }
+            }
+          }
         } else if (message.type === 'tool_progress') {
-          console.log(`[Agent] Tool progress: ${message.tool_name}`);
+          agentLog.push({
+            turn: turnCount,
+            type: 'tool_result',
+            timestamp,
+            content: `Tool: ${message.tool_name} (in progress)`,
+          });
+        } else if (message.type === 'stream_event') {
+          // Ignore stream events for logging
         } else if (message.type === 'result') {
           console.log(`[Agent] Completed after ${turnCount} turns`);
           if (message.subtype === 'success') {
-            console.log(`[Agent] Total cost: $${message.total_cost_usd?.toFixed(4) || 'unknown'}`);
+            totalCost = message.total_cost_usd;
+            console.log(`[Agent] Total cost: $${totalCost?.toFixed(4) || 'unknown'}`);
             finalResult = extractJsonFromResult(message.result);
           } else {
             // Error result
@@ -271,8 +347,17 @@ export async function generateWithAgent(
           }
         } else if (message.type === 'system') {
           console.log(`[Agent] System message: ${message.subtype}`);
+          agentLog.push({
+            turn: turnCount,
+            type: 'system',
+            timestamp,
+            content: `System: ${message.subtype}`,
+          });
         }
       }
+
+      // Print consolidated log
+      printAgentLog(agentLog, totalCost);
     } catch (agentError) {
       console.error('[Agent] SDK Error:', agentError);
       console.error('[Agent] Error details:', JSON.stringify(agentError, Object.getOwnPropertyNames(agentError)));
