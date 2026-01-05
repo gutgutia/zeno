@@ -92,6 +92,24 @@ JAVASCRIPT REQUIREMENTS:
 - Embed data as JavaScript arrays: const data = [...];
 - Use Chart.js for donut/bar/line charts
 
+CRITICAL - CHART.JS CONTAINER SIZING:
+Charts MUST have proper container sizing or they will render incorrectly:
+<div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+  <canvas id="myChart"></canvas>
+</div>
+- ALWAYS wrap canvas in a container with explicit height (e.g., 250px, 300px, 400px)
+- Container must have position: relative
+- Initialize Chart.js with maintainAspectRatio: false:
+  new Chart(ctx, {
+    type: 'bar',
+    data: {...},
+    options: {
+      responsive: true,
+      maintainAspectRatio: false, // REQUIRED for proper sizing
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+
 CSS REQUIREMENTS:
 - Use <style> block with CSS variables for theming
 - Include hover states and transitions
@@ -109,19 +127,38 @@ HTML STRUCTURE EXAMPLE:
   }
   .card { ... }
   .card:hover { transform: translateY(-2px); }
+  .chart-container { position: relative; height: 300px; width: 100%; }
+  .chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; }
 </style>
 <div class="dashboard">
   <!-- KPI Cards -->
-  <!-- Charts with Chart.js -->
+  <!-- Charts Section -->
+  <div class="chart-row">
+    <div class="card">
+      <h3>Status Distribution</h3>
+      <div class="chart-container">
+        <canvas id="statusChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Timeline</h3>
+      <div class="chart-container">
+        <canvas id="timelineChart"></canvas>
+      </div>
+    </div>
+  </div>
   <!-- Breakdown Section with Insights -->
-  <!-- Timeline/Grouped View -->
   <!-- Searchable Table -->
 </div>
 <script>
   const data = [...]; // Embed computed data
-  // Chart.js initialization
+  // Chart.js initialization with maintainAspectRatio: false
+  new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: { labels: [...], datasets: [{ data: [...], backgroundColor: [...] }] },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
   // Filter/search functionality
-  // Tooltip handling
 </script>
 
 INSIGHTS & CALLOUTS:
