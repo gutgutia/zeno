@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // No special config needed for Digital Ocean / traditional Node.js hosting
+  // Prevent Next.js from bundling these packages
+  // The Agent SDK uses subprocess spawning which breaks if bundled
+  serverExternalPackages: [
+    '@anthropic-ai/claude-agent-sdk',
+    '@e2b/code-interpreter',
+  ],
 };
 
 export default nextConfig;
