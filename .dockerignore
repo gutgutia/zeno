@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Next.js build output
+.next
+
+# Testing
+coverage
+
+# Misc
+.DS_Store
+*.pem
+.env*.local
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# Docs
+docs
+README.md
+*.md
+!package.json
+
+# Supabase local
+supabase/.temp

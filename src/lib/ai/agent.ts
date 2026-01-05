@@ -3,16 +3,30 @@ import { Sandbox } from '@e2b/code-interpreter';
 import { z } from 'zod';
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
 import { getAgentSystemPrompt, getAgentUserPrompt } from './agent-prompts';
 import { getRefreshSystemPrompt, getRefreshUserPrompt } from './refresh-prompts';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig } from '@/types/database';
 
 // Determine the path to the Claude Agent SDK executable
-// This varies by deployment environment (Vercel uses /var/task, Railway uses /app, local uses node_modules)
+// Priority: 1) Global CLI, 2) Local node_modules cli.js
 const getClaudeExecutablePath = () => {
+  // First, try to find globally installed claude CLI
+  // This is the recommended approach per Agent SDK docs
+  try {
+    const globalPath = execSync('which claude', { encoding: 'utf-8' }).trim();
+    if (globalPath && fs.existsSync(globalPath)) {
+      console.log('[Agent SDK] Found global claude CLI at:', globalPath);
+      return globalPath;
+    }
+  } catch {
+    console.log('[Agent SDK] Global claude CLI not found, checking local paths...');
+  }
+
+  // Fallback to local node_modules paths
   const possiblePaths = [
-    // Try to resolve from node_modules first
+    // Try to resolve from node_modules
     (() => {
       try {
         const sdkPath = require.resolve('@anthropic-ai/claude-agent-sdk');
@@ -21,6 +35,10 @@ const getClaudeExecutablePath = () => {
         return null;
       }
     })(),
+    // Global npm paths (where npm install -g puts things)
+    '/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js',
+    '/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js',
+    // Container paths
     '/app/node_modules/@anthropic-ai/claude-agent-sdk/cli.js', // Railway/DO
     '/var/task/node_modules/@anthropic-ai/claude-agent-sdk/cli.js', // Vercel
     path.join(process.cwd(), 'node_modules/@anthropic-ai/claude-agent-sdk/cli.js'), // Local
