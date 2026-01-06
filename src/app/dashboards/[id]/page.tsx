@@ -4,7 +4,6 @@ import { useState, useEffect, use, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -329,59 +328,64 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
               {/* Title */}
               <div className="min-w-0 flex-1">
-                {isEditingTitle ? (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={editedTitle}
-                      onChange={(e) => setEditedTitle(e.target.value)}
-                      className="text-lg font-semibold max-w-sm"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleTitleSave();
-                        if (e.key === 'Escape') {
-                          setIsEditingTitle(false);
-                          setEditedTitle(dashboard.title);
-                        }
-                      }}
-                    />
-                    <Button size="sm" onClick={handleTitleSave}>Save</Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setIsEditingTitle(false);
-                        setEditedTitle(dashboard.title);
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col">
-                    <button
-                      onClick={() => setIsEditingTitle(true)}
-                      className="group flex items-center gap-2 text-left"
-                      title="Click to edit title"
-                    >
-                      <h1 className="text-lg font-semibold text-[var(--color-gray-900)] truncate">
-                        {dashboard.title}
-                      </h1>
-                      <svg
-                        className="w-4 h-4 text-[var(--color-gray-400)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                <div className="flex flex-col">
+                  <div className="group flex items-center gap-2">
+                    {isEditingTitle ? (
+                      <input
+                        type="text"
+                        value={editedTitle}
+                        onChange={(e) => setEditedTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleTitleSave();
+                          }
+                          if (e.key === 'Escape') {
+                            setIsEditingTitle(false);
+                            setEditedTitle(dashboard.title);
+                          }
+                        }}
+                        onBlur={() => {
+                          // Save on blur if title changed, otherwise cancel
+                          if (editedTitle.trim() && editedTitle.trim() !== dashboard.title) {
+                            handleTitleSave();
+                          } else {
+                            setIsEditingTitle(false);
+                            setEditedTitle(dashboard.title);
+                          }
+                        }}
+                        autoFocus
+                        className="text-lg font-semibold text-[var(--color-gray-900)] bg-transparent border-none outline-none p-0 m-0 w-full min-w-0 focus:ring-0"
+                        style={{ caretColor: 'var(--color-primary)' }}
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setIsEditingTitle(true)}
+                        className="text-left min-w-0"
+                        title="Click to edit title"
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                    </button>
-                    {isComplete && dashboard.updated_at && (
-                      <span className="text-xs text-[var(--color-gray-500)]">
-                        Updated {formatLastUpdated(dashboard.updated_at)}
-                      </span>
+                        <h1 className="text-lg font-semibold text-[var(--color-gray-900)] truncate">
+                          {dashboard.title}
+                        </h1>
+                      </button>
                     )}
+                    <svg
+                      className={`w-4 h-4 text-[var(--color-gray-400)] flex-shrink-0 transition-opacity ${
+                        isEditingTitle ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
                   </div>
-                )}
+                  {isComplete && dashboard.updated_at && (
+                    <span className="text-xs text-[var(--color-gray-500)]">
+                      Updated {formatLastUpdated(dashboard.updated_at)}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Generation Status Badge */}
