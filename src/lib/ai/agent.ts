@@ -5,7 +5,8 @@ import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
 import { getAgentSystemPrompt, getAgentUserPrompt, getModifySystemPrompt, getModifyUserPrompt } from './agent-prompts';
-import { getRefreshSystemPrompt, getRefreshUserPrompt } from './refresh-prompts';
+import { getRefreshSystemPrompt, getRefreshUserPrompt, getLegacyRefreshUserPrompt } from './refresh-prompts';
+import { computeDataDiff, formatDiffForAI, type DataDiff } from '@/lib/data/diff';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig } from '@/types/database';
 
@@ -585,22 +586,64 @@ function extractRefreshResult(result: string): RefreshResult | null {
 }
 
 /**
- * Refresh a dashboard with new data while preserving its structure.
+ * Options for refresh operation
+ */
+export interface RefreshOptions {
+  /** Previous raw content for diff computation (if not provided, diff will be computed) */
+  oldRawContent?: string;
+  /** Pre-computed diff (if available from endpoint) */
+  diff?: DataDiff;
+}
+
+/**
+ * Refresh a dashboard with new data using SURGICAL updates.
  *
  * This function:
- * 1. Creates an E2B sandbox
- * 2. Writes the new data and existing HTML to the sandbox
- * 3. Runs an agent loop to update the values in the HTML
- * 4. Returns the updated HTML with preserved structure
+ * 1. Computes a diff between old and new data (if not provided)
+ * 2. Creates an E2B sandbox
+ * 3. Writes the new data and existing HTML to the sandbox
+ * 4. Runs an agent loop with surgical editing tools
+ * 5. Returns the updated HTML with preserved structure
+ *
+ * Uses Sonnet 4.5 for cost efficiency (surgical edits don't need Opus)
  */
 export async function refreshDashboardWithAgent(
   newRawContent: string,
   existingConfig: DashboardConfig,
-  branding: BrandingConfig | null
+  branding: BrandingConfig | null,
+  options: RefreshOptions = {}
 ): Promise<RefreshResult> {
-  console.log('[Refresh Agent] Starting dashboard refresh...');
+  console.log('[Refresh Agent] Starting surgical dashboard refresh...');
   console.log('[Refresh Agent] New content length:', newRawContent.length, 'characters');
   console.log('[Refresh Agent] Existing HTML length:', existingConfig.html.length, 'characters');
+
+  // Compute diff if old content is available
+  let diff = options.diff;
+  if (!diff && options.oldRawContent) {
+    console.log('[Refresh Agent] Computing data diff...');
+    diff = computeDataDiff(options.oldRawContent, newRawContent);
+    console.log('[Refresh Agent] Diff computed:', {
+      contentType: diff.contentType,
+      unchanged: diff.unchanged,
+      domainChanged: diff.domainChanged,
+      recommendedApproach: diff.recommendedApproach,
+    });
+
+    // Early exit if no changes
+    if (diff.unchanged) {
+      console.log('[Refresh Agent] No changes detected, returning existing HTML');
+      return {
+        html: existingConfig.html,
+        summary: 'No changes detected in the data',
+        changes: [],
+        warnings: [],
+      };
+    }
+  }
+
+  // Determine approach based on diff
+  const approach = diff?.recommendedApproach || 'surgical';
+  console.log(`[Refresh Agent] Using ${approach} approach`);
 
   // Create E2B sandbox
   console.log('[Refresh Agent] Creating E2B sandbox...');
@@ -614,35 +657,53 @@ export async function refreshDashboardWithAgent(
     await activeSandbox.files.write('/tmp/data.txt', newRawContent);
     await activeSandbox.files.write('/tmp/existing.html', existingConfig.html);
 
-    // Get prompts
-    const systemPrompt = getRefreshSystemPrompt(branding);
-    const userPrompt = getRefreshUserPrompt(
-      existingConfig.html,
-      existingConfig.analysis?.summary
-    );
+    // Get prompts based on whether we have diff info
+    const systemPrompt = getRefreshSystemPrompt(branding, approach);
+    let userPrompt: string;
+
+    if (diff) {
+      const diffFormatted = formatDiffForAI(diff);
+      userPrompt = getRefreshUserPrompt(
+        diff,
+        diffFormatted,
+        existingConfig.analysis?.summary
+      );
+    } else {
+      // Fallback to legacy prompt when no diff available
+      userPrompt = getLegacyRefreshUserPrompt(
+        existingConfig.html,
+        existingConfig.analysis?.summary
+      );
+    }
 
     console.log('[Refresh Agent] Starting agent loop...');
     let refreshResult: RefreshResult | null = null;
     let turnCount = 0;
 
-    // Build query options - use less thinking budget for refresh (simpler task)
+    // Use Sonnet 4.5 for surgical updates (cost-efficient)
+    // Use surgical editing tools (read_lines, edit_file, get_file, execute_python)
     const queryOptions: Parameters<typeof query>[0]['options'] = {
-      model: 'claude-opus-4-5-20251101',
+      model: 'claude-sonnet-4-5-20250514', // Sonnet for cost efficiency
       systemPrompt,
-      maxTurns: 10, // Fewer turns for refresh
+      maxTurns: approach === 'surgical' ? 15 : 10, // More turns for surgical (multiple edits)
       mcpServers: {
-        python: pythonToolServer,
+        filetools: modifyToolServer, // Includes surgical editing tools
       },
-      allowedTools: ['mcp__python__execute_python'],
+      allowedTools: [
+        'mcp__filetools__read_lines',
+        'mcp__filetools__edit_file',
+        'mcp__filetools__get_file',
+        'mcp__filetools__execute_python',
+      ],
       pathToClaudeCodeExecutable: CLAUDE_EXECUTABLE_PATH,
     };
 
-    // Add extended thinking with reduced budget
+    // Add extended thinking with reduced budget (surgical is simpler)
     if (AGENT_CONFIG.extendedThinking) {
       // @ts-expect-error - thinking option may not be in SDK types yet
       queryOptions.thinking = {
         type: 'enabled',
-        budget_tokens: 5000, // Less thinking needed for refresh
+        budget_tokens: approach === 'surgical' ? 3000 : 5000,
       };
     }
 
@@ -686,6 +747,11 @@ export async function refreshDashboardWithAgent(
     }
   }
 }
+
+/**
+ * Re-export diff utilities for use by endpoints
+ */
+export { computeDataDiff, formatDiffForAI, type DataDiff } from '@/lib/data/diff';
 
 /**
  * Result from modifying a dashboard
