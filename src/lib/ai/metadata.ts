@@ -6,7 +6,7 @@ const anthropic = new Anthropic({
 });
 
 // Claude Haiku for fast, cheap metadata generation
-const METADATA_MODEL = 'claude-haiku-4-5-20250514';
+const METADATA_MODEL = 'claude-haiku-4-5';
 
 export interface MetadataContext {
   rawContent: string;

@@ -444,7 +444,7 @@ export async function generateWithAgent(
 
     // Build query options
     const queryOptions: Parameters<typeof query>[0]['options'] = {
-      model: 'claude-opus-4-5-20251101',
+      model: 'claude-opus-4-5',
       systemPrompt,
       maxTurns: AGENT_CONFIG.maxTurns,
       mcpServers: {
@@ -570,7 +570,7 @@ export async function generateWithAgent(
       charts: {}, // All visualizations are inline
       metadata: {
         generatedAt: new Date().toISOString(),
-        generationModel: 'claude-opus-4-5-20251101',
+        generationModel: 'claude-opus-4-5',
         userInstructions,
         agentGenerated: true,
         turnCount,
