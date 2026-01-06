@@ -8,7 +8,7 @@ import type { BrandingConfig, Dashboard, Workspace, DataSource } from '@/types/d
 import { createVersion } from '@/lib/versions';
 import { computeDataDiff, condenseDiff, type DataDiff } from '@/lib/data/diff';
 import { deductCredits, hasEnoughCredits, getCreditBalance } from '@/lib/credits';
-import { logUsage } from '@/lib/costs';
+import { logUsage, type ModelId } from '@/lib/costs';
 
 // Lazy load the agent to prevent startup issues with subprocess spawning
 const getRefreshAgent = async () => {
@@ -310,7 +310,7 @@ export async function POST(
         userId: user.id,
         organizationId: membership?.organization_id || null,
         operationType: 'data_refresh',
-        modelId: refreshResult.usage.modelId, // Use model from agent response
+        modelId: refreshResult.usage.modelId as ModelId, // Use model from agent response
         usage: refreshResult.usage.usage,
         agentReportedCost: refreshResult.usage.costUsd,
         durationMs: refreshResult.usage.durationMs,
