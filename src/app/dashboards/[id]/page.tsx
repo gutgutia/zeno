@@ -119,26 +119,38 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     init();
   }, [fetchDashboard]);
 
-  // Poll for generation status updates
+  // Poll for generation/refresh status updates
   useEffect(() => {
     if (!dashboard) return;
 
     const status = dashboard.generation_status as GenerationStatus;
     const isGenerating = status === 'pending' || status === 'analyzing' || status === 'generating';
+    const isRefreshingStatus = status === 'refreshing';
 
-    if (!isGenerating) return;
+    // Poll during both generation and refresh
+    if (!isGenerating && !isRefreshingStatus) return;
 
     const interval = setInterval(async () => {
       const data = await fetchDashboard();
       if (data) {
         const newStatus = data.dashboard.generation_status as GenerationStatus;
+        const oldStatus = dashboard.generation_status;
         setDashboard(data.dashboard);
 
         if (newStatus === 'completed') {
-          toast.success('Your dashboard is ready!');
+          // Different messages for generation vs refresh
+          if (oldStatus === 'refreshing' || isRefreshingStatus) {
+            toast.success('Dashboard updated with new data!');
+          } else {
+            toast.success('Your dashboard is ready!');
+          }
           clearInterval(interval);
         } else if (newStatus === 'failed') {
-          toast.error('Generation failed. Please try again.');
+          if (oldStatus === 'refreshing' || isRefreshingStatus) {
+            toast.error('Data update failed. Please try again.');
+          } else {
+            toast.error('Generation failed. Please try again.');
+          }
           clearInterval(interval);
         }
       }
@@ -214,10 +226,19 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     setIsVersionHistoryOpen(false);
   };
 
+  // Handler for when data refresh starts - trigger polling
+  const handleDataRefreshStarted = useCallback(() => {
+    // Optimistically set status to refreshing so polling starts
+    setDashboard(prev => prev ? { ...prev, generation_status: 'refreshing' } : prev);
+  }, []);
+
   const handleDataRefresh = async (result: { success: boolean; refreshed: boolean }) => {
-    if (result.success && result.refreshed) {
+    if (result.success) {
       // Refetch the dashboard to get the updated config
-      await fetchDashboard();
+      const data = await fetchDashboard();
+      if (data) {
+        setDashboard(data.dashboard);
+      }
     }
   };
 
@@ -326,6 +347,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
   const generationStatus = dashboard.generation_status as GenerationStatus;
   const isGenerating = generationStatus === 'pending' || generationStatus === 'analyzing' || generationStatus === 'generating';
+  const isRefreshing = generationStatus === 'refreshing';
   const hasFailed = generationStatus === 'failed';
   const isComplete = generationStatus === 'completed' && dashboard.config;
 
@@ -430,6 +452,14 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                    generationStatus === 'generating' ? 'Generating...' : 'Pending...'}
                 </span>
               )}
+
+              {/* Refreshing Status Badge */}
+              {isRefreshing && (
+                <span className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
+                  <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                  Updating data...
+                </span>
+              )}
             </div>
 
             {/* Right side - Actions */}
@@ -444,10 +474,11 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
               )}
 
               {/* Update Data Button */}
-              {isComplete && (
+              {isComplete && !isRefreshing && (
                 <UpdateDataModal
                   dashboardId={id}
                   hasGoogleConnection={Boolean(dashboard.google_connection_id)}
+                  onRefreshStarted={handleDataRefreshStarted}
                   onRefreshComplete={handleDataRefresh}
                   trigger={
                     <Button variant="outline" size="sm" className="hidden sm:flex items-center gap-1.5">
@@ -599,6 +630,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                       <UpdateDataModal
                         dashboardId={id}
                         hasGoogleConnection={Boolean(dashboard.google_connection_id)}
+                        onRefreshStarted={handleDataRefreshStarted}
                         onRefreshComplete={handleDataRefresh}
                         trigger={
                           <Button>

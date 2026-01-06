@@ -9,6 +9,7 @@ import { createVersion } from '@/lib/versions';
 import { computeDataDiff, condenseDiff, type DataDiff } from '@/lib/data/diff';
 import { deductCredits, hasEnoughCredits, getCreditBalance } from '@/lib/credits';
 import { logUsage, type ModelId } from '@/lib/costs';
+import { sendDashboardUpdatedEmail } from '@/lib/email/send';
 
 // Lazy load the agent to prevent startup issues with subprocess spawning
 const getRefreshAgent = async () => {
@@ -401,6 +402,24 @@ export async function POST(
       } catch (versionError) {
         console.error('[Refresh] Failed to create version:', versionError);
         // Don't fail the request - the refresh was successful
+      }
+
+      // Send email notification if user has email
+      if (user.email) {
+        try {
+          await sendDashboardUpdatedEmail({
+            to: user.email,
+            dashboardTitle: dashboard.title,
+            dashboardId: id,
+            versionLabel: versionInfo?.label,
+            summary: refreshResult.summary,
+            changesCount: refreshResult.changes?.length,
+          });
+          console.log('[Refresh] Sent update notification email to', user.email);
+        } catch (emailError) {
+          console.error('[Refresh] Failed to send email notification:', emailError);
+          // Don't fail the request - the refresh was successful
+        }
       }
 
       return NextResponse.json({
