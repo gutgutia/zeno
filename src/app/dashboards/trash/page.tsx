@@ -128,9 +128,6 @@ export default function TrashPage() {
       {/* Header */}
       <div className="mb-8">
         <DashboardNav active="deleted" showNewButton={false} />
-        <p className="text-[var(--color-gray-600)] mt-1">
-          Deleted dashboards are kept for 30 days
-        </p>
       </div>
 
       {/* Trash List or Empty State */}

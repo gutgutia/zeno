@@ -116,9 +116,6 @@ export default async function DashboardsPage() {
           {/* Header - only show when dashboards exist */}
           <div className="mb-8">
             <DashboardNav active="my-dashboards" />
-            <p className="text-[var(--color-gray-600)] mt-1">
-              Create and manage your data visualizations
-            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {dashboards.map((dashboard) => (

@@ -77,9 +77,6 @@ export default function SharedWithMePage() {
       {/* Header */}
       <div className="mb-8">
         <DashboardNav active="shared" showNewButton={false} />
-        <p className="text-[var(--color-gray-600)] mt-1">
-          Dashboards that others have shared with you
-        </p>
       </div>
 
       {/* Dashboard Grid or Empty State */}
