@@ -242,8 +242,14 @@ export async function restoreVersion(
     userId,
   });
 
+  // Return dashboard with updated version numbers
+  // (createVersion updates the version numbers on the dashboard)
   return {
-    dashboard: dashboard as Dashboard,
+    dashboard: {
+      ...dashboard,
+      current_major_version: newVersion.major_version,
+      current_minor_version: newVersion.minor_version,
+    } as Dashboard,
     version: newVersion,
   };
 }

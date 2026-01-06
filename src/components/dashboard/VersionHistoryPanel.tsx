@@ -14,6 +14,8 @@ interface VersionHistoryPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onRestore: (dashboard: Dashboard) => void;
+  onPreview?: (version: DashboardVersion | null) => void;
+  previewingVersionId?: string | null;
 }
 
 function formatTimeAgo(dateString: string): string {
@@ -92,6 +94,8 @@ export function VersionHistoryPanel({
   isOpen,
   onClose,
   onRestore,
+  onPreview,
+  previewingVersionId,
 }: VersionHistoryPanelProps) {
   const [versions, setVersions] = useState<DashboardVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -213,10 +217,27 @@ export function VersionHistoryPanel({
                 const typeInfo = getChangeTypeInfo(version.change_type);
                 const versionLabel = `${version.major_version}.${version.minor_version}`;
 
+                const isPreviewing = previewingVersionId === version.id;
+
                 return (
                   <div
                     key={version.id}
-                    className={`p-4 ${isCurrent ? 'bg-[var(--color-primary)]/5' : 'hover:bg-[var(--color-gray-50)]'} transition-colors`}
+                    className={`p-4 transition-colors ${
+                      isPreviewing
+                        ? 'bg-[var(--color-primary)]/10 border-l-2 border-[var(--color-primary)]'
+                        : isCurrent
+                        ? 'bg-[var(--color-primary)]/5'
+                        : 'hover:bg-[var(--color-gray-50)] cursor-pointer'
+                    }`}
+                    onClick={() => {
+                      if (!isCurrent && onPreview) {
+                        if (isPreviewing) {
+                          onPreview(null); // Exit preview
+                        } else {
+                          onPreview(version);
+                        }
+                      }
+                    }}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -228,6 +249,11 @@ export function VersionHistoryPanel({
                           {isCurrent && (
                             <span className="px-1.5 py-0.5 text-xs font-medium bg-[var(--color-primary)] text-white rounded">
                               Current
+                            </span>
+                          )}
+                          {isPreviewing && (
+                            <span className="px-1.5 py-0.5 text-xs font-medium bg-amber-500 text-white rounded">
+                              Previewing
                             </span>
                           )}
                           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded ${typeInfo.color}`}>
@@ -252,7 +278,10 @@ export function VersionHistoryPanel({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleRestore(version)}
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent card click
+                            handleRestore(version);
+                          }}
                           disabled={isRestoring !== null}
                           className="flex-shrink-0"
                         >
