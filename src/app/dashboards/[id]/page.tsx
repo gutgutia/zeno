@@ -355,8 +355,13 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                           }
                         }}
                         autoFocus
-                        className="text-lg font-semibold text-[var(--color-gray-900)] bg-transparent border-none outline-none p-0 m-0 w-full min-w-0 focus:ring-0"
-                        style={{ caretColor: 'var(--color-primary)' }}
+                        className="font-semibold text-[var(--color-gray-900)] bg-transparent border-none outline-none p-0 m-0 w-full min-w-0 focus:ring-0"
+                        style={{
+                          fontSize: '1.125rem',
+                          lineHeight: '1.75rem',
+                          fontFamily: 'inherit',
+                          caretColor: 'var(--color-primary)',
+                        }}
                       />
                     ) : (
                       <button
@@ -364,9 +369,9 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                         className="text-left min-w-0"
                         title="Click to edit title"
                       >
-                        <h1 className="text-lg font-semibold text-[var(--color-gray-900)] truncate">
+                        <span className="text-lg font-semibold text-[var(--color-gray-900)] truncate block">
                           {dashboard.title}
-                        </h1>
+                        </span>
                       </button>
                     )}
                     <svg
