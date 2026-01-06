@@ -888,11 +888,11 @@ export async function refreshDashboardWithAgent(
             console.log(`[Refresh Agent] Token usage: input=${tokenUsage.inputTokens}, output=${tokenUsage.outputTokens}, thinking=${tokenUsage.thinkingTokens}`);
             refreshResult = extractRefreshResult(message.result);
             console.log(`[Refresh Agent] Extracted result: ${refreshResult ? 'success' : 'null'}`);
-          } else if (message.subtype === 'error') {
-            // Log detailed error info
+          } else if (message.subtype.startsWith('error')) {
+            // Log detailed error info (handles error_during_execution, error_max_turns, etc.)
             const errorResult = message as { errors?: string[]; error?: string; message?: string };
-            console.error(`[Refresh Agent] Error result received:`, JSON.stringify(errorResult, null, 2));
-            throw new Error(`Refresh agent error: ${errorResult.errors?.join(', ') || errorResult.error || errorResult.message || 'Unknown error'}`);
+            console.error(`[Refresh Agent] Error result received (${message.subtype}):`, JSON.stringify(errorResult, null, 2));
+            throw new Error(`Refresh agent error (${message.subtype}): ${errorResult.errors?.join(', ') || errorResult.error || errorResult.message || 'Unknown error'}`);
           } else {
             console.log(`[Refresh Agent] Unknown result subtype: ${message.subtype}`);
             console.log(`[Refresh Agent] Full message:`, JSON.stringify(message, null, 2));
