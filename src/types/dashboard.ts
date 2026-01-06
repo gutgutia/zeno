@@ -4,7 +4,7 @@ import type { ChartConfig } from './chart';
 export type ContentType = 'data' | 'text' | 'mixed';
 
 // Generation status for async processing
-export type GenerationStatus = 'pending' | 'analyzing' | 'generating' | 'completed' | 'failed';
+export type GenerationStatus = 'pending' | 'analyzing' | 'generating' | 'refreshing' | 'completed' | 'failed';
 
 // New dashboard config structure
 export interface DashboardConfig {
