@@ -165,10 +165,8 @@ export default async function PublicDashboardPage({ params }: PageProps) {
   // User object for header (null if not logged in)
   const headerUser = user ? { email: user.email || '' } : null;
 
-  // Version info
-  const version = dashboard.current_major_version !== undefined
-    ? { major: dashboard.current_major_version, minor: dashboard.current_minor_version || 0 }
-    : undefined;
+  // Last updated time (prefer updated_at, fall back to created_at)
+  const lastUpdated = dashboard.updated_at || dashboard.created_at;
 
   // Compute branding styles
   const brandingStyles: React.CSSProperties = {
@@ -187,9 +185,9 @@ export default async function PublicDashboardPage({ params }: PageProps) {
       <DashboardTitleBar
         title={dashboard.title}
         branding={branding}
-        version={version}
-        backUrl={user ? '/dashboards' : '/'}
-        showBackButton={true}
+        lastUpdated={lastUpdated}
+        backUrl="/dashboards"
+        showBackButton={!!user}
       />
 
       {/* Main content - same structure as owner view */}

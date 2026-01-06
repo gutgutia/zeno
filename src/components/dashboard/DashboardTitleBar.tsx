@@ -6,14 +6,40 @@ import type { BrandingConfig } from '@/types/database';
 interface DashboardTitleBarProps {
   title: string;
   branding?: BrandingConfig | null;
-  /** Version info to display */
-  version?: { major: number; minor: number };
+  /** Last updated or created timestamp */
+  lastUpdated?: string | Date;
   /** Back link URL - defaults to /dashboards */
   backUrl?: string;
   /** Whether to show the back button */
   showBackButton?: boolean;
   /** Children rendered on the right side (action buttons) */
   children?: React.ReactNode;
+}
+
+/**
+ * Format a date as relative time or absolute date
+ */
+function formatLastUpdated(date: string | Date): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours === 0) {
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      if (diffMins < 1) return 'Just now';
+      return `${diffMins}m ago`;
+    }
+    return `${diffHours}h ago`;
+  } else if (diffDays === 1) {
+    return 'Yesterday';
+  } else if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  } else {
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
 }
 
 /**
@@ -25,7 +51,7 @@ interface DashboardTitleBarProps {
 export function DashboardTitleBar({
   title,
   branding,
-  version,
+  lastUpdated,
   backUrl = '/dashboards',
   showBackButton = true,
   children,
@@ -69,9 +95,9 @@ export function DashboardTitleBar({
                 <h1 className="text-lg font-semibold text-[var(--color-gray-900)] truncate">
                   {title}
                 </h1>
-                {version && (
+                {lastUpdated && (
                   <span className="text-xs text-[var(--color-gray-500)]">
-                    v{version.major}.{version.minor}
+                    Updated {formatLastUpdated(lastUpdated)}
                   </span>
                 )}
               </div>

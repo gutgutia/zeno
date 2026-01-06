@@ -31,6 +31,32 @@ import type { DashboardConfig, GenerationStatus } from '@/types/dashboard';
 
 const POLL_INTERVAL = 3000; // 3 seconds
 
+/**
+ * Format a date as relative time or absolute date
+ */
+function formatLastUpdated(date: string | Date): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours === 0) {
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      if (diffMins < 1) return 'Just now';
+      return `${diffMins}m ago`;
+    }
+    return `${diffHours}h ago`;
+  } else if (diffDays === 1) {
+    return 'Yesterday';
+  } else if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  } else {
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+}
+
 export default function DashboardEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -353,9 +379,9 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                       </svg>
                     </button>
-                    {isComplete && dashboard.current_major_version !== undefined && (
+                    {isComplete && dashboard.updated_at && (
                       <span className="text-xs text-[var(--color-gray-500)]">
-                        v{dashboard.current_major_version}.{dashboard.current_minor_version || 0}
+                        Updated {formatLastUpdated(dashboard.updated_at)}
                       </span>
                     )}
                   </div>
