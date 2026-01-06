@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 import type { Dashboard, BrandingConfig } from '@/types/database';
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
-import { modifyDashboardWithAgent } from '@/lib/ai/agent';
+import { modifyDashboardWithAgent, AGENT_CONFIG } from '@/lib/ai/agent';
+import { modifyDashboardDirect } from '@/lib/ai/modify-direct';
 import { createVersion } from '@/lib/versions';
 import { deductCredits, hasEnoughCredits, getCreditBalance } from '@/lib/credits';
 import { logUsage } from '@/lib/costs';
@@ -88,17 +89,26 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Get raw content for reference
     const rawContent = dashboard.raw_content || '';
 
-    console.log('[Modify API] Starting agent modification...');
+    // Choose modification approach based on config
+    const useDirectApproach = AGENT_CONFIG.useDirectModify;
+    console.log(`[Modify API] Starting modification (${useDirectApproach ? 'direct' : 'agent'} approach)...`);
 
-    // Call the modify agent
-    const modifyResult = await modifyDashboardWithAgent(
-      currentConfig.html,
-      rawContent,
-      instructions,
-      branding
-    );
+    // Call the appropriate modify function
+    const modifyResult = useDirectApproach
+      ? await modifyDashboardDirect(
+          currentConfig.html,
+          rawContent,
+          instructions,
+          branding
+        )
+      : await modifyDashboardWithAgent(
+          currentConfig.html,
+          rawContent,
+          instructions,
+          branding
+        );
 
-    console.log('[Modify API] Agent modification complete');
+    console.log(`[Modify API] Modification complete (${useDirectApproach ? 'direct' : 'agent'})`);
     console.log(`[Modify API] Usage: ${modifyResult.usage.usage.inputTokens} input, ${modifyResult.usage.usage.outputTokens} output, cost: $${modifyResult.usage.costUsd.toFixed(4)}`);
 
     // Deduct credits based on actual usage

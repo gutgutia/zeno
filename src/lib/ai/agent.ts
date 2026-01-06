@@ -122,6 +122,15 @@ export const AGENT_CONFIG = {
 
   // Max turns before stopping
   maxTurns: 15,
+
+  // Use direct (non-agentic) approach for modifications
+  // This is faster, cheaper, and more predictable
+  // Set to false to use the full agent-based approach
+  useDirectModify: true,
+
+  // Use direct approach for data refresh
+  // (Not implemented yet - placeholder for future)
+  useDirectRefresh: false,
 };
 // ============================================================================
 

@@ -82,9 +82,43 @@ Credits = ceil((input_tokens + output_tokens * 5) / 10000)
 - Soft deletes via `deleted_at` timestamp
 - Version history for dashboards
 
+## AI Approaches
+
+The system supports two approaches for AI operations, configurable via `AGENT_CONFIG` in `src/lib/ai/agent.ts`:
+
+### Initial Generation (Always Agentic)
+- Uses Claude Agent SDK with E2B Python sandbox
+- Opus 4.5 for creative dashboard design
+- Multi-turn agent loop with Python execution for data analysis
+- Worth the overhead for one-time generation
+
+### Dashboard Modification
+Two approaches available (toggle with `AGENT_CONFIG.useDirectModify`):
+
+**Direct Approach (default, recommended):**
+- `src/lib/ai/modify-direct.ts`
+- Step 1: Classification (Haiku) - determines if data is needed
+- Step 2: Single Sonnet call - returns surgical edits as find/replace pairs
+- Benefits: Fast (~5-10s), cheap, predictable, no sandbox
+
+**Agentic Approach (fallback):**
+- `src/lib/ai/agent.ts` → `modifyDashboardWithAgent()`
+- Uses E2B sandbox with file editing tools
+- Multi-turn agent loop
+- Use when: Direct approach fails or complex modifications needed
+
+### Data Refresh
+Currently uses agentic approach. Direct approach planned (`AGENT_CONFIG.useDirectRefresh`).
+
+### Model Names
+**IMPORTANT:** Never use date stamps in model names.
+- ✅ `claude-sonnet-4-5`, `claude-opus-4-5`, `claude-haiku-4-5`
+- ❌ `claude-sonnet-4-5-20250514`
+
 ## Important Files
 
-- `src/lib/ai/agent.ts` - Claude Agent SDK integration
+- `src/lib/ai/agent.ts` - Claude Agent SDK integration + config flags
+- `src/lib/ai/modify-direct.ts` - Direct (non-agentic) modification approach
 - `src/lib/ai/generate.ts` - Single-step generation
 - `src/app/api/dashboards/[id]/generate/route.ts` - Generation endpoint
 - `src/lib/credits/index.ts` - Credit calculations
