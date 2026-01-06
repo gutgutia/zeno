@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { UpgradeModal } from '@/components/billing/UpgradeModal';
+import { CreditDisplay } from '@/components/billing/CreditDisplay';
 
 export function AppHeader() {
   const { user, signOut } = useAuth();
@@ -46,7 +47,10 @@ export function AppHeader() {
           </Link>
 
           {/* Right side - User menu */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* Credits Display */}
+            <CreditDisplay variant="compact" className="hidden sm:flex" />
+
             {/* Upgrade nudge for free users */}
             {!isPlanLoading && isFreePlan && (
               <button
