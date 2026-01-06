@@ -281,6 +281,6 @@ CREATE POLICY "Admins can view all usage logs"
   USING (
     EXISTS (
       SELECT 1 FROM public.admin_users
-      WHERE user_id = auth.uid() AND is_active = true
+      WHERE user_id = auth.uid()
     )
   );
