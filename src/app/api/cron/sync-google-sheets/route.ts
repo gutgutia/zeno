@@ -170,7 +170,11 @@ export async function GET(request: NextRequest) {
           const refreshResult = await refreshDashboardWithAgent(
             newContent,
             config,
-            branding
+            branding,
+            {
+              // Pass old content for diff computation
+              oldRawContent: dashboard.raw_content || '',
+            }
           );
 
           // Update dashboard

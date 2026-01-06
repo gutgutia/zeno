@@ -310,7 +310,7 @@ export async function POST(
         userId: user.id,
         organizationId: membership?.organization_id || null,
         operationType: 'data_refresh',
-        modelId: 'opus-4-5',
+        modelId: refreshResult.usage.modelId, // Use model from agent response
         usage: refreshResult.usage.usage,
         agentReportedCost: refreshResult.usage.costUsd,
         durationMs: refreshResult.usage.durationMs,

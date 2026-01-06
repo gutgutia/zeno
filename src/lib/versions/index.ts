@@ -93,6 +93,13 @@ export async function createVersion(
   // Calculate next version (for initial, use 1.0)
   let nextVersion: VersionInfo;
   if (changeType === 'initial') {
+    // Check if version 1.0 already exists (dashboard may have been regenerated)
+    const existingInitial = await getVersion(supabase, dashboardId, 1, 0);
+    if (existingInitial) {
+      // Initial version already exists - return it instead of creating duplicate
+      console.log(`[Versions] Initial version 1.0 already exists for dashboard ${dashboardId}, skipping creation`);
+      return existingInitial;
+    }
     nextVersion = { major: 1, minor: 0, label: '1.0' };
   } else {
     nextVersion = getNextVersion(current.major, current.minor, changeType);

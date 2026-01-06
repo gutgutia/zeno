@@ -269,6 +269,40 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     }
   };
 
+  // Retry refresh for dashboards that already had content but failed during data update
+  const handleRetryRefresh = async () => {
+    try {
+      // If it's a Google Sheets dashboard, sync from sheet
+      // Otherwise, we can't retry refresh without new data - show the update modal instead
+      if (dashboard?.google_connection_id && dashboard?.google_sheet_id) {
+        const response = await fetch(`/api/dashboards/${id}/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ syncFromSheet: true }),
+        });
+
+        if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.error || 'Failed to retry refresh');
+        }
+
+        // Refetch to get updated status
+        const data = await fetchDashboard();
+        if (data) {
+          setDashboard(data.dashboard);
+        }
+        toast.info('Retrying data refresh...');
+      } else {
+        // For non-Google Sheets dashboards, we need new data
+        // Just clear the error and let user use Update Data modal
+        toast.info('Please use the "Update Data" button to provide new data');
+      }
+    } catch (err) {
+      console.error('Failed to retry refresh:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to retry refresh');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--color-gray-50)]">
@@ -545,14 +579,48 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                 </svg>
               </div>
               <h2 className="text-xl font-semibold text-[var(--color-gray-900)] mb-2">
-                Generation Failed
+                {config ? 'Data Update Failed' : 'Generation Failed'}
               </h2>
               <p className="text-[var(--color-gray-600)] max-w-md mb-4">
-                {dashboard.generation_error || 'Something went wrong while generating your dashboard.'}
+                {dashboard.generation_error || (config
+                  ? 'Something went wrong while updating your dashboard with new data.'
+                  : 'Something went wrong while generating your dashboard.'
+                )}
               </p>
-              <Button onClick={handleRetryGeneration}>
-                Try Again
-              </Button>
+              <div className="flex gap-3">
+                {config ? (
+                  // Dashboard exists - offer refresh retry or update data
+                  <>
+                    {dashboard.google_connection_id && dashboard.google_sheet_id ? (
+                      <Button onClick={handleRetryRefresh}>
+                        Retry Sync
+                      </Button>
+                    ) : (
+                      <UpdateDataModal
+                        dashboardId={id}
+                        hasGoogleConnection={Boolean(dashboard.google_connection_id)}
+                        onRefreshComplete={handleDataRefresh}
+                        trigger={
+                          <Button>
+                            Update Data
+                          </Button>
+                        }
+                      />
+                    )}
+                    <Button variant="outline" onClick={() => {
+                      // Clear failed status and show the existing dashboard
+                      setDashboard(prev => prev ? { ...prev, generation_status: 'completed' } : prev);
+                    }}>
+                      View Existing Dashboard
+                    </Button>
+                  </>
+                ) : (
+                  // No dashboard yet - retry generation
+                  <Button onClick={handleRetryGeneration}>
+                    Try Again
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 
