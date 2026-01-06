@@ -796,7 +796,7 @@ export async function refreshDashboardWithAgent(
     const queryOptions: Parameters<typeof query>[0]['options'] = {
       model: 'claude-sonnet-4-5', // Sonnet for cost efficiency
       systemPrompt,
-      maxTurns: approach === 'surgical' ? 15 : 10, // More turns for surgical (multiple edits)
+      maxTurns: approach === 'surgical' ? 25 : 15, // More turns for surgical (multiple edits)
       mcpServers: {
         filetools: modifyToolServer, // Includes surgical editing tools
       },

@@ -349,7 +349,11 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
   const isGenerating = generationStatus === 'pending' || generationStatus === 'analyzing' || generationStatus === 'generating';
   const isRefreshing = generationStatus === 'refreshing';
   const hasFailed = generationStatus === 'failed';
-  const isComplete = generationStatus === 'completed' && dashboard.config;
+  // Dashboard is viewable if we have config and either:
+  // - Status is completed, or
+  // - We're refreshing (show existing while updating), or
+  // - Failed but we have existing content (show with error banner)
+  const isComplete = dashboard.config && (generationStatus === 'completed' || isRefreshing || hasFailed);
 
   const config = dashboard.config as DashboardConfig | null;
   const data = (dashboard.data as Record<string, unknown>[]) || [];
@@ -601,8 +605,8 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
             </div>
           )}
 
-          {/* Failed State */}
-          {hasFailed && (
+          {/* Failed State - Full page (only when no existing dashboard) */}
+          {hasFailed && !config && (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-center bg-white rounded-xl shadow-sm p-8">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
                 <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -610,48 +614,63 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                 </svg>
               </div>
               <h2 className="text-xl font-semibold text-[var(--color-gray-900)] mb-2">
-                {config ? 'Data Update Failed' : 'Generation Failed'}
+                Generation Failed
               </h2>
               <p className="text-[var(--color-gray-600)] max-w-md mb-4">
-                {dashboard.generation_error || (config
-                  ? 'Something went wrong while updating your dashboard with new data.'
-                  : 'Something went wrong while generating your dashboard.'
-                )}
+                {dashboard.generation_error || 'Something went wrong while generating your dashboard.'}
               </p>
-              <div className="flex gap-3">
-                {config ? (
-                  // Dashboard exists - offer refresh retry or update data
-                  <>
-                    {dashboard.google_connection_id && dashboard.google_sheet_id ? (
-                      <Button onClick={handleRetryRefresh}>
-                        Retry Sync
-                      </Button>
-                    ) : (
-                      <UpdateDataModal
-                        dashboardId={id}
-                        hasGoogleConnection={Boolean(dashboard.google_connection_id)}
-                        onRefreshStarted={handleDataRefreshStarted}
-                        onRefreshComplete={handleDataRefresh}
-                        trigger={
-                          <Button>
-                            Update Data
-                          </Button>
-                        }
-                      />
-                    )}
-                    <Button variant="outline" onClick={() => {
-                      // Clear failed status and show the existing dashboard
-                      setDashboard(prev => prev ? { ...prev, generation_status: 'completed' } : prev);
-                    }}>
-                      View Existing Dashboard
+              <Button onClick={handleRetryGeneration}>
+                Try Again
+              </Button>
+            </div>
+          )}
+
+          {/* Error Banner - When refresh fails but dashboard exists */}
+          {hasFailed && config && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <svg className="w-5 h-5 text-red-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Data update failed
+                  </h3>
+                  <p className="mt-1 text-sm text-red-700">
+                    {dashboard.generation_error || 'Something went wrong while updating your dashboard with new data.'}
+                    {' '}Your previous version is still available below.
+                  </p>
+                </div>
+                <div className="flex-shrink-0 flex items-center gap-2">
+                  {dashboard.google_connection_id && dashboard.google_sheet_id ? (
+                    <Button size="sm" variant="outline" onClick={handleRetryRefresh} className="border-red-300 text-red-700 hover:bg-red-100">
+                      Retry Sync
                     </Button>
-                  </>
-                ) : (
-                  // No dashboard yet - retry generation
-                  <Button onClick={handleRetryGeneration}>
-                    Try Again
-                  </Button>
-                )}
+                  ) : (
+                    <UpdateDataModal
+                      dashboardId={id}
+                      hasGoogleConnection={Boolean(dashboard.google_connection_id)}
+                      onRefreshStarted={handleDataRefreshStarted}
+                      onRefreshComplete={handleDataRefresh}
+                      trigger={
+                        <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-100">
+                          Try Again
+                        </Button>
+                      }
+                    />
+                  )}
+                  <button
+                    onClick={() => setDashboard(prev => prev ? { ...prev, generation_status: 'completed' } : prev)}
+                    className="text-red-400 hover:text-red-600"
+                    title="Dismiss"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           )}
