@@ -809,14 +809,15 @@ export async function refreshDashboardWithAgent(
       pathToClaudeCodeExecutable: CLAUDE_EXECUTABLE_PATH,
     };
 
-    // Add extended thinking with reduced budget (surgical is simpler)
-    if (AGENT_CONFIG.extendedThinking) {
-      // @ts-expect-error - thinking option may not be in SDK types yet
-      queryOptions.thinking = {
-        type: 'enabled',
-        budget_tokens: approach === 'surgical' ? 3000 : 5000,
-      };
-    }
+    // NOTE: Extended thinking disabled for refresh agent - may cause issues with Agent SDK + Sonnet
+    // If you want to re-enable, uncomment below:
+    // if (AGENT_CONFIG.extendedThinking) {
+    //   // @ts-expect-error - thinking option may not be in SDK types yet
+    //   queryOptions.thinking = {
+    //     type: 'enabled',
+    //     budget_tokens: approach === 'surgical' ? 3000 : 5000,
+    //   };
+    // }
 
     // Maximum time for the entire agent loop (3 minutes to leave buffer)
     const AGENT_LOOP_TIMEOUT_MS = 180000;
