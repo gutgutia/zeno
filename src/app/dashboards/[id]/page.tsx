@@ -191,36 +191,6 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     }
   }, [fetchDashboard]);
 
-  const handlePublish = async () => {
-    if (!dashboard) return;
-
-    try {
-      const response = await fetch(`/api/dashboards/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_published: !dashboard.is_published }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update publish status');
-      }
-
-      const data = await response.json();
-      setDashboard(data.dashboard);
-      toast.success(data.dashboard.is_published ? 'Dashboard published!' : 'Dashboard unpublished');
-    } catch (err) {
-      console.error('Failed to update publish status:', err);
-      toast.error('Failed to update publish status');
-    }
-  };
-
-  const handleCopyLink = () => {
-    if (!dashboard) return;
-    const url = `${window.location.origin}/d/${dashboard.slug}`;
-    navigator.clipboard.writeText(url);
-    toast.success('Link copied to clipboard!');
-  };
-
   const handleVersionRestore = (restoredDashboard: Dashboard) => {
     setDashboard(restoredDashboard);
     setIsVersionHistoryOpen(false);
@@ -506,36 +476,15 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                 </Button>
               )}
 
-              {/* Share Button */}
+              {/* Share Button (includes visibility, sharing, and copy link) */}
               <ShareDialog
                 dashboardId={id}
+                dashboardSlug={dashboard.slug}
                 isPublished={dashboard.is_published}
+                onPublishChange={(isPublished) => {
+                  setDashboard(prev => prev ? { ...prev, is_published: isPublished } : prev);
+                }}
               />
-
-              {/* Publish/Unpublish Button */}
-              <Button
-                variant={dashboard.is_published ? 'outline' : 'default'}
-                size="sm"
-                onClick={handlePublish}
-                disabled={!isComplete}
-              >
-                {dashboard.is_published ? 'Unpublish' : 'Publish'}
-              </Button>
-
-              {/* Copy Link Button (only when published) */}
-              {dashboard.is_published && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCopyLink}
-                  className="hidden md:flex items-center gap-1.5"
-                  title="Copy public link"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </Button>
-              )}
 
               {/* More Options Menu */}
               <DropdownMenu>

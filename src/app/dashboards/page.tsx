@@ -108,21 +108,20 @@ export default async function DashboardsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header - always show so users can navigate to Shared */}
+      <div className="mb-8">
+        <DashboardNav active="my-dashboards" />
+      </div>
+
       {/* Dashboard Grid or Empty State */}
       {!dashboards || dashboards.length === 0 ? (
         <EmptyState />
       ) : (
-        <>
-          {/* Header - only show when dashboards exist */}
-          <div className="mb-8">
-            <DashboardNav active="my-dashboards" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {dashboards.map((dashboard) => (
-              <DashboardCard key={dashboard.id} dashboard={dashboard} />
-            ))}
-          </div>
-        </>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {dashboards.map((dashboard) => (
+            <DashboardCard key={dashboard.id} dashboard={dashboard} />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -130,13 +129,13 @@ export default async function DashboardsPage() {
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-20 px-4">
+    <div className="relative flex flex-col items-center justify-center py-20 px-4">
       {/* Decorative background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-[var(--color-primary-light)] rounded-full blur-3xl opacity-30" />
-        <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-[var(--color-primary-lighter)] rounded-full blur-3xl opacity-30" />
+        <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-64 h-64 bg-[var(--color-primary-light)] rounded-full blur-3xl opacity-30" />
+        <div className="absolute top-1/2 right-1/4 -translate-y-1/2 w-48 h-48 bg-[var(--color-primary-lighter)] rounded-full blur-3xl opacity-30" />
       </div>
-      
+
       <div className="relative z-10 text-center max-w-lg">
         {/* Icon with Zeno blue background */}
         <div className="w-20 h-20 bg-[#0055FF] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
