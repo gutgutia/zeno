@@ -794,7 +794,7 @@ export async function refreshDashboardWithAgent(
     // Use Sonnet 4.5 for surgical updates (cost-efficient)
     // Use surgical editing tools (read_lines, edit_file, get_file, execute_python)
     const queryOptions: Parameters<typeof query>[0]['options'] = {
-      model: 'claude-sonnet-4-5-20250514', // Sonnet for cost efficiency
+      model: 'claude-sonnet-4-5', // Sonnet for cost efficiency
       systemPrompt,
       maxTurns: approach === 'surgical' ? 15 : 10, // More turns for surgical (multiple edits)
       mcpServers: {
