@@ -260,40 +260,6 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     }
   };
 
-  // Retry refresh for dashboards that already had content but failed during data update
-  const handleRetryRefresh = async () => {
-    try {
-      // If it's a Google Sheets dashboard, sync from sheet
-      // Otherwise, we can't retry refresh without new data - show the update modal instead
-      if (dashboard?.google_connection_id && dashboard?.google_sheet_id) {
-        const response = await fetch(`/api/dashboards/${id}/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ syncFromSheet: true }),
-        });
-
-        if (!response.ok) {
-          const result = await response.json();
-          throw new Error(result.error || 'Failed to retry refresh');
-        }
-
-        // Refetch to get updated status
-        const data = await fetchDashboard();
-        if (data) {
-          setDashboard(data.dashboard);
-        }
-        toast.info('Retrying data refresh...');
-      } else {
-        // For non-Google Sheets dashboards, we need new data
-        // Just clear the error and let user use Update Data modal
-        toast.info('Please use the "Update Data" button to provide new data');
-      }
-    } catch (err) {
-      console.error('Failed to retry refresh:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to retry refresh');
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--color-gray-50)]">
@@ -319,7 +285,11 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
   const isGenerating = generationStatus === 'pending' || generationStatus === 'analyzing' || generationStatus === 'generating';
   const isRefreshing = generationStatus === 'refreshing';
   const hasFailed = generationStatus === 'failed';
-  const isComplete = generationStatus === 'completed' && dashboard.config;
+  // Dashboard is viewable if we have config and either:
+  // - Status is completed, or
+  // - We're refreshing (show existing while updating), or
+  // - Failed but we have existing content (show with error banner)
+  const isComplete = dashboard.config && (generationStatus === 'completed' || isRefreshing || hasFailed);
 
   const config = dashboard.config as DashboardConfig | null;
   const data = (dashboard.data as Record<string, unknown>[]) || [];
@@ -550,8 +520,8 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
             </div>
           )}
 
-          {/* Failed State */}
-          {hasFailed && (
+          {/* Failed State - Full page (only when no existing dashboard) */}
+          {hasFailed && !config && (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-center bg-white rounded-xl shadow-sm p-8">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
                 <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -559,49 +529,14 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                 </svg>
               </div>
               <h2 className="text-xl font-semibold text-[var(--color-gray-900)] mb-2">
-                {config ? 'Data Update Failed' : 'Generation Failed'}
+                Generation Failed
               </h2>
               <p className="text-[var(--color-gray-600)] max-w-md mb-4">
-                {dashboard.generation_error || (config
-                  ? 'Something went wrong while updating your dashboard with new data.'
-                  : 'Something went wrong while generating your dashboard.'
-                )}
+                {dashboard.generation_error || 'Something went wrong while generating your dashboard.'}
               </p>
-              <div className="flex gap-3">
-                {config ? (
-                  // Dashboard exists - offer refresh retry or update data
-                  <>
-                    {dashboard.google_connection_id && dashboard.google_sheet_id ? (
-                      <Button onClick={handleRetryRefresh}>
-                        Retry Sync
-                      </Button>
-                    ) : (
-                      <UpdateDataModal
-                        dashboardId={id}
-                        hasGoogleConnection={Boolean(dashboard.google_connection_id)}
-                        onRefreshStarted={handleDataRefreshStarted}
-                        onRefreshComplete={handleDataRefresh}
-                        trigger={
-                          <Button>
-                            Update Data
-                          </Button>
-                        }
-                      />
-                    )}
-                    <Button variant="outline" onClick={() => {
-                      // Clear failed status and show the existing dashboard
-                      setDashboard(prev => prev ? { ...prev, generation_status: 'completed' } : prev);
-                    }}>
-                      View Existing Dashboard
-                    </Button>
-                  </>
-                ) : (
-                  // No dashboard yet - retry generation
-                  <Button onClick={handleRetryGeneration}>
-                    Try Again
-                  </Button>
-                )}
-              </div>
+              <Button onClick={handleRetryGeneration}>
+                Try Again
+              </Button>
             </div>
           )}
 
