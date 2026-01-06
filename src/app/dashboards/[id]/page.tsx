@@ -25,7 +25,7 @@ import { UpdateDataModal } from '@/components/dashboard/UpdateDataModal';
 import { VersionHistoryPanel } from '@/components/dashboard/VersionHistoryPanel';
 import { ModifyWithAIModal } from '@/components/dashboard/ModifyWithAIModal';
 import { toast } from 'sonner';
-import type { Dashboard, BrandingConfig } from '@/types/database';
+import type { Dashboard, BrandingConfig, DashboardVersion } from '@/types/database';
 import type { DashboardConfig, GenerationStatus } from '@/types/dashboard';
 
 const POLL_INTERVAL = 3000; // 3 seconds
@@ -69,6 +69,12 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
   // Version history state
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+  const [previewingVersion, setPreviewingVersion] = useState<{
+    id: string;
+    html: string;
+    major: number;
+    minor: number;
+  } | null>(null);
 
   // Delete confirmation state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -192,7 +198,28 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
   const handleVersionRestore = (restoredDashboard: Dashboard) => {
     setDashboard(restoredDashboard);
+    setPreviewingVersion(null); // Clear any preview
     setIsVersionHistoryOpen(false);
+  };
+
+  const handleVersionPreview = async (version: DashboardVersion | null) => {
+    if (!version) {
+      setPreviewingVersion(null);
+      return;
+    }
+
+    // Get the HTML from the version's config
+    const versionConfig = version.config as DashboardConfig | null;
+    if (versionConfig?.html) {
+      setPreviewingVersion({
+        id: version.id,
+        html: versionConfig.html,
+        major: version.major_version,
+        minor: version.minor_version,
+      });
+    } else {
+      toast.error('Unable to preview this version');
+    }
   };
 
   // Handler for when data refresh starts - trigger polling
@@ -549,9 +576,22 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
           {/* Completed State - Render the dashboard */}
           {isComplete && config && (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden relative">
+              {previewingVersion && (
+                <div className="absolute top-4 left-4 right-4 z-10 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 flex items-center justify-between">
+                  <span className="text-amber-800 text-sm font-medium">
+                    Previewing v{previewingVersion.major}.{previewingVersion.minor}
+                  </span>
+                  <button
+                    onClick={() => setPreviewingVersion(null)}
+                    className="text-amber-600 hover:text-amber-800 text-sm font-medium"
+                  >
+                    Exit Preview
+                  </button>
+                </div>
+              )}
               <PageRenderer
-                html={config.html}
+                html={previewingVersion?.html || config.html}
                 charts={config.charts}
                 data={data}
               />
@@ -581,8 +621,13 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
             minor: dashboard.current_minor_version || 0,
           }}
           isOpen={isVersionHistoryOpen}
-          onClose={() => setIsVersionHistoryOpen(false)}
+          onClose={() => {
+            setIsVersionHistoryOpen(false);
+            setPreviewingVersion(null);
+          }}
           onRestore={handleVersionRestore}
+          onPreview={handleVersionPreview}
+          previewingVersionId={previewingVersion?.id}
         />
       )}
 
