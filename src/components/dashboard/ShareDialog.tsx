@@ -13,20 +13,47 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import type { DashboardShare } from '@/types/database';
+import { toast } from 'sonner';
+
+type Visibility = 'private' | 'public' | 'specific';
 
 interface ShareDialogProps {
   dashboardId: string;
+  dashboardSlug: string;
   isPublished: boolean;
+  onPublishChange?: (isPublished: boolean) => void;
   trigger?: React.ReactNode;
 }
 
-export function ShareDialog({ dashboardId, isPublished, trigger }: ShareDialogProps) {
+export function ShareDialog({
+  dashboardId,
+  dashboardSlug,
+  isPublished,
+  onPublishChange,
+  trigger,
+}: ShareDialogProps) {
   const [shares, setShares] = useState<DashboardShare[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [newShareValue, setNewShareValue] = useState('');
   const [shareType, setShareType] = useState<'email' | 'domain'>('email');
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
+
+  // Determine current visibility
+  const getVisibility = (): Visibility => {
+    if (isPublished) return 'public';
+    if (shares.length > 0) return 'specific';
+    return 'private';
+  };
+
+  const [visibility, setVisibility] = useState<Visibility>(getVisibility());
+
+  // Update visibility when shares or isPublished changes
+  useEffect(() => {
+    setVisibility(getVisibility());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPublished, shares.length]);
 
   // Fetch shares on mount
   useEffect(() => {
@@ -46,6 +73,41 @@ export function ShareDialog({ dashboardId, isPublished, trigger }: ShareDialogPr
     }
     fetchShares();
   }, [dashboardId]);
+
+  const handleVisibilityChange = async (newVisibility: Visibility) => {
+    if (newVisibility === visibility) return;
+
+    // If changing to/from public, update the published status
+    if (newVisibility === 'public' || visibility === 'public') {
+      setIsUpdatingVisibility(true);
+      try {
+        const response = await fetch(`/api/dashboards/${dashboardId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_published: newVisibility === 'public' }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update visibility');
+        }
+
+        onPublishChange?.(newVisibility === 'public');
+        toast.success(
+          newVisibility === 'public'
+            ? 'Dashboard is now public'
+            : 'Dashboard is no longer public'
+        );
+      } catch (err) {
+        console.error('Failed to update visibility:', err);
+        toast.error('Failed to update visibility');
+        return;
+      } finally {
+        setIsUpdatingVisibility(false);
+      }
+    }
+
+    setVisibility(newVisibility);
+  };
 
   const handleAddShare = async () => {
     if (!newShareValue.trim()) return;
@@ -72,6 +134,11 @@ export function ShareDialog({ dashboardId, isPublished, trigger }: ShareDialogPr
 
       setShares((prev) => [data.share, ...prev]);
       setNewShareValue('');
+      toast.success(
+        shareType === 'email'
+          ? `Shared with ${newShareValue.trim()}`
+          : `Shared with @${newShareValue.trim()}`
+      );
     } catch (err) {
       setError('Failed to add share');
       console.error(err);
@@ -88,11 +155,21 @@ export function ShareDialog({ dashboardId, isPublished, trigger }: ShareDialogPr
 
       if (response.ok) {
         setShares((prev) => prev.filter((s) => s.id !== shareId));
+        toast.success('Share removed');
       }
     } catch (err) {
       console.error('Failed to remove share:', err);
+      toast.error('Failed to remove share');
     }
   };
+
+  const handleCopyLink = () => {
+    const url = `${window.location.origin}/d/${dashboardSlug}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Link copied to clipboard');
+  };
+
+  const dashboardUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/d/${dashboardSlug}`;
 
   return (
     <Dialog>
@@ -114,94 +191,214 @@ export function ShareDialog({ dashboardId, isPublished, trigger }: ShareDialogPr
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Public status */}
-          <div className="flex items-center justify-between p-3 bg-[var(--color-gray-50)] rounded-lg">
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-[var(--color-gray-500)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-sm font-medium">Public access</span>
+        <div className="space-y-5 py-4">
+          {/* Visibility Options */}
+          <div className="space-y-3">
+            <Label>Who can access</Label>
+            <div className="space-y-2">
+              {/* Private */}
+              <label
+                className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                  visibility === 'private'
+                    ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
+                    : 'border-[var(--color-gray-200)] hover:border-[var(--color-gray-300)]'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="visibility"
+                  checked={visibility === 'private'}
+                  onChange={() => handleVisibilityChange('private')}
+                  disabled={isUpdatingVisibility}
+                  className="sr-only"
+                />
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  visibility === 'private' ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-gray-100)] text-[var(--color-gray-500)]'
+                }`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-[var(--color-gray-900)]">Private</p>
+                  <p className="text-xs text-[var(--color-gray-500)]">Only you can view</p>
+                </div>
+                {visibility === 'private' && (
+                  <svg className="w-5 h-5 text-[var(--color-primary)]" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </label>
+
+              {/* Anyone with link */}
+              <label
+                className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                  visibility === 'public'
+                    ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
+                    : 'border-[var(--color-gray-200)] hover:border-[var(--color-gray-300)]'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="visibility"
+                  checked={visibility === 'public'}
+                  onChange={() => handleVisibilityChange('public')}
+                  disabled={isUpdatingVisibility}
+                  className="sr-only"
+                />
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  visibility === 'public' ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-gray-100)] text-[var(--color-gray-500)]'
+                }`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-[var(--color-gray-900)]">Anyone with the link</p>
+                  <p className="text-xs text-[var(--color-gray-500)]">Anyone on the internet can view</p>
+                </div>
+                {visibility === 'public' && (
+                  <svg className="w-5 h-5 text-[var(--color-primary)]" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </label>
+
+              {/* Specific people/domains */}
+              <label
+                className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                  visibility === 'specific'
+                    ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
+                    : 'border-[var(--color-gray-200)] hover:border-[var(--color-gray-300)]'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="visibility"
+                  checked={visibility === 'specific'}
+                  onChange={() => handleVisibilityChange('specific')}
+                  disabled={isUpdatingVisibility}
+                  className="sr-only"
+                />
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  visibility === 'specific' ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-gray-100)] text-[var(--color-gray-500)]'
+                }`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-[var(--color-gray-900)]">Specific people or domains</p>
+                  <p className="text-xs text-[var(--color-gray-500)]">
+                    {shares.length > 0 ? `${shares.length} ${shares.length === 1 ? 'person/domain' : 'people/domains'} with access` : 'Invite by email or domain'}
+                  </p>
+                </div>
+                {visibility === 'specific' && (
+                  <svg className="w-5 h-5 text-[var(--color-primary)]" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </label>
             </div>
-            <span className={`text-sm ${isPublished ? 'text-[var(--color-success)]' : 'text-[var(--color-gray-500)]'}`}>
-              {isPublished ? 'Anyone with link' : 'Off'}
-            </span>
           </div>
 
-          {/* Add share form */}
-          <div className="space-y-3">
-            <Label>Share with specific people</Label>
+          {/* Share form - only show when 'specific' is selected */}
+          {visibility === 'specific' && (
+            <div className="space-y-3 pt-2 border-t border-[var(--color-gray-200)]">
+              <Label>Add people or domains</Label>
+              <div className="flex gap-2">
+                <select
+                  value={shareType}
+                  onChange={(e) => setShareType(e.target.value as 'email' | 'domain')}
+                  className="px-3 py-2 border border-[var(--color-gray-200)] rounded-lg text-sm bg-white"
+                >
+                  <option value="email">Email</option>
+                  <option value="domain">Domain</option>
+                </select>
+                <Input
+                  value={newShareValue}
+                  onChange={(e) => setNewShareValue(e.target.value)}
+                  placeholder={shareType === 'email' ? 'user@example.com' : 'company.com'}
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddShare();
+                    }
+                  }}
+                />
+                <Button onClick={handleAddShare} disabled={isAdding || !newShareValue.trim()}>
+                  {isAdding ? '...' : 'Add'}
+                </Button>
+              </div>
+              {error && <p className="text-sm text-[var(--color-error)]">{error}</p>}
+              <p className="text-xs text-[var(--color-gray-500)]">
+                {shareType === 'email'
+                  ? 'They will receive an email notification'
+                  : 'Everyone with this email domain can access'}
+              </p>
+
+              {/* Current shares */}
+              {isLoading ? (
+                <div className="text-center py-4 text-[var(--color-gray-500)]">Loading...</div>
+              ) : shares.length > 0 ? (
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {shares.map((share) => (
+                    <div
+                      key={share.id}
+                      className="flex items-center justify-between p-2 bg-[var(--color-gray-50)] rounded-lg"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium ${
+                          share.share_type === 'domain' ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-secondary)]'
+                        }`}>
+                          {share.share_type === 'domain' ? '@' : share.share_value.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-[var(--color-gray-900)]">
+                            {share.share_type === 'domain' ? `@${share.share_value}` : share.share_value}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveShare(share.id)}
+                        className="p-1 text-[var(--color-gray-400)] hover:text-[var(--color-error)] transition-colors"
+                        title="Remove access"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* Dashboard Link - always show */}
+          <div className="pt-4 border-t border-[var(--color-gray-200)]">
+            <Label className="mb-2 block">Dashboard link</Label>
             <div className="flex gap-2">
-              <select
-                value={shareType}
-                onChange={(e) => setShareType(e.target.value as 'email' | 'domain')}
-                className="px-3 py-2 border border-[var(--color-gray-200)] rounded-lg text-sm bg-white"
-              >
-                <option value="email">Email</option>
-                <option value="domain">Domain</option>
-              </select>
               <Input
-                value={newShareValue}
-                onChange={(e) => setNewShareValue(e.target.value)}
-                placeholder={shareType === 'email' ? 'user@example.com' : 'company.com'}
-                className="flex-1"
+                value={dashboardUrl}
+                readOnly
+                className="flex-1 text-sm bg-[var(--color-gray-50)]"
               />
-              <Button onClick={handleAddShare} disabled={isAdding || !newShareValue.trim()}>
-                {isAdding ? '...' : 'Add'}
+              <Button variant="outline" onClick={handleCopyLink}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
               </Button>
             </div>
-            {error && <p className="text-sm text-[var(--color-error)]">{error}</p>}
-            <p className="text-xs text-[var(--color-gray-500)]">
-              {shareType === 'email'
-                ? 'Share with a specific email address'
-                : 'Share with everyone from a domain (e.g., company.com)'}
+            <p className="text-xs text-[var(--color-gray-500)] mt-1">
+              {visibility === 'private'
+                ? 'Only you can access this link'
+                : visibility === 'public'
+                ? 'Anyone with this link can view'
+                : 'Only invited people can access this link'}
             </p>
           </div>
-
-          {/* Current shares */}
-          {isLoading ? (
-            <div className="text-center py-4 text-[var(--color-gray-500)]">Loading...</div>
-          ) : shares.length > 0 ? (
-            <div className="space-y-2">
-              <Label>People with access</Label>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {shares.map((share) => (
-                  <div
-                    key={share.id}
-                    className="flex items-center justify-between p-2 border border-[var(--color-gray-200)] rounded-lg"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm ${
-                        share.share_type === 'domain' ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-secondary)]'
-                      }`}>
-                        {share.share_type === 'domain' ? '@' : share.share_value.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">
-                          {share.share_type === 'domain' ? `@${share.share_value}` : share.share_value}
-                        </p>
-                        <p className="text-xs text-[var(--color-gray-500)]">
-                          {share.share_type === 'domain' ? 'Domain' : 'Email'}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleRemoveShare(share.id)}
-                      className="text-[var(--color-gray-400)] hover:text-[var(--color-error)] transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-[var(--color-gray-500)] text-center py-4">
-              No shares yet. Add emails or domains above.
-            </p>
-          )}
         </div>
       </DialogContent>
     </Dialog>
