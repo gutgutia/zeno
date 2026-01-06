@@ -10,6 +10,8 @@ import { computeDataDiff, condenseDiff, type DataDiff } from '@/lib/data/diff';
 import { deductCredits, hasEnoughCredits, getCreditBalance } from '@/lib/credits';
 import { logUsage, type ModelId } from '@/lib/costs';
 import { sendDashboardUpdatedEmail } from '@/lib/email/send';
+import { AGENT_CONFIG } from '@/lib/ai/agent';
+import { refreshDashboardDirect, needsRegeneration } from '@/lib/ai/refresh-direct';
 
 // Lazy load the agent to prevent startup issues with subprocess spawning
 const getRefreshAgent = async () => {
@@ -261,17 +263,63 @@ export async function POST(
         console.log('[Refresh] Will use regeneration approach instead of surgical');
       }
 
-      // Refresh using Agent SDK (lazy loaded) with diff info
-      const refreshDashboardWithAgent = await getRefreshAgent();
-      const refreshResult = await refreshDashboardWithAgent(
-        newContent,
-        config,
-        branding,
-        {
-          oldRawContent,
-          diff,
+      // Choose refresh approach based on config
+      const useDirectApproach = AGENT_CONFIG.useDirectRefresh;
+      console.log(`[Refresh] Starting refresh (${useDirectApproach ? 'direct' : 'agent'} approach)...`);
+
+      let refreshResult: {
+        html: string;
+        summary: string;
+        changes?: Array<{ metric: string; old: string; new: string }>;
+        warnings?: string[];
+        usage: { usage: { inputTokens: number; outputTokens: number }; costUsd: number; durationMs: number; turnCount: number; modelId: string };
+      };
+
+      if (useDirectApproach) {
+        // Try direct approach first
+        const directResult = await refreshDashboardDirect(
+          newContent,
+          config,
+          branding,
+          {
+            oldRawContent,
+            diff,
+          }
+        );
+
+        // Check if direct approach determined regeneration is needed
+        if (needsRegeneration(directResult)) {
+          console.log('[Refresh] Direct approach recommends regeneration:', directResult.reason);
+          console.log('[Refresh] Falling back to agent approach for regeneration...');
+
+          // Fall back to agent for regeneration
+          const refreshDashboardWithAgent = await getRefreshAgent();
+          refreshResult = await refreshDashboardWithAgent(
+            newContent,
+            config,
+            branding,
+            {
+              oldRawContent,
+              diff,
+            }
+          );
+        } else {
+          // Direct approach succeeded
+          refreshResult = directResult;
         }
-      );
+      } else {
+        // Use agent approach directly
+        const refreshDashboardWithAgent = await getRefreshAgent();
+        refreshResult = await refreshDashboardWithAgent(
+          newContent,
+          config,
+          branding,
+          {
+            oldRawContent,
+            diff,
+          }
+        );
+      }
 
       console.log(`[Refresh] Usage: ${refreshResult.usage.usage.inputTokens} input, ${refreshResult.usage.usage.outputTokens} output, cost: $${refreshResult.usage.costUsd.toFixed(4)}`);
 
