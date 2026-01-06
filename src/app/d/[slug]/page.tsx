@@ -6,7 +6,8 @@ import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import Link from 'next/link';
 import { PublicPageRenderer } from './PublicPageRenderer';
-import { SharedDashboardAuthGate, AccessRevoked } from '@/components/dashboard/SharedDashboardAuthGate';
+import { SharedDashboardHeader } from '@/components/layout/shared-dashboard-header';
+import { SharedDashboardAuthGate } from '@/components/dashboard/SharedDashboardAuthGate';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -100,11 +101,13 @@ export default async function PublicDashboardPage({ params }: PageProps) {
     workspaces: { branding: BrandingConfig | null; owner_id: string };
   };
 
+  // Get the user client for auth checks
+  const userSupabase = await createClient();
+  const { data: { user } } = await userSupabase.auth.getUser();
+
   // If published, allow access to anyone
   if (!dashboardData.is_published) {
     // Not published - check for share-based access
-    const userSupabase = await createClient();
-    const { data: { user } } = await userSupabase.auth.getUser();
 
     // Check if user is the owner
     const isOwner = user && dashboardData.workspaces.owner_id === user.id;
@@ -163,19 +166,32 @@ export default async function PublicDashboardPage({ params }: PageProps) {
     ...(branding.colors?.background && { backgroundColor: branding.colors.background }),
   };
 
+  // User object for header (null if not logged in)
+  const headerUser = user ? { email: user.email || '' } : null;
+
   return (
-    <div className="min-h-screen" style={brandingStyles}>
-      {/* Render the page content */}
-      <PublicPageRenderer
-        html={config.html}
-        charts={config.charts}
-        data={chartData}
-        branding={branding}
+    <div className="min-h-screen flex flex-col" style={brandingStyles}>
+      {/* Consistent header for all shared dashboards */}
+      <SharedDashboardHeader
+        user={headerUser}
         title={dashboard.title}
+        logoUrl={branding.logoUrl}
+        companyName={branding.companyName}
       />
 
+      {/* Render the page content */}
+      <div className="flex-1">
+        <PublicPageRenderer
+          html={config.html}
+          charts={config.charts}
+          data={chartData}
+          branding={branding}
+          title={dashboard.title}
+        />
+      </div>
+
       {/* Footer */}
-      <footer className="bg-white border-t border-[var(--color-gray-200)] mt-auto">
+      <footer className="bg-white border-t border-[var(--color-gray-200)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <p className="text-sm text-[var(--color-gray-500)] text-center">
             Created with{' '}

@@ -23,6 +23,9 @@ export interface DashboardConfig {
     // Refresh-related fields
     lastRefreshedAt?: string;
     refreshSummary?: string;
+    // Modification-related fields
+    lastModifiedAt?: string;
+    modificationSummary?: string;
   };
 }
 
