@@ -225,17 +225,10 @@ function ConnectionsContent() {
                 >
                   {disconnecting ? 'Disconnecting...' : 'Disconnect'}
                 </Button>
-              ) : canUseGoogleSheets ? (
+              ) : (
                 <Button onClick={handleConnect}>
                   Connect
                 </Button>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)] bg-[var(--color-primary)]/10 px-2.5 py-1 rounded-full">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  Pro
-                </span>
               )}
             </div>
           </div>
@@ -266,10 +259,28 @@ function ConnectionsContent() {
       </div>
 
       {/* Upgrade prompt for Google Sheets */}
-      {!canUseGoogleSheets && !connection && (
+      {!canUseGoogleSheets && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-sm text-amber-800">
+                {connection
+                  ? "Your Google account is connected, but you'll need to upgrade to Pro to import data from Google Sheets."
+                  : "You can connect your Google account now, but you'll need to upgrade to Pro to import data from Google Sheets."
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!canUseGoogleSheets && (
         <UpgradePrompt
           title="Google Sheets Integration"
-          description="Connect your Google account to import data directly from Google Sheets. Changes in your spreadsheets automatically sync to your dashboards."
+          description="Import data directly from Google Sheets and keep your dashboards automatically synced with changes in your spreadsheets."
           requiredPlan="pro"
         />
       )}

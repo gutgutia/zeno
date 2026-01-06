@@ -13,6 +13,8 @@ import { detectContentTypeQuick } from '@/lib/ai/content-detection';
 import { estimateTokens, isContentTooLarge, MAX_TOKENS } from '@/types/dashboard';
 import { SheetSelector } from '@/components/sheets/SheetSelector';
 import { GoogleSheetPicker } from '@/components/sheets/GoogleSheetPicker';
+import { UpgradePrompt } from '@/components/billing/UpgradePrompt';
+import { usePlan } from '@/lib/hooks';
 import type { ParsedData, DataSchema, ContentType } from '@/types/dashboard';
 import type { DataSource } from '@/types/database';
 
@@ -34,6 +36,10 @@ function NewDashboardPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Plan features
+  const { features } = usePlan();
+  const canUseGoogleSheets = features.google_sheets;
 
   // Check for Google connection callback
   const googleConnected = searchParams.get('google_connected');
@@ -694,6 +700,21 @@ function NewDashboardPageContent() {
                       </svg>
                       Connect Google Account
                     </Button>
+                  </div>
+                ) : !canUseGoogleSheets ? (
+                  // Connected but doesn't have Google Sheets feature - show upgrade prompt
+                  <div className="py-4">
+                    <div className="flex items-center gap-2 mb-4 text-sm text-green-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Google account connected
+                    </div>
+                    <UpgradePrompt
+                      title="Google Sheets Integration"
+                      description="Import data directly from Google Sheets and keep your dashboards automatically synced. Upgrade to Pro to unlock this feature."
+                      requiredPlan="pro"
+                    />
                   </div>
                 ) : (
                   <GoogleSheetPicker
