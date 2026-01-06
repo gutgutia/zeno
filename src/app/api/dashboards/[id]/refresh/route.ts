@@ -7,6 +7,8 @@ import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig, Dashboard, Workspace, DataSource } from '@/types/database';
 import { createVersion } from '@/lib/versions';
 import { computeDataDiff, condenseDiff, type DataDiff } from '@/lib/data/diff';
+import { deductCredits, hasEnoughCredits, getCreditBalance } from '@/lib/credits';
+import { logUsage } from '@/lib/costs';
 
 // Lazy load the agent to prevent startup issues with subprocess spawning
 const getRefreshAgent = async () => {
@@ -72,6 +74,19 @@ export async function POST(
         { error: 'Forbidden' },
         { status: 403 }
       );
+    }
+
+    // Check credit balance (estimated 15 credits for refresh)
+    const ESTIMATED_REFRESH_CREDITS = 15;
+    const hasCredits = await hasEnoughCredits(user.id, ESTIMATED_REFRESH_CREDITS);
+    if (!hasCredits) {
+      const balance = await getCreditBalance(user.id);
+      return NextResponse.json({
+        error: 'Insufficient credits',
+        credits_required: ESTIMATED_REFRESH_CREDITS,
+        credits_available: balance?.balance || 0,
+        upgrade_url: '/settings/billing',
+      }, { status: 402 });
     }
 
     // Verify dashboard has been generated (has config)
@@ -257,6 +272,57 @@ export async function POST(
         }
       );
 
+      console.log(`[Refresh] Usage: ${refreshResult.usage.usage.inputTokens} input, ${refreshResult.usage.usage.outputTokens} output, cost: $${refreshResult.usage.costUsd.toFixed(4)}`);
+
+      // Deduct credits based on actual usage
+      const actualInputTokens = refreshResult.usage.usage.inputTokens || 0;
+      const actualOutputTokens = refreshResult.usage.usage.outputTokens || 0;
+
+      const deductionResult = await deductCredits(
+        user.id,
+        actualInputTokens,
+        actualOutputTokens,
+        'dashboard_refresh',
+        id,
+        `Refreshed dashboard with new data`,
+        supabase
+      );
+
+      if (!deductionResult.success) {
+        console.warn(`[Refresh] Failed to deduct credits:`, deductionResult.error);
+      } else {
+        console.log(`[Refresh] Deducted ${deductionResult.credits_used} credits. Remaining: ${deductionResult.balance_after}`);
+      }
+
+      // Get user's organization for logging
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: membership } = await (supabase as any)
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .not('accepted_at', 'is', null)
+        .limit(1)
+        .single();
+
+      // Log usage to ai_usage_logs
+      await logUsage(supabase, {
+        dashboardId: id,
+        userId: user.id,
+        organizationId: membership?.organization_id || null,
+        operationType: 'data_refresh',
+        modelId: 'opus-4-5',
+        usage: refreshResult.usage.usage,
+        agentReportedCost: refreshResult.usage.costUsd,
+        durationMs: refreshResult.usage.durationMs,
+        turnCount: refreshResult.usage.turnCount,
+        creditsDeducted: deductionResult.success ? deductionResult.credits_used : 0,
+        status: 'success',
+        metadata: {
+          isGoogleSheetSync,
+          extendedThinking: true,
+        },
+      });
+
       // Update dashboard with new HTML
       const updatedConfig: DashboardConfig = {
         ...config,
@@ -348,6 +414,10 @@ export async function POST(
         // Include diff info for debugging/transparency
         diff: condenseDiff(diff),
         approach: diff.recommendedApproach,
+        credits: deductionResult.success ? {
+          used: deductionResult.credits_used,
+          remaining: deductionResult.balance_after,
+        } : undefined,
       });
     } catch (error) {
       // Update status to failed
