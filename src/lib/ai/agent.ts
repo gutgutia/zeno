@@ -844,7 +844,7 @@ export async function refreshDashboardWithAgent(
         costUsd: totalCost,
         turnCount,
         durationMs,
-        modelId: 'opus-4-5',
+        modelId: 'sonnet-4-5', // Using Sonnet for cost-efficient surgical updates
       },
     };
   } finally {
