@@ -835,12 +835,33 @@ export async function refreshDashboardWithAgent(
         if (message.type === 'assistant') {
           turnCount++;
           console.log(`[Refresh Agent] Turn ${turnCount}: Assistant message (${Math.round((Date.now() - agentLoopStartTime) / 1000)}s elapsed)`);
+          // Log assistant message content for debugging
+          const assistantMsg = message as { content?: Array<{ type: string; text?: string; name?: string }> };
+          if (assistantMsg.content) {
+            for (const block of assistantMsg.content) {
+              if (block.type === 'text') {
+                console.log(`[Refresh Agent] Assistant text: ${block.text?.slice(0, 300) || '(empty)'}...`);
+              } else if (block.type === 'tool_use') {
+                console.log(`[Refresh Agent] Assistant tool_use: ${block.name}`);
+              }
+            }
+          } else {
+            console.log(`[Refresh Agent] Assistant message has no content`);
+          }
         } else if (message.type === 'tool_progress') {
           console.log(`[Refresh Agent] Tool progress: ${message.tool_name}`);
         } else if (message.type === 'result') {
-          console.log(`[Refresh Agent] Completed after ${turnCount} turns (${Math.round((Date.now() - agentLoopStartTime) / 1000)}s total)`);
+          console.log(`[Refresh Agent] Result received after ${turnCount} turns (${Math.round((Date.now() - agentLoopStartTime) / 1000)}s total)`);
+          console.log(`[Refresh Agent] Result subtype: ${message.subtype}`);
+          console.log(`[Refresh Agent] Result keys: ${Object.keys(message).join(', ')}`);
+
           if (message.subtype === 'success') {
             totalCost = message.total_cost_usd || 0;
+            // Log the raw result for debugging
+            const rawResult = (message as { result?: string }).result;
+            console.log(`[Refresh Agent] Raw result length: ${rawResult?.length || 0}`);
+            console.log(`[Refresh Agent] Raw result preview: ${rawResult?.slice(0, 500) || '(empty)'}`);
+
             // Extract token usage from SDK result if available
             const resultWithUsage = message as {
               total_cost_usd?: number;
@@ -865,9 +886,15 @@ export async function refreshDashboardWithAgent(
             console.log(`[Refresh Agent] Total cost: $${totalCost?.toFixed(4) || 'unknown'}`);
             console.log(`[Refresh Agent] Token usage: input=${tokenUsage.inputTokens}, output=${tokenUsage.outputTokens}, thinking=${tokenUsage.thinkingTokens}`);
             refreshResult = extractRefreshResult(message.result);
+            console.log(`[Refresh Agent] Extracted result: ${refreshResult ? 'success' : 'null'}`);
+          } else if (message.subtype === 'error') {
+            // Log detailed error info
+            const errorResult = message as { errors?: string[]; error?: string; message?: string };
+            console.error(`[Refresh Agent] Error result received:`, JSON.stringify(errorResult, null, 2));
+            throw new Error(`Refresh agent error: ${errorResult.errors?.join(', ') || errorResult.error || errorResult.message || 'Unknown error'}`);
           } else {
-            const errorResult = message as { errors?: string[] };
-            throw new Error(`Refresh agent error: ${errorResult.errors?.join(', ') || 'Unknown error'}`);
+            console.log(`[Refresh Agent] Unknown result subtype: ${message.subtype}`);
+            console.log(`[Refresh Agent] Full message:`, JSON.stringify(message, null, 2));
           }
         } else if (message.type === 'system') {
           console.log(`[Refresh Agent] System message: ${message.subtype}`);
@@ -884,7 +911,15 @@ export async function refreshDashboardWithAgent(
         'Agent refresh loop'
       );
     } catch (loopError) {
-      console.error(`[Refresh Agent] Agent loop failed after ${Math.round((Date.now() - agentLoopStartTime) / 1000)}s:`, loopError);
+      const elapsed = Math.round((Date.now() - agentLoopStartTime) / 1000);
+      console.error(`[Refresh Agent] Agent loop failed after ${elapsed}s`);
+      console.error(`[Refresh Agent] Error type: ${loopError instanceof Error ? loopError.constructor.name : typeof loopError}`);
+      console.error(`[Refresh Agent] Error message: ${loopError instanceof Error ? loopError.message : String(loopError)}`);
+      if (loopError instanceof Error && loopError.stack) {
+        console.error(`[Refresh Agent] Error stack: ${loopError.stack}`);
+      }
+      // Log the state at failure
+      console.error(`[Refresh Agent] State at failure: turns=${turnCount}, cost=$${totalCost.toFixed(4)}, hasResult=${!!refreshResult}`);
       throw loopError;
     }
 
