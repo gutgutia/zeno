@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { formatRelativeTime } from '@/lib/utils/format';
 
 interface SharedDashboard {
@@ -74,24 +75,11 @@ export default function SharedWithMePage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">
-            Shared with Me
-          </h1>
-          <p className="text-[var(--color-gray-600)] mt-1">
-            Dashboards that others have shared with you
-          </p>
-        </div>
-        <Link
-          href="/dashboards"
-          className="flex items-center gap-1.5 px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          My Dashboards
-        </Link>
+      <div className="mb-8">
+        <DashboardNav active="shared" showNewButton={false} />
+        <p className="text-[var(--color-gray-600)] mt-1">
+          Dashboards that others have shared with you
+        </p>
       </div>
 
       {/* Dashboard Grid or Empty State */}

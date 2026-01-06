@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import {
   Dialog,
   DialogContent,
@@ -125,25 +126,11 @@ export default function TrashPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/dashboards"
-            className="p-2 rounded-lg text-[var(--color-gray-500)] hover:text-[var(--color-gray-700)] hover:bg-[var(--color-gray-100)] transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">
-              Trash
-            </h1>
-            <p className="text-[var(--color-gray-600)] mt-1">
-              Deleted dashboards are kept for 30 days
-            </p>
-          </div>
-        </div>
+      <div className="mb-8">
+        <DashboardNav active="deleted" showNewButton={false} />
+        <p className="text-[var(--color-gray-600)] mt-1">
+          Deleted dashboards are kept for 30 days
+        </p>
       </div>
 
       {/* Trash List or Empty State */}

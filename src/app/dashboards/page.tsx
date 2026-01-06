@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { formatRelativeTime } from '@/lib/utils/format';
 import type { Dashboard, Workspace } from '@/types/database';
 
@@ -113,38 +114,11 @@ export default async function DashboardsPage() {
       ) : (
         <>
           {/* Header - only show when dashboards exist */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">
-                My Dashboards
-              </h1>
-              <p className="text-[var(--color-gray-600)] mt-1">
-                Create and manage your data visualizations
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/dashboards/shared"
-                className="flex items-center gap-1.5 px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                </svg>
-                Shared with me
-              </Link>
-              <Link
-                href="/dashboards/trash"
-                className="flex items-center gap-1.5 px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Trash
-              </Link>
-              <Link href="/dashboards/new">
-                <Button>+ New Dashboard</Button>
-              </Link>
-            </div>
+          <div className="mb-8">
+            <DashboardNav active="my-dashboards" />
+            <p className="text-[var(--color-gray-600)] mt-1">
+              Create and manage your data visualizations
+            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {dashboards.map((dashboard) => (
