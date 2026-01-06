@@ -128,9 +128,10 @@ export const AGENT_CONFIG = {
   // Set to false to use the full agent-based approach
   useDirectModify: true,
 
-  // Use direct approach for data refresh
-  // (Not implemented yet - placeholder for future)
-  useDirectRefresh: false,
+  // Use direct (non-agentic) approach for data refresh
+  // This is faster, cheaper, and more predictable
+  // Falls back to full regeneration for major schema changes
+  useDirectRefresh: true,
 };
 // ============================================================================
 

@@ -108,7 +108,26 @@ Two approaches available (toggle with `AGENT_CONFIG.useDirectModify`):
 - Use when: Direct approach fails or complex modifications needed
 
 ### Data Refresh
-Currently uses agentic approach. Direct approach planned (`AGENT_CONFIG.useDirectRefresh`).
+Two approaches available (toggle with `AGENT_CONFIG.useDirectRefresh`):
+
+**Direct Approach (default, recommended):**
+- `src/lib/ai/refresh-direct.ts`
+- Uses pre-computed data diff to understand what changed
+- Step 1: Classification (Haiku or heuristics) - determines surgical vs regeneration
+- Step 2: For surgical: Single Sonnet call with diff + HTML + new data → find/replace edits
+- Step 3: If regeneration needed, falls back to agentic approach
+- Benefits: Fast (~10-15s for surgical), cheap, predictable
+
+**Classification Logic:**
+- Value-only changes → Surgical (no AI classification needed)
+- Minor column changes (1-2 added/removed) → Haiku classifies → usually surgical
+- Major schema changes (>30% columns different) → Regeneration
+
+**Agentic Approach (fallback for regeneration):**
+- `src/lib/ai/agent.ts` → `refreshDashboardWithAgent()`
+- Uses E2B sandbox
+- Multi-turn agent loop
+- Used when: Schema changed significantly, domain changed
 
 ### Model Names
 **IMPORTANT:** Never use date stamps in model names.
@@ -117,8 +136,10 @@ Currently uses agentic approach. Direct approach planned (`AGENT_CONFIG.useDirec
 
 ## Important Files
 
-- `src/lib/ai/agent.ts` - Claude Agent SDK integration + config flags
+- `src/lib/ai/agent.ts` - Claude Agent SDK integration + config flags (`AGENT_CONFIG`)
 - `src/lib/ai/modify-direct.ts` - Direct (non-agentic) modification approach
+- `src/lib/ai/refresh-direct.ts` - Direct (non-agentic) refresh approach
+- `src/lib/data/diff.ts` - Data diff computation for refresh
 - `src/lib/ai/generate.ts` - Single-step generation
 - `src/app/api/dashboards/[id]/generate/route.ts` - Generation endpoint
 - `src/lib/credits/index.ts` - Credit calculations
