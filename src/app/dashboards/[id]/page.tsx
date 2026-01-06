@@ -290,40 +290,6 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     }
   };
 
-  // Retry refresh for dashboards that already had content but failed during data update
-  const handleRetryRefresh = async () => {
-    try {
-      // If it's a Google Sheets dashboard, sync from sheet
-      // Otherwise, we can't retry refresh without new data - show the update modal instead
-      if (dashboard?.google_connection_id && dashboard?.google_sheet_id) {
-        const response = await fetch(`/api/dashboards/${id}/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ syncFromSheet: true }),
-        });
-
-        if (!response.ok) {
-          const result = await response.json();
-          throw new Error(result.error || 'Failed to retry refresh');
-        }
-
-        // Refetch to get updated status
-        const data = await fetchDashboard();
-        if (data) {
-          setDashboard(data.dashboard);
-        }
-        toast.info('Retrying data refresh...');
-      } else {
-        // For non-Google Sheets dashboards, we need new data
-        // Just clear the error and let user use Update Data modal
-        toast.info('Please use the "Update Data" button to provide new data');
-      }
-    } catch (err) {
-      console.error('Failed to retry refresh:', err);
-      toast.error(err instanceof Error ? err.message : 'Failed to retry refresh');
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--color-gray-50)]">
@@ -622,56 +588,6 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
               <Button onClick={handleRetryGeneration}>
                 Try Again
               </Button>
-            </div>
-          )}
-
-          {/* Error Banner - When refresh fails but dashboard exists */}
-          {hasFailed && config && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <svg className="w-5 h-5 text-red-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-red-800">
-                    Data update failed
-                  </h3>
-                  <p className="mt-1 text-sm text-red-700">
-                    {dashboard.generation_error || 'Something went wrong while updating your dashboard with new data.'}
-                    {' '}Your previous version is still available below.
-                  </p>
-                </div>
-                <div className="flex-shrink-0 flex items-center gap-2">
-                  {dashboard.google_connection_id && dashboard.google_sheet_id ? (
-                    <Button size="sm" variant="outline" onClick={handleRetryRefresh} className="border-red-300 text-red-700 hover:bg-red-100">
-                      Retry Sync
-                    </Button>
-                  ) : (
-                    <UpdateDataModal
-                      dashboardId={id}
-                      hasGoogleConnection={Boolean(dashboard.google_connection_id)}
-                      onRefreshStarted={handleDataRefreshStarted}
-                      onRefreshComplete={handleDataRefresh}
-                      trigger={
-                        <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-100">
-                          Try Again
-                        </Button>
-                      }
-                    />
-                  )}
-                  <button
-                    onClick={() => setDashboard(prev => prev ? { ...prev, generation_status: 'completed' } : prev)}
-                    className="text-red-400 hover:text-red-600"
-                    title="Dismiss"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
             </div>
           )}
 
