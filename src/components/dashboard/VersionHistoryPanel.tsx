@@ -227,12 +227,20 @@ export function VersionHistoryPanel({
                         ? 'bg-[var(--color-primary)]/10 border-l-2 border-[var(--color-primary)]'
                         : isCurrent
                         ? 'bg-[var(--color-primary)]/5'
-                        : 'hover:bg-[var(--color-gray-50)] cursor-pointer'
-                    }`}
+                        : 'hover:bg-[var(--color-gray-50)]'
+                    } ${(onPreview && (!isCurrent || previewingVersionId)) ? 'cursor-pointer' : ''}`}
                     onClick={() => {
-                      if (!isCurrent && onPreview) {
+                      if (!onPreview) return;
+
+                      if (isCurrent) {
+                        // Clicking current version exits preview mode
+                        if (previewingVersionId) {
+                          onPreview(null);
+                        }
+                      } else {
+                        // Toggle preview for non-current versions
                         if (isPreviewing) {
-                          onPreview(null); // Exit preview
+                          onPreview(null);
                         } else {
                           onPreview(version);
                         }

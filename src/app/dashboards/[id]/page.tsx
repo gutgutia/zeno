@@ -322,6 +322,32 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
   return (
     <div style={brandingStyles}>
+      {/* Version Preview Banner - Fixed at top */}
+      {previewingVersion && (
+        <div className="sticky top-0 z-50 bg-amber-500 text-white px-4 py-2 shadow-md">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span className="text-sm font-medium">
+                Previewing v{previewingVersion.major}.{previewingVersion.minor}
+              </span>
+            </div>
+            <button
+              onClick={() => setPreviewingVersion(null)}
+              className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium bg-white/20 hover:bg-white/30 rounded-md transition-colors"
+            >
+              Exit Preview
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Dashboard Title Bar - Constrained width */}
       <div className="bg-white border-b border-[var(--color-gray-200)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -576,20 +602,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
 
           {/* Completed State - Render the dashboard */}
           {isComplete && config && (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden relative">
-              {previewingVersion && (
-                <div className="absolute top-4 left-4 right-4 z-10 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 flex items-center justify-between">
-                  <span className="text-amber-800 text-sm font-medium">
-                    Previewing v{previewingVersion.major}.{previewingVersion.minor}
-                  </span>
-                  <button
-                    onClick={() => setPreviewingVersion(null)}
-                    className="text-amber-600 hover:text-amber-800 text-sm font-medium"
-                  >
-                    Exit Preview
-                  </button>
-                </div>
-              )}
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <PageRenderer
                 html={previewingVersion?.html || config.html}
                 charts={config.charts}
