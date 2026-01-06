@@ -17,29 +17,15 @@ import { createClient } from '@/lib/supabase/client';
 interface SharedDashboardHeaderProps {
   /** User object if authenticated, null otherwise */
   user: { email: string } | null;
-  /** Dashboard title to display */
-  title: string;
-  /** Optional company logo URL from branding */
-  logoUrl?: string;
-  /** Optional company name from branding */
-  companyName?: string;
 }
 
 /**
- * Header component for shared dashboards (both public and private).
+ * Header component for shared dashboards - matches AppHeader exactly
  *
- * Shows:
- * - Zeno logo (always)
- * - Dashboard title with optional company branding
- * - For authenticated users: avatar dropdown with My Dashboards, Settings, Sign Out
- * - For unauthenticated users: Sign In / Get Started buttons
+ * For authenticated users: Same as AppHeader (logo + avatar dropdown)
+ * For unauthenticated users: Logo + Sign In / Get Started buttons
  */
-export function SharedDashboardHeader({
-  user,
-  title,
-  logoUrl,
-  companyName,
-}: SharedDashboardHeaderProps) {
+export function SharedDashboardHeader({ user }: SharedDashboardHeaderProps) {
   const router = useRouter();
   const supabase = createClient();
   const userInitial = user?.email?.charAt(0).toUpperCase() || 'U';
@@ -53,42 +39,22 @@ export function SharedDashboardHeader({
     <header className="sticky top-0 z-50 bg-white border-b border-[var(--color-gray-200)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
-          {/* Left side - Zeno Logo + Dashboard Title */}
-          <div className="flex items-center gap-4 min-w-0 flex-1">
-            {/* Zeno Logo */}
-            <Link href="/" className="flex-shrink-0">
-              <Image
-                src="/brand/logo-primary.svg"
-                alt="Zeno"
-                width={151}
-                height={66}
-                className="h-7 w-auto"
-                priority
-              />
-            </Link>
+          {/* Logo */}
+          <Link href={user ? '/dashboards' : '/'} className="flex items-center">
+            <Image
+              src="/brand/logo-primary.svg"
+              alt="Zeno"
+              width={151}
+              height={66}
+              className="h-7 w-auto"
+              priority
+            />
+          </Link>
 
-            {/* Divider */}
-            <div className="hidden sm:block h-6 w-px bg-[var(--color-gray-200)]" />
-
-            {/* Dashboard branding + title */}
-            <div className="flex items-center gap-3 min-w-0">
-              {logoUrl && (
-                <img
-                  src={logoUrl}
-                  alt={companyName || 'Logo'}
-                  className="h-6 w-auto flex-shrink-0"
-                />
-              )}
-              <h1 className="text-sm font-medium text-[var(--color-gray-700)] truncate">
-                {title}
-              </h1>
-            </div>
-          </div>
-
-          {/* Right side - Auth state dependent */}
-          <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Right side */}
+          <div className="flex items-center gap-3">
             {user ? (
-              /* Authenticated user - show avatar dropdown */
+              /* Authenticated user - same as AppHeader */
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2">
@@ -119,7 +85,7 @@ export function SharedDashboardHeader({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              /* Unauthenticated - show sign in / get started buttons */
+              /* Unauthenticated - show sign in buttons */
               <>
                 <Link href="/auth">
                   <Button variant="ghost" size="sm">

@@ -5,8 +5,9 @@ import type { Dashboard, BrandingConfig, DashboardShare } from '@/types/database
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import Link from 'next/link';
-import { PublicPageRenderer } from './PublicPageRenderer';
 import { SharedDashboardHeader } from '@/components/layout/shared-dashboard-header';
+import { DashboardTitleBar } from '@/components/dashboard/DashboardTitleBar';
+import { PageRenderer } from '@/components/dashboard/PageRenderer';
 import { SharedDashboardAuthGate } from '@/components/dashboard/SharedDashboardAuthGate';
 
 interface PageProps {
@@ -161,37 +162,51 @@ export default async function PublicDashboardPage({ params }: PageProps) {
     dashboard.branding_override
   );
 
-  // Compute inline styles from branding
-  const brandingStyles: React.CSSProperties = {
-    ...(branding.colors?.background && { backgroundColor: branding.colors.background }),
-  };
-
   // User object for header (null if not logged in)
   const headerUser = user ? { email: user.email || '' } : null;
 
+  // Version info
+  const version = dashboard.current_major_version !== undefined
+    ? { major: dashboard.current_major_version, minor: dashboard.current_minor_version || 0 }
+    : undefined;
+
+  // Compute branding styles
+  const brandingStyles: React.CSSProperties = {
+    '--brand-primary': branding.colors?.primary,
+    '--brand-secondary': branding.colors?.secondary,
+    '--brand-accent': branding.colors?.accent,
+    '--brand-background': branding.colors?.background,
+  } as React.CSSProperties;
+
   return (
-    <div className="min-h-screen flex flex-col" style={brandingStyles}>
-      {/* Consistent header for all shared dashboards */}
-      <SharedDashboardHeader
-        user={headerUser}
+    <div className="min-h-screen bg-[var(--color-gray-50)]" style={brandingStyles}>
+      {/* Top nav bar - same as owner view */}
+      <SharedDashboardHeader user={headerUser} />
+
+      {/* Title bar - same as owner view, without action buttons */}
+      <DashboardTitleBar
         title={dashboard.title}
-        logoUrl={branding.logoUrl}
-        companyName={branding.companyName}
+        branding={branding}
+        version={version}
+        backUrl={user ? '/dashboards' : '/'}
+        showBackButton={true}
       />
 
-      {/* Render the page content */}
-      <div className="flex-1">
-        <PublicPageRenderer
-          html={config.html}
-          charts={config.charts}
-          data={chartData}
-          branding={branding}
-          title={dashboard.title}
-        />
-      </div>
+      {/* Main content - same structure as owner view */}
+      <main className="transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <PageRenderer
+              html={config.html}
+              charts={config.charts}
+              data={chartData}
+            />
+          </div>
+        </div>
+      </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-[var(--color-gray-200)]">
+      <footer className="bg-white border-t border-[var(--color-gray-200)] mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <p className="text-sm text-[var(--color-gray-500)] text-center">
             Created with{' '}
