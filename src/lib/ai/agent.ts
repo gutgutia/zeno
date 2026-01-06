@@ -661,6 +661,32 @@ export interface RefreshOptions {
 }
 
 /**
+ * Timeout wrapper to prevent operations from hanging indefinitely
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  operation: string
+): Promise<T> {
+  let timeoutId: NodeJS.Timeout;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${operation} timed out after ${timeoutMs / 1000} seconds`));
+    }, timeoutMs);
+  });
+
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    clearTimeout(timeoutId!);
+    return result;
+  } catch (error) {
+    clearTimeout(timeoutId!);
+    throw error;
+  }
+}
+
+/**
  * Refresh a dashboard with new data using SURGICAL updates.
  *
  * This function:
@@ -718,11 +744,20 @@ export async function refreshDashboardWithAgent(
   const approach = diff?.recommendedApproach || 'surgical';
   console.log(`[Refresh Agent] Using ${approach} approach`);
 
-  // Create E2B sandbox
+  // Create E2B sandbox with timeout protection
   console.log('[Refresh Agent] Creating E2B sandbox...');
-  activeSandbox = await Sandbox.create({
-    timeoutMs: 300000, // 5 minute max
-  });
+  const sandboxStartTime = Date.now();
+  try {
+    activeSandbox = await withTimeout(
+      Sandbox.create({ timeoutMs: 240000 }), // 4 minute max (leave buffer for cleanup)
+      60000, // 60 second timeout for sandbox creation
+      'E2B sandbox creation'
+    );
+    console.log(`[Refresh Agent] Sandbox created in ${Date.now() - sandboxStartTime}ms`);
+  } catch (sandboxError) {
+    console.error('[Refresh Agent] Failed to create sandbox:', sandboxError);
+    throw new Error(`Failed to create E2B sandbox: ${sandboxError instanceof Error ? sandboxError.message : String(sandboxError)}`);
+  }
 
   try {
     // Write new data and existing HTML to sandbox
@@ -750,6 +785,7 @@ export async function refreshDashboardWithAgent(
     }
 
     console.log('[Refresh Agent] Starting agent loop...');
+    const agentLoopStartTime = Date.now();
     let refreshResult: RefreshResult | null = null;
     let turnCount = 0;
     let totalCost: number = 0;
@@ -782,51 +818,74 @@ export async function refreshDashboardWithAgent(
       };
     }
 
-    // Run the agent loop
-    for await (const message of query({
-      prompt: userPrompt,
-      options: queryOptions,
-    })) {
-      if (message.type === 'assistant') {
-        turnCount++;
-        console.log(`[Refresh Agent] Turn ${turnCount}: Assistant message`);
-      } else if (message.type === 'tool_progress') {
-        console.log(`[Refresh Agent] Tool progress: ${message.tool_name}`);
-      } else if (message.type === 'result') {
-        console.log(`[Refresh Agent] Completed after ${turnCount} turns`);
-        if (message.subtype === 'success') {
-          totalCost = message.total_cost_usd || 0;
-          // Extract token usage from SDK result if available
-          const resultWithUsage = message as {
-            total_cost_usd?: number;
-            result: string;
-            usage?: {
-              input_tokens?: number;
-              output_tokens?: number;
-              thinking_tokens?: number;
-              cache_read_tokens?: number;
-              cache_write_tokens?: number;
-            };
-          };
-          if (resultWithUsage.usage) {
-            tokenUsage = {
-              inputTokens: resultWithUsage.usage.input_tokens || 0,
-              outputTokens: resultWithUsage.usage.output_tokens || 0,
-              thinkingTokens: resultWithUsage.usage.thinking_tokens || 0,
-              cacheReadTokens: resultWithUsage.usage.cache_read_tokens || 0,
-              cacheWriteTokens: resultWithUsage.usage.cache_write_tokens || 0,
-            };
-          }
-          console.log(`[Refresh Agent] Total cost: $${totalCost?.toFixed(4) || 'unknown'}`);
-          console.log(`[Refresh Agent] Token usage: input=${tokenUsage.inputTokens}, output=${tokenUsage.outputTokens}, thinking=${tokenUsage.thinkingTokens}`);
-          refreshResult = extractRefreshResult(message.result);
-        } else {
-          const errorResult = message as { errors?: string[] };
-          throw new Error(`Refresh agent error: ${errorResult.errors?.join(', ') || 'Unknown error'}`);
+    // Maximum time for the entire agent loop (3 minutes to leave buffer)
+    const AGENT_LOOP_TIMEOUT_MS = 180000;
+
+    // Run the agent loop with timeout protection
+    const agentLoopPromise = (async () => {
+      for await (const message of query({
+        prompt: userPrompt,
+        options: queryOptions,
+      })) {
+        // Check for overall timeout inside loop
+        if (Date.now() - agentLoopStartTime > AGENT_LOOP_TIMEOUT_MS) {
+          throw new Error(`Agent loop timed out after ${AGENT_LOOP_TIMEOUT_MS / 1000} seconds`);
         }
-      } else if (message.type === 'system') {
-        console.log(`[Refresh Agent] System message: ${message.subtype}`);
+
+        if (message.type === 'assistant') {
+          turnCount++;
+          console.log(`[Refresh Agent] Turn ${turnCount}: Assistant message (${Math.round((Date.now() - agentLoopStartTime) / 1000)}s elapsed)`);
+        } else if (message.type === 'tool_progress') {
+          console.log(`[Refresh Agent] Tool progress: ${message.tool_name}`);
+        } else if (message.type === 'result') {
+          console.log(`[Refresh Agent] Completed after ${turnCount} turns (${Math.round((Date.now() - agentLoopStartTime) / 1000)}s total)`);
+          if (message.subtype === 'success') {
+            totalCost = message.total_cost_usd || 0;
+            // Extract token usage from SDK result if available
+            const resultWithUsage = message as {
+              total_cost_usd?: number;
+              result: string;
+              usage?: {
+                input_tokens?: number;
+                output_tokens?: number;
+                thinking_tokens?: number;
+                cache_read_tokens?: number;
+                cache_write_tokens?: number;
+              };
+            };
+            if (resultWithUsage.usage) {
+              tokenUsage = {
+                inputTokens: resultWithUsage.usage.input_tokens || 0,
+                outputTokens: resultWithUsage.usage.output_tokens || 0,
+                thinkingTokens: resultWithUsage.usage.thinking_tokens || 0,
+                cacheReadTokens: resultWithUsage.usage.cache_read_tokens || 0,
+                cacheWriteTokens: resultWithUsage.usage.cache_write_tokens || 0,
+              };
+            }
+            console.log(`[Refresh Agent] Total cost: $${totalCost?.toFixed(4) || 'unknown'}`);
+            console.log(`[Refresh Agent] Token usage: input=${tokenUsage.inputTokens}, output=${tokenUsage.outputTokens}, thinking=${tokenUsage.thinkingTokens}`);
+            refreshResult = extractRefreshResult(message.result);
+          } else {
+            const errorResult = message as { errors?: string[] };
+            throw new Error(`Refresh agent error: ${errorResult.errors?.join(', ') || 'Unknown error'}`);
+          }
+        } else if (message.type === 'system') {
+          console.log(`[Refresh Agent] System message: ${message.subtype}`);
+        }
       }
+      return refreshResult;
+    })();
+
+    // Wait for agent loop with timeout
+    try {
+      refreshResult = await withTimeout(
+        agentLoopPromise,
+        AGENT_LOOP_TIMEOUT_MS + 10000, // Add 10s buffer
+        'Agent refresh loop'
+      );
+    } catch (loopError) {
+      console.error(`[Refresh Agent] Agent loop failed after ${Math.round((Date.now() - agentLoopStartTime) / 1000)}s:`, loopError);
+      throw loopError;
     }
 
     if (!refreshResult?.html) {
