@@ -32,8 +32,8 @@ const plans = [
     monthlyPrice: 10,
     annualPrice: 8,
     description: 'For solo creators and freelancers',
-    credits: '200 credits/seat/mo',
-    creditsNote: '~15-40 dashboards',
+    credits: '100 credits/seat/mo',
+    creditsNote: '~5-15 dashboards',
     features: [
       'Unlimited dashboards',
       'Private sharing (email & domain)',
@@ -50,11 +50,11 @@ const plans = [
   },
   {
     name: 'Pro',
-    monthlyPrice: 24,
+    monthlyPrice: 25,
     annualPrice: 20,
     description: 'For teams needing integrations & branding',
-    credits: '500 credits/seat/mo',
-    creditsNote: '~35-100 dashboards',
+    credits: '250 credits/seat/mo',
+    creditsNote: '~15-40 dashboards',
     features: [
       'Everything in Starter',
       'Remove Zeno branding',
@@ -75,9 +75,9 @@ const plans = [
 ];
 
 const creditPacks = [
-  { credits: 100, price: 6, perCredit: 0.06 },
-  { credits: 500, price: 25, perCredit: 0.05, savings: '17%' },
-  { credits: 2000, price: 80, perCredit: 0.04, savings: '33%' },
+  { credits: 100, price: 10, perCredit: 0.10 },
+  { credits: 500, price: 45, perCredit: 0.09, savings: '10%' },
+  { credits: 2000, price: 160, perCredit: 0.08, savings: '20%' },
 ];
 
 export function Pricing() {

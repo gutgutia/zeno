@@ -30,9 +30,9 @@ interface CreditInfo {
 }
 
 const creditPacks = [
-  { size: 'small', credits: 100, price: 6, perCredit: 0.06 },
-  { size: 'medium', credits: 500, price: 25, perCredit: 0.05, savings: '17%' },
-  { size: 'large', credits: 2000, price: 80, perCredit: 0.04, savings: '33%' },
+  { size: 'small', credits: 100, price: 10, perCredit: 0.10 },
+  { size: 'medium', credits: 500, price: 45, perCredit: 0.09, savings: '10%' },
+  { size: 'large', credits: 2000, price: 160, perCredit: 0.08, savings: '20%' },
 ];
 
 const plans = [
@@ -47,14 +47,14 @@ const plans = [
   {
     name: 'Starter',
     price: 10,
-    credits: '200/seat/mo',
+    credits: '100/seat/mo',
     features: ['Unlimited dashboards', 'Private sharing', 'Custom subdomain', 'Email support'],
     plan: 'starter',
   },
   {
     name: 'Pro',
-    price: 24,
-    credits: '500/seat/mo',
+    price: 25,
+    credits: '250/seat/mo',
     features: ['Remove Zeno branding', 'Custom domain', 'Custom branding', 'Google Sheets', 'Priority support'],
     popular: true,
     plan: 'pro',
@@ -269,7 +269,7 @@ export default function BillingPage() {
                 </p>
               ) : (
                 <p className="text-sm text-[var(--color-gray-600)]">
-                  {currentPlan === 'starter' ? '200' : '500'} credits per month • Renews monthly
+                  {currentPlan === 'starter' ? '100' : '250'} credits per month • Renews monthly
                 </p>
               )}
             </div>
