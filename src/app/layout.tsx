@@ -3,6 +3,7 @@ import { Providers } from "@/lib/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://zeno.fyi"),
   title: "Zeno - Beautiful Dashboards in Seconds",
   description: "Paste your data, describe what you want, and let AI create stunning, shareable dashboards. No spreadsheet skills required.",
   keywords: ["dashboard", "data visualization", "AI", "analytics", "charts"],
@@ -19,7 +20,14 @@ export const metadata: Metadata = {
     url: "https://zeno.fyi",
     siteName: "Zeno",
     type: "website",
-    images: ["/social/og-image.png"],
+    images: [
+      {
+        url: "/social/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Zeno - Beautiful Dashboards in Seconds",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
