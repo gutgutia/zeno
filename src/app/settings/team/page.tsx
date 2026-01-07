@@ -43,9 +43,13 @@ interface SeatInfo {
   seats_pending: number;
   seats_available: number;
   plan_type: string;
+  billing_cycle: 'monthly' | 'annual';
   has_subscription: boolean;
+  subscription_ends_at: string | null;
   credits_per_seat: number;
   price_per_seat: number;
+  price_per_seat_monthly: number;
+  price_per_seat_annual: number;
 }
 
 export default function TeamPage() {
@@ -379,6 +383,21 @@ export default function TeamPage() {
       {/* Seat Info Section */}
       {seatInfo && seatInfo.has_subscription && canAddTeamMembers && (
         <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-6">
+          {/* Cancellation Warning */}
+          {seatInfo.subscription_ends_at && (
+            <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100 mb-4">
+              <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-amber-800">Subscription is scheduled to cancel</p>
+                <p className="text-sm text-amber-700 mt-0.5">
+                  To add more seats, please <Link href="/settings/billing" className="underline">reactivate your subscription</Link> first.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-start justify-between">
             <div>
               <h3 className="font-semibold text-[var(--color-gray-900)] mb-1">Team Seats</h3>
@@ -386,7 +405,7 @@ export default function TeamPage() {
                 {seatInfo.credits_per_seat} credits per seat per month
               </p>
             </div>
-            {canManageMembers && (
+            {canManageMembers && !seatInfo.subscription_ends_at && (
               <Button variant="outline" size="sm" onClick={() => setIsAddSeatDialogOpen(true)}>
                 Add Seats
               </Button>
@@ -592,7 +611,7 @@ export default function TeamPage() {
           <DialogHeader>
             <DialogTitle>Add Team Seats</DialogTitle>
             <DialogDescription>
-              Add more seats to invite additional team members. You'll be charged a prorated amount for the remainder of your billing cycle.
+              Add more seats to invite additional team members. You&apos;ll be charged immediately for the prorated amount.
             </DialogDescription>
           </DialogHeader>
 
@@ -603,9 +622,17 @@ export default function TeamPage() {
                   <span className="text-sm text-[var(--color-gray-600)]">Current seats</span>
                   <span className="font-medium">{seatInfo.seats_purchased}</span>
                 </div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-[var(--color-gray-600)]">Billing cycle</span>
+                  <span className="font-medium capitalize">{seatInfo.billing_cycle}</span>
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-[var(--color-gray-600)]">Price per seat</span>
-                  <span className="font-medium">${seatInfo.price_per_seat}/mo</span>
+                  <span className="font-medium">
+                    {seatInfo.billing_cycle === 'annual'
+                      ? `$${seatInfo.price_per_seat_annual}/year`
+                      : `$${seatInfo.price_per_seat}/mo`}
+                  </span>
                 </div>
               </div>
 
@@ -644,9 +671,13 @@ export default function TeamPage() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--color-gray-600)]">Additional monthly cost</span>
+                  <span className="text-[var(--color-gray-600)]">
+                    Additional {seatInfo.billing_cycle === 'annual' ? 'annual' : 'monthly'} cost
+                  </span>
                   <span className="text-[var(--color-gray-900)]">
-                    +${seatsToAdd * seatInfo.price_per_seat}/mo
+                    {seatInfo.billing_cycle === 'annual'
+                      ? `+$${seatsToAdd * seatInfo.price_per_seat_annual}/year`
+                      : `+$${seatsToAdd * seatInfo.price_per_seat}/mo`}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm mt-1">
@@ -656,6 +687,10 @@ export default function TeamPage() {
                   </span>
                 </div>
               </div>
+
+              <p className="text-xs text-[var(--color-gray-500)]">
+                You&apos;ll be charged a prorated amount today based on the time remaining in your billing period.
+              </p>
             </div>
           )}
 

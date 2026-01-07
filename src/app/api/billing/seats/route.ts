@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: org } = await (supabase as any)
       .from('organizations')
-      .select('stripe_subscription_id, seats_purchased, plan_type')
+      .select('stripe_subscription_id, seats_purchased, plan_type, subscription_ends_at')
       .eq('id', organization_id)
       .single();
 
@@ -53,6 +53,14 @@ export async function POST(request: Request) {
     if (!org.stripe_subscription_id) {
       return NextResponse.json(
         { error: 'No active subscription. Please upgrade first.' },
+        { status: 400 }
+      );
+    }
+
+    // Check if subscription is scheduled to cancel
+    if (org.subscription_ends_at) {
+      return NextResponse.json(
+        { error: 'Cannot add seats while subscription is scheduled to cancel. Please reactivate your subscription first.' },
         { status: 400 }
       );
     }
@@ -86,7 +94,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid subscription' }, { status: 500 });
     }
 
-    // Update the subscription with new quantity (prorated)
+    // Update the subscription with new quantity (charge immediately)
     await stripe.subscriptions.update(org.stripe_subscription_id, {
       items: [
         {
@@ -94,7 +102,8 @@ export async function POST(request: Request) {
           quantity: seats,
         },
       ],
-      proration_behavior: 'create_prorations',
+      proration_behavior: 'always_invoice',
+      payment_behavior: 'allow_incomplete',
       metadata: {
         ...subscription.metadata,
         seats: seats.toString(),
@@ -176,7 +185,7 @@ export async function GET(request: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: org } = await (supabase as any)
       .from('organizations')
-      .select('seats_purchased, plan_type, stripe_subscription_id')
+      .select('seats_purchased, plan_type, stripe_subscription_id, billing_cycle, subscription_ends_at')
       .eq('id', organizationId)
       .single();
 
@@ -198,8 +207,25 @@ export async function GET(request: Request) {
     // Calculate credits per seat
     const creditsPerSeat = org?.plan_type === 'enterprise' ? 500 : org?.plan_type === 'pro' ? 250 : 100;
 
-    // Calculate seat price (Starter = $10, Pro = $25)
-    const pricePerSeat = org?.plan_type === 'enterprise' ? 100 : org?.plan_type === 'pro' ? 25 : 10;
+    // Calculate seat price based on plan and billing cycle
+    // Monthly: Starter = $10, Pro = $25, Enterprise = $100
+    // Annual: Starter = $8, Pro = $20, Enterprise = $80 (per month)
+    const isAnnual = org?.billing_cycle === 'annual';
+    let pricePerSeatMonthly: number;
+    let pricePerSeatAnnual: number;
+
+    if (org?.plan_type === 'enterprise') {
+      pricePerSeatMonthly = 100;
+      pricePerSeatAnnual = 80;
+    } else if (org?.plan_type === 'pro') {
+      pricePerSeatMonthly = 25;
+      pricePerSeatAnnual = 20;
+    } else {
+      pricePerSeatMonthly = 10;
+      pricePerSeatAnnual = 8;
+    }
+
+    const pricePerSeat = isAnnual ? pricePerSeatAnnual : pricePerSeatMonthly;
 
     return NextResponse.json({
       seats_purchased: org?.seats_purchased || 1,
@@ -207,9 +233,13 @@ export async function GET(request: Request) {
       seats_pending: pendingInvitations || 0,
       seats_available: Math.max(0, (org?.seats_purchased || 1) - (currentMembers || 1) - (pendingInvitations || 0)),
       plan_type: org?.plan_type || 'free',
+      billing_cycle: org?.billing_cycle || 'monthly',
       has_subscription: !!org?.stripe_subscription_id,
+      subscription_ends_at: org?.subscription_ends_at || null,
       credits_per_seat: creditsPerSeat,
       price_per_seat: pricePerSeat,
+      price_per_seat_monthly: pricePerSeatMonthly,
+      price_per_seat_annual: pricePerSeatAnnual * 12, // Annual total
     });
   } catch (error) {
     console.error('Seat info error:', error);
