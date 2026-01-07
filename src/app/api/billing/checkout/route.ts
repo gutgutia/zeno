@@ -201,6 +201,7 @@ export async function POST(request: Request) {
               const oldSeats = orgData.seats_purchased || 1;
 
               // Update the subscription to the new plan
+              // Use 'always_invoice' to charge immediately for the upgrade
               const updatedSubscription = await getStripe().subscriptions.update(
                 orgData.stripe_subscription_id,
                 {
@@ -217,7 +218,8 @@ export async function POST(request: Request) {
                     plan,
                     seats: seats.toString(),
                   },
-                  proration_behavior: 'create_prorations',
+                  proration_behavior: 'always_invoice',
+                  payment_behavior: 'allow_incomplete',
                 }
               );
 

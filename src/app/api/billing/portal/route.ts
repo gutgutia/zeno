@@ -70,7 +70,7 @@ export async function POST(request: Request) {
 
     const session = await getStripe().billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${baseUrl}/settings/billing`,
+      return_url: `${baseUrl}/settings/billing?from_portal=true`,
     });
 
     return NextResponse.json({ url: session.url });

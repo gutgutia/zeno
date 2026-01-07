@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -67,17 +68,14 @@ const plans = [
   },
 ];
 
-export default function BillingPage() {
+function BillingContent() {
   const [creditInfo, setCreditInfo] = useState<CreditInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
+  const searchParams = useSearchParams();
 
-  useEffect(() => {
-    fetchCredits();
-  }, []);
-
-  const fetchCredits = async () => {
+  const fetchCredits = useCallback(async () => {
     try {
       const response = await fetch('/api/credits');
       if (response.ok) {
@@ -90,7 +88,47 @@ export default function BillingPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchCredits();
+
+    // Show toast based on URL params (returning from Stripe)
+    const success = searchParams.get('success');
+    const canceled = searchParams.get('canceled');
+    const fromPortal = searchParams.get('from_portal');
+
+    if (success === 'true') {
+      toast.success('Payment successful! Your account has been updated.');
+      // Clear URL params
+      window.history.replaceState({}, '', '/settings/billing');
+    } else if (canceled === 'true') {
+      toast.info('Payment was canceled.');
+      window.history.replaceState({}, '', '/settings/billing');
+    } else if (fromPortal === 'true') {
+      // Returning from portal - just refresh data silently
+      toast.success('Billing settings updated.');
+      window.history.replaceState({}, '', '/settings/billing');
+    }
+
+    // Refresh when returning to the page (e.g., from Stripe portal)
+    const handleFocus = () => {
+      fetchCredits();
+    };
+
+    // Listen for credits-updated event from other components
+    const handleCreditsUpdated = () => {
+      fetchCredits();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('credits-updated', handleCreditsUpdated);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('credits-updated', handleCreditsUpdated);
+    };
+  }, [fetchCredits, searchParams]);
 
   const handleBuyCreditPack = async (size: string) => {
     setIsCheckoutLoading(size);
@@ -572,5 +610,22 @@ export default function BillingPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Wrap in Suspense for useSearchParams
+export default function BillingPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 w-48 bg-[var(--color-gray-200)] rounded" />
+          <div className="h-32 bg-[var(--color-gray-200)] rounded-xl" />
+          <div className="h-64 bg-[var(--color-gray-200)] rounded-xl" />
+        </div>
+      </div>
+    }>
+      <BillingContent />
+    </Suspense>
   );
 }
