@@ -114,18 +114,61 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
 async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   const metadata = subscription.metadata || {};
-  const organizationId = metadata.organization_id;
+  let organizationId = metadata.organization_id;
   const userId = metadata.user_id;
-  const plan = metadata.plan || 'starter';
-  const seats = parseInt(metadata.seats || '1', 10);
+  const customerId = subscription.customer as string;
 
-  console.log('[Webhook] Subscription metadata:', {
+  console.log('[Webhook] Subscription update received:', {
+    subscriptionId: subscription.id,
+    status: subscription.status,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    customerId,
+    metadata,
+  });
+
+  // If no organization_id in metadata, look it up by customer ID
+  if (!organizationId && customerId) {
+    console.log('[Webhook] No organization_id in metadata, looking up by customer ID:', customerId);
+    const { data: org } = await getSupabaseAdmin()
+      .from('organizations')
+      .select('id, plan_type, seats_purchased')
+      .eq('stripe_customer_id', customerId)
+      .single();
+
+    if (org) {
+      organizationId = org.id;
+      console.log('[Webhook] Found organization by customer ID:', organizationId);
+    } else {
+      console.log('[Webhook] No organization found for customer ID:', customerId);
+    }
+  }
+
+  // Get plan and seats from metadata or from existing org data
+  let plan = metadata.plan;
+  let seats = parseInt(metadata.seats || '1', 10);
+
+  if (organizationId && !plan) {
+    // Get current plan from org if not in metadata
+    const { data: org } = await getSupabaseAdmin()
+      .from('organizations')
+      .select('plan_type, seats_purchased')
+      .eq('id', organizationId)
+      .single();
+
+    if (org) {
+      plan = org.plan_type;
+      seats = org.seats_purchased || 1;
+      console.log('[Webhook] Using existing org plan:', plan, 'seats:', seats);
+    }
+  }
+
+  plan = plan || 'starter';
+
+  console.log('[Webhook] Processing with:', {
     organizationId,
     userId,
     plan,
     seats,
-    subscriptionId: subscription.id,
-    status: subscription.status,
   });
 
   if (organizationId) {
@@ -144,12 +187,22 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     const isPlanChange = !isNewSubscription && currentOrg && (currentOrg.plan_type !== plan || currentOrg.seats_purchased !== seats);
 
     // Check if subscription is scheduled to cancel
+    // Stripe Portal uses cancel_at (timestamp) instead of cancel_at_period_end (boolean)
     const cancelAtPeriodEnd = subscription.cancel_at_period_end;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cancelAt = (subscription as any).cancel_at; // timestamp when subscription will cancel
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const currentPeriodEnd = (subscription as any).current_period_end;
-    const subscriptionEndsAt = cancelAtPeriodEnd && currentPeriodEnd
-      ? new Date(currentPeriodEnd * 1000).toISOString()
-      : null;
+
+    // Subscription ends at cancel_at if set, or current_period_end if cancel_at_period_end is true
+    let subscriptionEndsAt: string | null = null;
+    if (cancelAt) {
+      subscriptionEndsAt = new Date(cancelAt * 1000).toISOString();
+    } else if (cancelAtPeriodEnd && currentPeriodEnd) {
+      subscriptionEndsAt = new Date(currentPeriodEnd * 1000).toISOString();
+    }
+
+    console.log('[Webhook] Cancellation check:', { cancelAtPeriodEnd, cancelAt, subscriptionEndsAt });
 
     // Update organization subscription
     console.log(`[Webhook] Updating organization ${organizationId} with plan: ${plan} (isNewSubscription: ${isNewSubscription}, isPlanChange: ${isPlanChange}, cancelAtPeriodEnd: ${cancelAtPeriodEnd})`);
