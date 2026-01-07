@@ -180,30 +180,18 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
       const creditsPerSeat = plan === 'enterprise' ? 500 : plan === 'pro' ? 250 : 100;
       const totalCredits = creditsPerSeat * seats;
 
-      // Check if we need to refill (first activation or renewal)
-      const { data: orgCredits } = await getSupabaseAdmin()
-        .from('organization_credits')
-        .select('last_refill_at')
-        .eq('organization_id', organizationId)
-        .single();
-
-      const lastRefill = orgCredits?.last_refill_at
-        ? new Date(orgCredits.last_refill_at)
-        : null;
       const now = new Date();
 
-      // Refill if never refilled or last refill was > 25 days ago
-      const shouldRefill =
-        !lastRefill ||
-        now.getTime() - lastRefill.getTime() > 25 * 24 * 60 * 60 * 1000;
-
-      if (shouldRefill) {
+      // For NEW subscriptions (Free → Starter/Pro), always give credits
+      // For renewals, check if enough time has passed since last refill
+      if (isNewSubscription) {
+        // New subscription - give full credits for first month
         await getSupabaseAdmin().rpc('add_credits', {
           p_user_id: null,
           p_org_id: organizationId,
           p_amount: totalCredits,
           p_transaction_type: 'monthly_refill',
-          p_description: `Monthly refill: ${totalCredits} credits (${seats} seats × ${creditsPerSeat})`,
+          p_description: `New subscription: ${totalCredits} credits (${seats} seats × ${creditsPerSeat})`,
         });
 
         await getSupabaseAdmin()
@@ -211,9 +199,42 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
           .update({ last_refill_at: now.toISOString() })
           .eq('organization_id', organizationId);
 
-        console.log(`[Webhook] Refilled ${totalCredits} credits for org ${organizationId}`);
+        console.log(`[Webhook] New subscription - added ${totalCredits} credits for org ${organizationId}`);
       } else {
-        console.log(`[Webhook] Skipping credit refill - last refill was ${lastRefill ? Math.round((now.getTime() - lastRefill.getTime()) / (24 * 60 * 60 * 1000)) : 'never'} days ago`);
+        // Renewal - check if we need to refill (monthly allocation, even for annual plans)
+        const { data: orgCredits } = await getSupabaseAdmin()
+          .from('organization_credits')
+          .select('last_refill_at')
+          .eq('organization_id', organizationId)
+          .single();
+
+        const lastRefill = orgCredits?.last_refill_at
+          ? new Date(orgCredits.last_refill_at)
+          : null;
+
+        // Refill if never refilled or last refill was > 25 days ago
+        const shouldRefill =
+          !lastRefill ||
+          now.getTime() - lastRefill.getTime() > 25 * 24 * 60 * 60 * 1000;
+
+        if (shouldRefill) {
+          await getSupabaseAdmin().rpc('add_credits', {
+            p_user_id: null,
+            p_org_id: organizationId,
+            p_amount: totalCredits,
+            p_transaction_type: 'monthly_refill',
+            p_description: `Monthly refill: ${totalCredits} credits (${seats} seats × ${creditsPerSeat})`,
+          });
+
+          await getSupabaseAdmin()
+            .from('organization_credits')
+            .update({ last_refill_at: now.toISOString() })
+            .eq('organization_id', organizationId);
+
+          console.log(`[Webhook] Renewal - refilled ${totalCredits} credits for org ${organizationId}`);
+        } else {
+          console.log(`[Webhook] Skipping credit refill - last refill was ${lastRefill ? Math.round((now.getTime() - lastRefill.getTime()) / (24 * 60 * 60 * 1000)) : 'never'} days ago`);
+        }
       }
     } else if (isPlanChange) {
       console.log('[Webhook] Skipping credit handling - plan change already handled by checkout');

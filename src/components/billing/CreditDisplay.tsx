@@ -26,6 +26,19 @@ export function CreditDisplay({ variant = 'compact', className = '' }: CreditDis
 
   useEffect(() => {
     fetchCredits();
+
+    // Listen for credit updates (dispatched when plan changes)
+    const handleCreditsUpdated = () => {
+      fetchCredits();
+    };
+
+    window.addEventListener('credits-updated', handleCreditsUpdated);
+    window.addEventListener('focus', handleCreditsUpdated);
+
+    return () => {
+      window.removeEventListener('credits-updated', handleCreditsUpdated);
+      window.removeEventListener('focus', handleCreditsUpdated);
+    };
   }, []);
 
   const fetchCredits = async () => {

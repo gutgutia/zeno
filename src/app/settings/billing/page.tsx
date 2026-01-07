@@ -13,6 +13,8 @@ interface CreditInfo {
   organization_id?: string;
   plan: string;
   subscription_ends_at?: string | null;
+  billing_cycle?: 'monthly' | 'annual' | null;
+  last_refill_at?: string | null;
   limits: {
     dashboards: {
       current: number;
@@ -142,6 +144,8 @@ export default function BillingPage() {
         toast.success(data.message || 'Subscription updated successfully');
         // Refresh the page to show updated plan
         await fetchCredits();
+        // Notify other components (like navbar) to refresh credits
+        window.dispatchEvent(new CustomEvent('credits-updated'));
         setIsCheckoutLoading(null);
         return;
       }
@@ -292,7 +296,7 @@ export default function BillingPage() {
                 </p>
               ) : (
                 <p className="text-sm text-[var(--color-gray-600)]">
-                  {currentPlan === 'starter' ? '100' : '250'} credits per month • Renews monthly
+                  {currentPlan === 'starter' ? '100' : '250'} credits per month • Renews {creditInfo?.billing_cycle === 'annual' ? 'annually' : 'monthly'}
                 </p>
               )}
             </div>
@@ -338,24 +342,50 @@ export default function BillingPage() {
         {/* Subscription Details for Paid Plans */}
         {currentPlan !== 'free' && !creditInfo?.subscription_ends_at && (
           <div className="px-6 py-4 bg-[var(--color-gray-50)] border-t border-[var(--color-gray-100)]">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[var(--color-gray-600)]">
-                Manage your subscription, update payment methods, view invoices, or cancel anytime.
-              </span>
+            <div className="flex items-center gap-6 text-sm">
+              {/* Next Renewal Date */}
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-[var(--color-gray-400)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="text-[var(--color-gray-600)]">
+                  Next renewal: {(() => {
+                    // Calculate next renewal based on billing cycle and last refill
+                    if (creditInfo?.last_refill_at) {
+                      const lastRefill = new Date(creditInfo.last_refill_at);
+                      const nextRenewal = new Date(lastRefill);
+                      if (creditInfo.billing_cycle === 'annual') {
+                        nextRenewal.setFullYear(nextRenewal.getFullYear() + 1);
+                      } else {
+                        nextRenewal.setMonth(nextRenewal.getMonth() + 1);
+                      }
+                      return nextRenewal.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    }
+                    return 'N/A';
+                  })()}
+                </span>
+              </div>
+              {/* Next Credit Refill */}
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-[var(--color-gray-400)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span className="text-[var(--color-gray-600)]">
+                  Next credit refill: {(() => {
+                    // Credits refill monthly for all plans
+                    if (creditInfo?.last_refill_at) {
+                      const lastRefill = new Date(creditInfo.last_refill_at);
+                      const nextRefill = new Date(lastRefill);
+                      nextRefill.setMonth(nextRefill.getMonth() + 1);
+                      return nextRefill.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    }
+                    return 'N/A';
+                  })()}
+                </span>
+              </div>
             </div>
           </div>
         )}
-
-        {/* Dashboard Count */}
-        <div className="px-6 py-4 border-t border-[var(--color-gray-100)]">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-[var(--color-gray-600)]">
-              <span className="font-medium text-[var(--color-gray-900)]">{creditInfo?.limits?.dashboards?.current || 0}</span>
-              <span> dashboards created</span>
-            </div>
-            <span className="text-xs text-[var(--color-gray-500)]">Unlimited</span>
-          </div>
-        </div>
       </div>
 
       {/* Credit Packs */}
