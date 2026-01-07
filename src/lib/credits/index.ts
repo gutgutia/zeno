@@ -352,7 +352,7 @@ export async function getPlanFeatures(plan: PlanType): Promise<PlanFeature[]> {
 }
 
 /**
- * Check if user can create more dashboards
+ * Get dashboard count for user (no limits - we rely on credits instead)
  */
 export async function canCreateDashboard(userId: string): Promise<{
   allowed: boolean;
@@ -362,15 +362,7 @@ export async function canCreateDashboard(userId: string): Promise<{
 }> {
   const supabase = await createClient();
 
-  // Get dashboard limit
-  const limit = await getFeatureLimit(userId, 'max_dashboards');
-
-  // If unlimited, allow
-  if (limit === null) {
-    return { allowed: true, current: 0, limit: null };
-  }
-
-  // Count current dashboards
+  // Count current dashboards (for display only)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { count } = await (supabase as any)
     .from('dashboards')
@@ -380,16 +372,8 @@ export async function canCreateDashboard(userId: string): Promise<{
 
   const current = count || 0;
 
-  if (current >= limit) {
-    return {
-      allowed: false,
-      current,
-      limit,
-      reason: `You've reached your limit of ${limit} dashboards. Upgrade to create more.`,
-    };
-  }
-
-  return { allowed: true, current, limit };
+  // Always allow - we rely on credits to gate dashboard creation, not arbitrary limits
+  return { allowed: true, current, limit: null };
 }
 
 // ============================================

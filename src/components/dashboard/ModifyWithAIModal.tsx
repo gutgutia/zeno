@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { UpgradeModal } from '@/components/billing/UpgradeModal';
 
 interface ModifyWithAIModalProps {
   dashboardId: string;
@@ -29,6 +30,8 @@ export function ModifyWithAIModal({
   const [isOpen, setIsOpen] = useState(false);
   const [instructions, setInstructions] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [creditsInfo, setCreditsInfo] = useState<{ needed: number; available: number } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,12 +52,21 @@ export function ModifyWithAIModal({
         body: JSON.stringify({ instructions: instructions.trim() }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
+        // Handle insufficient credits (402)
+        if (response.status === 402) {
+          setCreditsInfo({
+            needed: data.credits_required || 10,
+            available: data.credits_available || 0,
+          });
+          setUpgradeModalOpen(true);
+          toast.dismiss(toastId);
+          return;
+        }
         throw new Error(data.error || 'Failed to modify dashboard');
       }
-
-      const data = await response.json();
 
       toast.success('Dashboard modified!', {
         id: toastId,
@@ -162,6 +174,15 @@ export function ModifyWithAIModal({
           </div>
         </form>
       </DialogContent>
+
+      {/* Upgrade Modal for insufficient credits */}
+      <UpgradeModal
+        isOpen={upgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
+        reason="credits"
+        creditsNeeded={creditsInfo?.needed}
+        creditsAvailable={creditsInfo?.available}
+      />
     </Dialog>
   );
 }

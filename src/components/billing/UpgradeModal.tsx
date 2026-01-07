@@ -26,7 +26,7 @@ const plans = [
     price: 10,
     priceAnnual: 8,
     credits: '200/seat/mo',
-    features: ['Unlimited dashboards', 'Private sharing', 'Custom subdomain', 'Email support'],
+    features: ['200 credits/month', 'Private sharing', 'Custom subdomain', 'Email support'],
     plan: 'starter',
   },
   {
@@ -35,10 +35,10 @@ const plans = [
     priceAnnual: 20,
     credits: '500/seat/mo',
     features: [
+      '500 credits/month',
       'Everything in Starter',
       'Remove Zeno branding',
       'Custom domain',
-      'Custom branding',
       'Google Sheets integration',
       'Priority support',
     ],

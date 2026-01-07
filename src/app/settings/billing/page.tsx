@@ -40,7 +40,7 @@ const plans = [
     name: 'Free',
     price: 0,
     credits: '100 one-time',
-    features: ['3 dashboards', 'Public sharing only', 'Zeno branding'],
+    features: ['Unlimited dashboards', 'Public sharing only', 'Zeno branding'],
     current: false,
     plan: 'free',
   },
@@ -244,43 +244,72 @@ export default function BillingPage() {
       </div>
 
       {/* Current Plan */}
-      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-[var(--color-gray-900)]">Current Plan</h2>
-          {currentPlan !== 'free' && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleManageBilling}
-              disabled={isCheckoutLoading === 'portal'}
-            >
-              {isCheckoutLoading === 'portal' ? 'Loading...' : 'Manage Subscription'}
-            </Button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-2xl font-bold text-[var(--color-gray-900)] capitalize">
-            {currentPlan}
-          </span>
-          {currentPlan === 'free' && (
-            <span className="px-2 py-0.5 text-xs font-medium bg-[var(--color-gray-100)] text-[var(--color-gray-600)] rounded-full">
-              Free Tier
-            </span>
-          )}
-        </div>
-
-        {/* Usage */}
-        {creditInfo?.limits?.dashboards && (
-          <div className="text-sm text-[var(--color-gray-600)]">
-            <span className="font-medium">{creditInfo.limits.dashboards.current}</span>
-            {creditInfo.limits.dashboards.limit ? (
-              <span> / {creditInfo.limits.dashboards.limit} dashboards used</span>
-            ) : (
-              <span> dashboards (unlimited)</span>
+      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] overflow-hidden mb-8">
+        {/* Plan Header */}
+        <div className={`p-6 ${currentPlan !== 'free' ? 'bg-gradient-to-r from-[var(--color-primary)]/5 to-[var(--color-primary)]/10' : ''}`}>
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl font-bold text-[var(--color-gray-900)] capitalize">
+                  {currentPlan} Plan
+                </span>
+                {currentPlan === 'free' ? (
+                  <span className="px-2.5 py-1 text-xs font-medium bg-[var(--color-gray-100)] text-[var(--color-gray-600)] rounded-full">
+                    Free Tier
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+                    Active
+                  </span>
+                )}
+              </div>
+              {currentPlan === 'free' ? (
+                <p className="text-sm text-[var(--color-gray-600)]">
+                  Upgrade to get more credits monthly and unlock premium features.
+                </p>
+              ) : (
+                <p className="text-sm text-[var(--color-gray-600)]">
+                  {currentPlan === 'starter' ? '200' : '500'} credits per month • Renews monthly
+                </p>
+              )}
+            </div>
+            {currentPlan !== 'free' && (
+              <Button
+                onClick={handleManageBilling}
+                disabled={isCheckoutLoading === 'portal'}
+                className="flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                {isCheckoutLoading === 'portal' ? 'Loading...' : 'Manage Subscription'}
+              </Button>
             )}
           </div>
+        </div>
+
+        {/* Subscription Details for Paid Plans */}
+        {currentPlan !== 'free' && (
+          <div className="px-6 py-4 bg-[var(--color-gray-50)] border-t border-[var(--color-gray-100)]">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-[var(--color-gray-600)]">
+                Manage your subscription, update payment methods, view invoices, or cancel anytime.
+              </span>
+            </div>
+          </div>
         )}
+
+        {/* Dashboard Count */}
+        <div className="px-6 py-4 border-t border-[var(--color-gray-100)]">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-[var(--color-gray-600)]">
+              <span className="font-medium text-[var(--color-gray-900)]">{creditInfo?.limits?.dashboards?.current || 0}</span>
+              <span> dashboards created</span>
+            </div>
+            <span className="text-xs text-[var(--color-gray-500)]">Unlimited</span>
+          </div>
+        </div>
       </div>
 
       {/* Credit Packs */}

@@ -14,6 +14,7 @@ import { estimateTokens, isContentTooLarge, MAX_TOKENS } from '@/types/dashboard
 import { SheetSelector } from '@/components/sheets/SheetSelector';
 import { GoogleSheetPicker } from '@/components/sheets/GoogleSheetPicker';
 import { UpgradePrompt } from '@/components/billing/UpgradePrompt';
+import { UpgradeModal } from '@/components/billing/UpgradeModal';
 import { usePlan } from '@/lib/hooks';
 import type { ParsedData, DataSchema, ContentType } from '@/types/dashboard';
 import type { DataSource } from '@/types/database';
@@ -78,6 +79,10 @@ function NewDashboardPageContent() {
   // UI state
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Upgrade modal state
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [creditsInfo, setCreditsInfo] = useState<{ needed: number; available: number } | null>(null);
 
   // Token estimation
   const tokenCount = useMemo(() => estimateTokens(rawContent), [rawContent]);
@@ -449,13 +454,24 @@ function NewDashboardPageContent() {
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
+        // Handle insufficient credits (402)
+        if (response.status === 402) {
+          setCreditsInfo({
+            needed: data.credits_required || 25,
+            available: data.credits_available || 0,
+          });
+          setUpgradeModalOpen(true);
+          setIsLoading(false);
+          setStep('instructions'); // Go back to instructions step
+          return;
+        }
         throw new Error(data.error || 'Failed to create dashboard');
       }
 
-      const { dashboard } = await response.json();
-      router.push(`/dashboards/${dashboard.id}`);
+      router.push(`/dashboards/${data.dashboard.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create dashboard');
       setStep('error');
@@ -980,6 +996,15 @@ function NewDashboardPageContent() {
           </Button>
         </div>
       )}
+
+      {/* Upgrade Modal for insufficient credits */}
+      <UpgradeModal
+        isOpen={upgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
+        reason="credits"
+        creditsNeeded={creditsInfo?.needed}
+        creditsAvailable={creditsInfo?.available}
+      />
     </div>
   );
 }

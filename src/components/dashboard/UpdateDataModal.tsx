@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { UpgradeModal } from '@/components/billing/UpgradeModal';
 
 interface UpdateDataModalProps {
   dashboardId: string;
@@ -55,6 +56,8 @@ export function UpdateDataModal({
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [creditsInfo, setCreditsInfo] = useState<{ needed: number; available: number } | null>(null);
 
   // Track if component is mounted to avoid state updates after unmount
   const isMounted = useRef(true);
@@ -123,6 +126,17 @@ export function UpdateDataModal({
       if (!isMounted.current) return; // Component unmounted, skip updates
 
       if (!response.ok) {
+        // Handle insufficient credits (402)
+        if (response.status === 402) {
+          setCreditsInfo({
+            needed: result.credits_required || 10,
+            available: result.credits_available || 0,
+          });
+          setUpgradeModalOpen(true);
+          setModalState('input');
+          setIsRefreshing(false);
+          return;
+        }
         throw new Error(result.error || 'Failed to refresh dashboard');
       }
 
@@ -426,6 +440,15 @@ export function UpdateDataModal({
           </>
         )}
       </DialogContent>
+
+      {/* Upgrade Modal for insufficient credits */}
+      <UpgradeModal
+        isOpen={upgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
+        reason="credits"
+        creditsNeeded={creditsInfo?.needed}
+        creditsAvailable={creditsInfo?.available}
+      />
     </Dialog>
   );
 }

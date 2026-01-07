@@ -24,6 +24,7 @@ import { ShareDialog } from '@/components/dashboard/ShareDialog';
 import { UpdateDataModal } from '@/components/dashboard/UpdateDataModal';
 import { VersionHistoryPanel } from '@/components/dashboard/VersionHistoryPanel';
 import { ModifyWithAIModal } from '@/components/dashboard/ModifyWithAIModal';
+import { UpgradeModal } from '@/components/billing/UpgradeModal';
 import { toast } from 'sonner';
 import type { Dashboard, BrandingConfig, DashboardVersion } from '@/types/database';
 import type { DashboardConfig, GenerationStatus } from '@/types/dashboard';
@@ -79,6 +80,10 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
   // Delete confirmation state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Upgrade modal state
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [creditsInfo, setCreditsInfo] = useState<{ needed: number; available: number } | null>(null);
 
   // Compute CSS variables for branding
   const brandingStyles = useMemo(() => {
@@ -270,8 +275,19 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
         headers: { 'Content-Type': 'application/json' },
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to retry generation');
+        // Handle insufficient credits (402)
+        if (response.status === 402) {
+          setCreditsInfo({
+            needed: result.credits_required || 25,
+            available: result.credits_available || 0,
+          });
+          setUpgradeModalOpen(true);
+          return;
+        }
+        throw new Error(result.error || 'Failed to retry generation');
       }
 
       // Refetch to get updated status
@@ -282,7 +298,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
       toast.info('Retrying generation...');
     } catch (err) {
       console.error('Failed to retry generation:', err);
-      toast.error('Failed to retry generation');
+      toast.error(err instanceof Error ? err.message : 'Failed to retry generation');
     }
   };
 
@@ -671,6 +687,15 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Upgrade Modal for insufficient credits */}
+      <UpgradeModal
+        isOpen={upgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
+        reason="credits"
+        creditsNeeded={creditsInfo?.needed}
+        creditsAvailable={creditsInfo?.available}
+      />
     </div>
   );
 }
