@@ -37,13 +37,27 @@ interface Invitation {
   invited_by: { name: string } | null;
 }
 
+interface SeatInfo {
+  seats_purchased: number;
+  seats_used: number;
+  seats_pending: number;
+  seats_available: number;
+  plan_type: string;
+  has_subscription: boolean;
+  credits_per_seat: number;
+  price_per_seat: number;
+}
+
 export default function TeamPage() {
   const [organization, setOrganization] = useState<OrganizationWithRole | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [seatInfo, setSeatInfo] = useState<SeatInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingOrg, setIsCreatingOrg] = useState(false);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [isAddSeatDialogOpen, setIsAddSeatDialogOpen] = useState(false);
+  const [seatsToAdd, setSeatsToAdd] = useState(1);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,6 +74,7 @@ export default function TeamPage() {
     if (organization) {
       fetchMembers(organization.id);
       fetchInvitations(organization.id);
+      fetchSeatInfo(organization.id);
     }
   }, [organization]);
 
@@ -127,6 +142,50 @@ export default function TeamPage() {
       }
     } catch (error) {
       console.error('Failed to fetch invitations:', error);
+    }
+  };
+
+  const fetchSeatInfo = async (orgId: string) => {
+    try {
+      const response = await fetch(`/api/billing/seats?organization_id=${orgId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSeatInfo(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch seat info:', error);
+    }
+  };
+
+  const handleAddSeats = async () => {
+    if (!organization || !seatInfo) return;
+
+    setIsSubmitting(true);
+    try {
+      const newTotal = seatInfo.seats_purchased + seatsToAdd;
+      const response = await fetch('/api/billing/seats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organization_id: organization.id,
+          seats: newTotal,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to add seats');
+      }
+
+      setIsAddSeatDialogOpen(false);
+      setSeatsToAdd(1);
+      fetchSeatInfo(organization.id);
+      toast.success(data.message || `Added ${seatsToAdd} seat(s)`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add seats');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -317,6 +376,58 @@ export default function TeamPage() {
         />
       )}
 
+      {/* Seat Info Section */}
+      {seatInfo && seatInfo.has_subscription && canAddTeamMembers && (
+        <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="font-semibold text-[var(--color-gray-900)] mb-1">Team Seats</h3>
+              <p className="text-sm text-[var(--color-gray-500)]">
+                {seatInfo.credits_per_seat} credits per seat per month
+              </p>
+            </div>
+            {canManageMembers && (
+              <Button variant="outline" size="sm" onClick={() => setIsAddSeatDialogOpen(true)}>
+                Add Seats
+              </Button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-[var(--color-gray-100)]">
+            <div>
+              <div className="text-2xl font-bold text-[var(--color-gray-900)]">
+                {seatInfo.seats_purchased}
+              </div>
+              <div className="text-sm text-[var(--color-gray-500)]">Total Seats</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-[var(--color-gray-900)]">
+                {seatInfo.seats_used}
+              </div>
+              <div className="text-sm text-[var(--color-gray-500)]">Used</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-green-600">
+                {seatInfo.seats_available}
+              </div>
+              <div className="text-sm text-[var(--color-gray-500)]">Available</div>
+            </div>
+          </div>
+
+          {seatInfo.seats_pending > 0 && (
+            <p className="text-sm text-amber-600 mt-3">
+              {seatInfo.seats_pending} pending invitation{seatInfo.seats_pending > 1 ? 's' : ''} (counts toward seat limit)
+            </p>
+          )}
+
+          {seatInfo.seats_available === 0 && (
+            <p className="text-sm text-[var(--color-gray-500)] mt-3">
+              All seats are in use. Add more seats to invite additional team members.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Members Section */}
       <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-6">
         <h3 className="font-semibold text-[var(--color-gray-900)] mb-4">
@@ -470,6 +581,90 @@ export default function TeamPage() {
             </Button>
             <Button onClick={handleInvite} disabled={isSubmitting}>
               {isSubmitting ? 'Sending...' : 'Send Invitation'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Seats Dialog */}
+      <Dialog open={isAddSeatDialogOpen} onOpenChange={setIsAddSeatDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Team Seats</DialogTitle>
+            <DialogDescription>
+              Add more seats to invite additional team members. You'll be charged a prorated amount for the remainder of your billing cycle.
+            </DialogDescription>
+          </DialogHeader>
+
+          {seatInfo && (
+            <div className="space-y-4 py-4">
+              <div className="bg-[var(--color-gray-50)] rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-[var(--color-gray-600)]">Current seats</span>
+                  <span className="font-medium">{seatInfo.seats_purchased}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[var(--color-gray-600)]">Price per seat</span>
+                  <span className="font-medium">${seatInfo.price_per_seat}/mo</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-gray-700)] mb-1">
+                  Seats to add
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSeatsToAdd(Math.max(1, seatsToAdd - 1))}
+                    className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)] flex items-center justify-center hover:bg-[var(--color-gray-50)]"
+                  >
+                    -
+                  </button>
+                  <Input
+                    type="number"
+                    value={seatsToAdd}
+                    onChange={(e) => setSeatsToAdd(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-20 text-center"
+                    min={1}
+                  />
+                  <button
+                    onClick={() => setSeatsToAdd(seatsToAdd + 1)}
+                    className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)] flex items-center justify-center hover:bg-[var(--color-gray-50)]"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-[var(--color-primary)]/5 rounded-lg p-4 border border-[var(--color-primary)]/20">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium text-[var(--color-gray-900)]">New total</span>
+                  <span className="font-bold text-[var(--color-primary)]">
+                    {seatInfo.seats_purchased + seatsToAdd} seats
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--color-gray-600)]">Additional monthly cost</span>
+                  <span className="text-[var(--color-gray-900)]">
+                    +${seatsToAdd * seatInfo.price_per_seat}/mo
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-1">
+                  <span className="text-[var(--color-gray-600)]">Additional credits/mo</span>
+                  <span className="text-green-600">
+                    +{seatsToAdd * seatInfo.credits_per_seat} credits
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddSeatDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddSeats} disabled={isSubmitting}>
+              {isSubmitting ? 'Adding...' : `Add ${seatsToAdd} Seat${seatsToAdd > 1 ? 's' : ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>

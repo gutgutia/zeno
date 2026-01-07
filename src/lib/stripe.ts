@@ -46,9 +46,9 @@ export const PRICE_IDS = {
 
 // Credit pack price IDs
 export const CREDIT_PACK_PRICES = {
-  small: process.env.STRIPE_CREDIT_PACK_SMALL_PRICE_ID || '',   // 100 credits - $6
-  medium: process.env.STRIPE_CREDIT_PACK_MEDIUM_PRICE_ID || '', // 500 credits - $25
-  large: process.env.STRIPE_CREDIT_PACK_LARGE_PRICE_ID || '',   // 2000 credits - $80
+  small: process.env.STRIPE_CREDIT_PACK_SMALL_PRICE_ID || '',   // 100 credits - $10
+  medium: process.env.STRIPE_CREDIT_PACK_MEDIUM_PRICE_ID || '', // 500 credits - $45
+  large: process.env.STRIPE_CREDIT_PACK_LARGE_PRICE_ID || '',   // 2000 credits - $160
 };
 
 // Credit amounts per pack

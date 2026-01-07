@@ -131,7 +131,8 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
 
     // If subscription is active, refill credits
     if (subscription.status === 'active') {
-      const creditsPerSeat = plan === 'pro' ? 500 : plan === 'enterprise' ? 1000 : 200;
+      // Credits per seat: Starter = 100, Pro = 250, Enterprise = 500
+      const creditsPerSeat = plan === 'enterprise' ? 500 : plan === 'pro' ? 250 : 100;
       const totalCredits = creditsPerSeat * seats;
 
       // Check if we need to refill (first activation or renewal)
