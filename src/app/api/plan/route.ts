@@ -19,6 +19,7 @@ export interface PlanResponse {
 }
 
 // Define features per plan
+// TODO: Revert google_sheets to false for free/starter after Google OAuth approval
 const PLAN_FEATURES: Record<PlanType, PlanFeatures> = {
   free: {
     team_members: false,
@@ -26,7 +27,7 @@ const PLAN_FEATURES: Record<PlanType, PlanFeatures> = {
     custom_domain: false,
     custom_branding: false,
     remove_zeno_branding: false,
-    google_sheets: false,
+    google_sheets: true, // TEMP: Enabled for Google OAuth consent screen approval
     scheduled_refresh: false,
     pdf_export: false,
   },
@@ -36,7 +37,7 @@ const PLAN_FEATURES: Record<PlanType, PlanFeatures> = {
     custom_domain: false,
     custom_branding: false,
     remove_zeno_branding: false,
-    google_sheets: false,
+    google_sheets: true, // TEMP: Enabled for Google OAuth consent screen approval
     scheduled_refresh: false,
     pdf_export: false,
   },

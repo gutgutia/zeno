@@ -38,14 +38,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
+  console.log(`[Webhook] Received event: ${event.type}`);
+
   try {
     switch (event.type) {
       case 'checkout.session.completed':
+        console.log('[Webhook] Processing checkout.session.completed');
         await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
         break;
 
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
+        console.log(`[Webhook] Processing ${event.type}`);
         await handleSubscriptionUpdate(event.data.object as Stripe.Subscription);
         break;
 
@@ -115,9 +119,42 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   const plan = metadata.plan || 'starter';
   const seats = parseInt(metadata.seats || '1', 10);
 
+  console.log('[Webhook] Subscription metadata:', {
+    organizationId,
+    userId,
+    plan,
+    seats,
+    subscriptionId: subscription.id,
+    status: subscription.status,
+  });
+
   if (organizationId) {
+    // Get current org data to check if this is a plan change or renewal
+    const { data: currentOrg } = await getSupabaseAdmin()
+      .from('organizations')
+      .select('plan_type, seats_purchased, stripe_subscription_id')
+      .eq('id', organizationId)
+      .single();
+
+    // This is a mid-cycle upgrade if:
+    // 1. Org already has the same subscription ID (not a new subscription)
+    // 2. Plan or seats changed
+    // For new subscriptions (checkout redirect), stripe_subscription_id won't match yet
+    const isNewSubscription = !currentOrg?.stripe_subscription_id || currentOrg.stripe_subscription_id !== subscription.id;
+    const isPlanChange = !isNewSubscription && currentOrg && (currentOrg.plan_type !== plan || currentOrg.seats_purchased !== seats);
+
+    // Check if subscription is scheduled to cancel
+    const cancelAtPeriodEnd = subscription.cancel_at_period_end;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const currentPeriodEnd = (subscription as any).current_period_end;
+    const subscriptionEndsAt = cancelAtPeriodEnd && currentPeriodEnd
+      ? new Date(currentPeriodEnd * 1000).toISOString()
+      : null;
+
     // Update organization subscription
-    await getSupabaseAdmin()
+    console.log(`[Webhook] Updating organization ${organizationId} with plan: ${plan} (isNewSubscription: ${isNewSubscription}, isPlanChange: ${isPlanChange}, cancelAtPeriodEnd: ${cancelAtPeriodEnd})`);
+
+    const { error: updateError } = await getSupabaseAdmin()
       .from('organizations')
       .update({
         stripe_subscription_id: subscription.id,
@@ -126,11 +163,19 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
         billing_cycle: subscription.items.data[0]?.price?.recurring?.interval === 'year'
           ? 'annual'
           : 'monthly',
+        subscription_ends_at: subscriptionEndsAt, // null if not canceling, date if scheduled to cancel
       })
       .eq('id', organizationId);
 
-    // If subscription is active, refill credits
-    if (subscription.status === 'active') {
+    if (updateError) {
+      console.error('[Webhook] Failed to update organization:', updateError);
+    } else {
+      console.log(`[Webhook] Successfully updated organization ${organizationId} to plan: ${plan}`);
+    }
+
+    // If subscription is active, handle credits
+    // Skip credit handling for plan changes - checkout route already handled it
+    if (subscription.status === 'active' && !isPlanChange) {
       // Credits per seat: Starter = 100, Pro = 250, Enterprise = 500
       const creditsPerSeat = plan === 'enterprise' ? 500 : plan === 'pro' ? 250 : 100;
       const totalCredits = creditsPerSeat * seats;
@@ -166,8 +211,12 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
           .update({ last_refill_at: now.toISOString() })
           .eq('organization_id', organizationId);
 
-        console.log(`Refilled ${totalCredits} credits for org ${organizationId}`);
+        console.log(`[Webhook] Refilled ${totalCredits} credits for org ${organizationId}`);
+      } else {
+        console.log(`[Webhook] Skipping credit refill - last refill was ${lastRefill ? Math.round((now.getTime() - lastRefill.getTime()) / (24 * 60 * 60 * 1000)) : 'never'} days ago`);
       }
+    } else if (isPlanChange) {
+      console.log('[Webhook] Skipping credit handling - plan change already handled by checkout');
     }
   } else if (userId) {
     // Individual subscription - update profile
@@ -179,21 +228,23 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  // This fires when subscription actually ends (after cancel_at_period_end expires)
   const metadata = subscription.metadata || {};
   const organizationId = metadata.organization_id;
   const userId = metadata.user_id;
 
   if (organizationId) {
-    // Downgrade org to starter (keep org but remove premium features)
+    // Downgrade org to free plan - credits remain in account
     await getSupabaseAdmin()
       .from('organizations')
       .update({
         stripe_subscription_id: null,
-        plan_type: 'team', // Basic team, no premium
+        plan_type: 'free',
+        subscription_ends_at: null, // Clear the scheduled end date
       })
       .eq('id', organizationId);
 
-    console.log(`Subscription cancelled for org ${organizationId}`);
+    console.log(`[Webhook] Subscription ended for org ${organizationId} - downgraded to free plan`);
   } else if (userId) {
     // Downgrade user to free
     await getSupabaseAdmin()
@@ -201,7 +252,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       .update({ plan_type: 'free' })
       .eq('id', userId);
 
-    console.log(`Subscription cancelled for user ${userId}`);
+    console.log(`[Webhook] Subscription ended for user ${userId} - downgraded to free plan`);
   }
 }
 

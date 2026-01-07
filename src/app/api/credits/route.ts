@@ -36,6 +36,18 @@ export async function GET() {
       10
     );
 
+    // Get subscription end date if scheduled to cancel
+    let subscriptionEndsAt: string | null = null;
+    if (balance.organization_id) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: org } = await (supabase as any)
+        .from('organizations')
+        .select('subscription_ends_at')
+        .eq('id', balance.organization_id)
+        .single();
+      subscriptionEndsAt = org?.subscription_ends_at || null;
+    }
+
     return NextResponse.json({
       balance: balance.balance,
       lifetime_credits: balance.lifetime_credits,
@@ -43,6 +55,7 @@ export async function GET() {
       source: balance.source,
       organization_id: balance.organization_id,
       plan,
+      subscription_ends_at: subscriptionEndsAt,
       limits: {
         dashboards: {
           current: dashboardStatus.current,

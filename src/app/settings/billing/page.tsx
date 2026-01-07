@@ -12,6 +12,7 @@ interface CreditInfo {
   source: 'organization' | 'user';
   organization_id?: string;
   plan: string;
+  subscription_ends_at?: string | null;
   limits: {
     dashboards: {
       current: number;
@@ -38,7 +39,8 @@ const creditPacks = [
 const plans = [
   {
     name: 'Free',
-    price: 0,
+    monthlyPrice: 0,
+    annualPrice: 0,
     credits: '100 one-time',
     features: ['Unlimited dashboards', 'Public sharing only', 'Zeno branding'],
     current: false,
@@ -46,14 +48,16 @@ const plans = [
   },
   {
     name: 'Starter',
-    price: 10,
+    monthlyPrice: 10,
+    annualPrice: 8,
     credits: '100/seat/mo',
     features: ['Unlimited dashboards', 'Private sharing', 'Custom subdomain', 'Email support'],
     plan: 'starter',
   },
   {
     name: 'Pro',
-    price: 25,
+    monthlyPrice: 25,
+    annualPrice: 20,
     credits: '250/seat/mo',
     features: ['Remove Zeno branding', 'Custom domain', 'Custom branding', 'Google Sheets', 'Priority support'],
     popular: true,
@@ -65,6 +69,7 @@ export default function BillingPage() {
   const [creditInfo, setCreditInfo] = useState<CreditInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState<string | null>(null);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
 
   useEffect(() => {
     fetchCredits();
@@ -120,7 +125,7 @@ export default function BillingPage() {
         body: JSON.stringify({
           type: 'subscription',
           plan,
-          billing_cycle: 'annual',
+          billing_cycle: billingCycle,
           seats: 1,
           organization_id: creditInfo?.organization_id,
         }),
@@ -132,6 +137,16 @@ export default function BillingPage() {
         throw new Error(data.error || 'Failed to create checkout session');
       }
 
+      // If subscription was updated inline (no redirect needed)
+      if (data.success) {
+        toast.success(data.message || 'Subscription updated successfully');
+        // Refresh the page to show updated plan
+        await fetchCredits();
+        setIsCheckoutLoading(null);
+        return;
+      }
+
+      // Otherwise redirect to Stripe checkout
       window.location.href = data.url;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to start checkout');
@@ -257,6 +272,10 @@ export default function BillingPage() {
                   <span className="px-2.5 py-1 text-xs font-medium bg-[var(--color-gray-100)] text-[var(--color-gray-600)] rounded-full">
                     Free Tier
                   </span>
+                ) : creditInfo?.subscription_ends_at ? (
+                  <span className="px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
+                    Canceling
+                  </span>
                 ) : (
                   <span className="px-2.5 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
                     Active
@@ -266,6 +285,10 @@ export default function BillingPage() {
               {currentPlan === 'free' ? (
                 <p className="text-sm text-[var(--color-gray-600)]">
                   Upgrade to get more credits monthly and unlock premium features.
+                </p>
+              ) : creditInfo?.subscription_ends_at ? (
+                <p className="text-sm text-[var(--color-gray-600)]">
+                  Your plan is active until {new Date(creditInfo.subscription_ends_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </p>
               ) : (
                 <p className="text-sm text-[var(--color-gray-600)]">
@@ -289,8 +312,31 @@ export default function BillingPage() {
           </div>
         </div>
 
+        {/* Cancellation Notice */}
+        {currentPlan !== 'free' && creditInfo?.subscription_ends_at && (
+          <div className="px-6 py-4 bg-amber-50 border-t border-amber-100">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-amber-800">
+                  Your subscription is scheduled to cancel
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  You&apos;ll keep access to {currentPlan === 'starter' ? 'Starter' : 'Pro'} features until {new Date(creditInfo.subscription_ends_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.
+                  After that, you&apos;ll be downgraded to the Free plan. Your credits will remain in your account.
+                </p>
+                <p className="text-sm text-amber-700 mt-2">
+                  Changed your mind? Click &quot;Manage Subscription&quot; to reactivate.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Subscription Details for Paid Plans */}
-        {currentPlan !== 'free' && (
+        {currentPlan !== 'free' && !creditInfo?.subscription_ends_at && (
           <div className="px-6 py-4 bg-[var(--color-gray-50)] border-t border-[var(--color-gray-100)]">
             <div className="flex items-center justify-between text-sm">
               <span className="text-[var(--color-gray-600)]">
@@ -354,67 +400,117 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Upgrade Plans (only show if on free) */}
-      {currentPlan === 'free' && (
-        <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-8">
-          <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-4">Upgrade Your Plan</h2>
-          <p className="text-sm text-[var(--color-gray-500)] mb-6">
-            Get more credits monthly, unlock premium features, and remove limits.
-          </p>
+      {/* Upgrade Plans (show if can upgrade to a higher plan) */}
+      {(() => {
+        const planOrder = ['free', 'starter', 'pro'];
+        const currentIndex = planOrder.indexOf(currentPlan);
+        const availablePlans = plans.filter(p => {
+          const planIndex = planOrder.indexOf(p.plan);
+          return planIndex > currentIndex;
+        });
 
-          <div className="grid md:grid-cols-2 gap-4">
-            {plans.filter(p => p.plan !== 'free').map((plan) => (
-              <div
-                key={plan.name}
-                className={`relative rounded-xl p-5 border ${
-                  plan.popular
-                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
-                    : 'border-[var(--color-gray-200)]'
-                }`}
-              >
-                {plan.popular && (
-                  <span className="absolute -top-2.5 left-4 bg-[var(--color-primary)] text-white text-xs font-medium px-2 py-0.5 rounded-full">
-                    Most Popular
-                  </span>
-                )}
+        if (availablePlans.length === 0) return null;
 
-                <h3 className="font-semibold text-lg mb-1">{plan.name}</h3>
-                <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-2xl font-bold">${plan.price}</span>
-                  <span className="text-[var(--color-gray-500)]">/seat/mo</span>
-                </div>
+        return (
+          <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-8">
+            <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-4">
+              {currentPlan === 'free' ? 'Upgrade Your Plan' : 'Upgrade to Pro'}
+            </h2>
+            <p className="text-sm text-[var(--color-gray-500)] mb-4">
+              {currentPlan === 'free'
+                ? 'Get more credits monthly, unlock premium features, and remove limits.'
+                : 'Get 250 credits/seat/month, remove Zeno branding, and unlock premium features.'}
+            </p>
 
-                <div className="flex items-center gap-2 mb-4 text-sm text-[var(--color-primary)]">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  {plan.credits}
-                </div>
-
-                <ul className="space-y-2 mb-4">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm">
-                      <svg className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-
-                <Button
-                  onClick={() => handleUpgrade(plan.plan)}
-                  disabled={isCheckoutLoading === plan.plan}
-                  variant={plan.popular ? 'default' : 'outline'}
-                  className="w-full"
+            {/* Billing Toggle */}
+            <div className="flex justify-center mb-6">
+              <div className="inline-flex items-center gap-2 bg-[var(--color-gray-100)] rounded-full p-1">
+                <button
+                  onClick={() => setBillingCycle('monthly')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    billingCycle === 'monthly'
+                      ? 'bg-white text-[var(--color-gray-900)] shadow-sm'
+                      : 'text-[var(--color-gray-600)]'
+                  }`}
                 >
-                  {isCheckoutLoading === plan.plan ? 'Loading...' : `Upgrade to ${plan.name}`}
-                </Button>
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingCycle('annual')}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    billingCycle === 'annual'
+                      ? 'bg-white text-[var(--color-gray-900)] shadow-sm'
+                      : 'text-[var(--color-gray-600)]'
+                  }`}
+                >
+                  Annual
+                  <span className="ml-1 text-xs text-green-600">Save 20%</span>
+                </button>
               </div>
-            ))}
+            </div>
+
+            <div className={`grid gap-4 ${availablePlans.length > 1 ? 'md:grid-cols-2' : 'max-w-md mx-auto'}`}>
+              {availablePlans.map((plan) => {
+                const price = billingCycle === 'annual' ? plan.annualPrice : plan.monthlyPrice;
+                return (
+                  <div
+                    key={plan.name}
+                    className={`relative rounded-xl p-5 border ${
+                      plan.popular
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
+                        : 'border-[var(--color-gray-200)]'
+                    }`}
+                  >
+                    {plan.popular && (
+                      <span className="absolute -top-2.5 left-4 bg-[var(--color-primary)] text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                        {currentPlan === 'starter' ? 'Recommended' : 'Most Popular'}
+                      </span>
+                    )}
+
+                    <h3 className="font-semibold text-lg mb-1">{plan.name}</h3>
+                    <div className="flex items-baseline gap-1 mb-2">
+                      <span className="text-2xl font-bold">${price}</span>
+                      <span className="text-[var(--color-gray-500)]">/seat/mo</span>
+                    </div>
+                    {billingCycle === 'annual' && (
+                      <p className="text-xs text-[var(--color-gray-400)] mb-2">
+                        Billed annually (${price * 12}/seat/year)
+                      </p>
+                    )}
+
+                    <div className="flex items-center gap-2 mb-4 text-sm text-[var(--color-primary)]">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      {plan.credits}
+                    </div>
+
+                    <ul className="space-y-2 mb-4">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-start gap-2 text-sm">
+                          <svg className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Button
+                      onClick={() => handleUpgrade(plan.plan)}
+                      disabled={isCheckoutLoading === plan.plan}
+                      variant={plan.popular ? 'default' : 'outline'}
+                      className="w-full"
+                    >
+                      {isCheckoutLoading === plan.plan ? 'Loading...' : `Upgrade to ${plan.name}`}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Transaction History */}
       <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6">
