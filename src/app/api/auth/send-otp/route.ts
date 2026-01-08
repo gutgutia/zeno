@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   try {
     // Check IP-based rate limit first (before parsing body)
     const clientIP = getClientIP(request);
-    const ipRateLimit = checkRateLimit(clientIP, 'send-otp-ip', IP_RATE_LIMIT);
+    const ipRateLimit = await checkRateLimit(clientIP, 'send-otp-ip', IP_RATE_LIMIT);
 
     if (!ipRateLimit.allowed) {
       const retryAfterSeconds = Math.ceil((ipRateLimit.resetTime - Date.now()) / 1000);
