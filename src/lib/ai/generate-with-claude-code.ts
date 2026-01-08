@@ -126,13 +126,46 @@ export async function generateWithClaudeCode(
     console.log('[Claude Code E2B] Running Claude Code CLI...');
     const commandStartTime = Date.now();
 
-    const result = await sandbox.commands.run(
-      `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`,
-      {
-        timeoutMs: CLAUDE_CODE_CONFIG.commandTimeoutMs,
-        cwd: '/home/user',
+    // First, check if claude is installed and what version
+    const versionCheck = await sandbox.commands.run('which claude && claude --version', {
+      timeoutMs: 30000,
+      cwd: '/home/user',
+    }).catch((err) => {
+      console.log('[Claude Code E2B] Version check failed:', err.message);
+      return { stdout: '', stderr: err.message, exitCode: 1 };
+    });
+    console.log('[Claude Code E2B] Claude CLI check:', versionCheck.stdout || versionCheck.stderr);
+
+    // Run the actual command
+    let result;
+    try {
+      result = await sandbox.commands.run(
+        `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`,
+        {
+          timeoutMs: CLAUDE_CODE_CONFIG.commandTimeoutMs,
+          cwd: '/home/user',
+        }
+      );
+    } catch (cmdError: unknown) {
+      // E2B throws on non-zero exit codes - extract the result from the error
+      console.error('[Claude Code E2B] Command failed with error:', cmdError);
+
+      // Try to extract stdout/stderr from the error
+      const err = cmdError as { result?: { stdout?: string; stderr?: string; exitCode?: number }; message?: string };
+      if (err.result) {
+        console.log('[Claude Code E2B] Error stdout:', err.result.stdout?.slice(0, 1000) || '(empty)');
+        console.log('[Claude Code E2B] Error stderr:', err.result.stderr?.slice(0, 1000) || '(empty)');
+        console.log('[Claude Code E2B] Error exit code:', err.result.exitCode);
       }
-    );
+
+      // Check if ANTHROPIC_API_KEY is available in the sandbox
+      const envCheck = await sandbox.commands.run('echo "ANTHROPIC_API_KEY set: ${ANTHROPIC_API_KEY:+yes}"', {
+        timeoutMs: 5000,
+      }).catch(() => ({ stdout: 'failed to check', stderr: '', exitCode: 1 }));
+      console.log('[Claude Code E2B] API key check in sandbox:', envCheck.stdout);
+
+      throw cmdError;
+    }
 
     const commandDuration = Date.now() - commandStartTime;
     console.log(`[Claude Code E2B] Claude Code completed in ${commandDuration}ms`);
