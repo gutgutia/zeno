@@ -29,13 +29,24 @@ const getAgent = async (): Promise<{
   const { generateWithAgent, AGENT_CONFIG, generateWithClaudeCode, isClaudeCodeE2BAvailable } = await import('@/lib/ai/agent');
   console.log('[Generate] Agent module loaded successfully');
 
+  // Debug: Log configuration
+  console.log('[Generate] AGENT_CONFIG.useClaudeCodeE2B:', AGENT_CONFIG.useClaudeCodeE2B);
+  const e2bAvailable = isClaudeCodeE2BAvailable();
+  console.log('[Generate] isClaudeCodeE2BAvailable():', e2bAvailable);
+
   // Check if we should use the new Claude Code E2B approach
-  if (AGENT_CONFIG.useClaudeCodeE2B && isClaudeCodeE2BAvailable()) {
-    console.log('[Generate] Using Claude Code E2B approach (full Claude Code capabilities)');
+  if (AGENT_CONFIG.useClaudeCodeE2B && e2bAvailable) {
+    console.log('[Generate] ✅ Using Claude Code E2B approach (full Claude Code capabilities)');
     return { generator: generateWithClaudeCode as (rawContent: string, branding: BrandingConfig | null, userInstructions?: string) => Promise<GenerationResult>, isClaudeCodeE2B: true };
   }
 
-  console.log('[Generate] Using MCP-based agent approach');
+  console.log('[Generate] ⚠️ Falling back to MCP-based agent approach');
+  if (!AGENT_CONFIG.useClaudeCodeE2B) {
+    console.log('[Generate] Reason: useClaudeCodeE2B is disabled in AGENT_CONFIG');
+  }
+  if (!e2bAvailable) {
+    console.log('[Generate] Reason: E2B not available (check E2B_API_KEY and ANTHROPIC_API_KEY env vars)');
+  }
   return { generator: generateWithAgent as (rawContent: string, branding: BrandingConfig | null, userInstructions?: string) => Promise<GenerationResult>, isClaudeCodeE2B: false };
 };
 

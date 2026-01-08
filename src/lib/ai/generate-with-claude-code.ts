@@ -239,5 +239,14 @@ export async function generateWithClaudeCode(
  * (requires E2B_API_KEY to be set)
  */
 export function isClaudeCodeE2BAvailable(): boolean {
-  return !!(process.env.E2B_API_KEY && process.env.ANTHROPIC_API_KEY);
+  const hasE2BKey = !!process.env.E2B_API_KEY;
+  const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
+
+  console.log('[Claude Code E2B] Availability check:', {
+    hasE2BKey,
+    hasAnthropicKey,
+    available: hasE2BKey && hasAnthropicKey,
+  });
+
+  return hasE2BKey && hasAnthropicKey;
 }
