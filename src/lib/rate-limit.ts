@@ -1,44 +1,20 @@
 /**
- * Simple in-memory rate limiter for API endpoints.
- * Tracks requests by identifier (typically IP address) with configurable limits.
+ * Database-backed rate limiter for API endpoints.
+ * Uses Supabase to persist rate limit data across serverless invocations.
  *
- * Note: This is suitable for single-instance deployments.
- * For multi-instance deployments, consider using Redis or a similar distributed store.
+ * This ensures rate limiting works correctly in:
+ * - Serverless environments (cold starts)
+ * - Multi-instance deployments
+ * - Edge functions
  */
 
-interface RateLimitEntry {
-  count: number;
-  resetTime: number;
-}
+import { createAdminClient } from '@/lib/supabase/admin';
 
 interface RateLimitConfig {
   /** Maximum number of requests allowed within the window */
   maxRequests: number;
   /** Time window in milliseconds */
   windowMs: number;
-}
-
-// In-memory store for rate limit tracking
-const rateLimitStore = new Map<string, RateLimitEntry>();
-
-// Cleanup interval to prevent memory leaks (runs every 5 minutes)
-const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
-let cleanupInterval: NodeJS.Timeout | null = null;
-
-function startCleanup() {
-  if (cleanupInterval) return;
-
-  cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of rateLimitStore.entries()) {
-      if (now > entry.resetTime) {
-        rateLimitStore.delete(key);
-      }
-    }
-  }, CLEANUP_INTERVAL_MS);
-
-  // Don't prevent Node from exiting
-  cleanupInterval.unref();
 }
 
 export interface RateLimitResult {
@@ -53,52 +29,66 @@ export interface RateLimitResult {
 }
 
 /**
- * Check if a request should be rate limited.
+ * Check if a request should be rate limited using database-backed storage.
  *
- * @param identifier - Unique identifier for the client (e.g., IP address, user ID)
+ * @param identifier - Unique identifier for the client (e.g., IP address)
  * @param namespace - Namespace to separate different rate limit contexts (e.g., 'otp', 'api')
  * @param config - Rate limit configuration
  * @returns Rate limit result with allowed status and metadata
- *
- * @example
- * ```ts
- * const result = checkRateLimit(clientIP, 'otp', { maxRequests: 10, windowMs: 5 * 60 * 1000 });
- * if (!result.allowed) {
- *   return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
- * }
- * ```
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   identifier: string,
   namespace: string,
   config: RateLimitConfig
-): RateLimitResult {
-  startCleanup();
-
+): Promise<RateLimitResult> {
+  const supabase = createAdminClient();
   const key = `${namespace}:${identifier}`;
   const now = Date.now();
+  const windowStart = new Date(now - config.windowMs).toISOString();
 
-  let entry = rateLimitStore.get(key);
+  // Count requests in the current window
+  const { count, error } = await supabase
+    .from('rate_limits')
+    .select('*', { count: 'exact', head: true })
+    .eq('key', key)
+    .gt('created_at', windowStart);
 
-  // If no entry exists or the window has expired, create a new one
-  if (!entry || now > entry.resetTime) {
-    entry = {
-      count: 0,
+  if (error) {
+    console.error('Rate limit check failed:', error);
+    // Fail open - allow the request if we can't check
+    return {
+      allowed: true,
+      remaining: config.maxRequests,
       resetTime: now + config.windowMs,
+      limit: config.maxRequests,
     };
   }
 
-  // Increment the request count
-  entry.count++;
-  rateLimitStore.set(key, entry);
+  const requestCount = count || 0;
+  const allowed = requestCount < config.maxRequests;
+  const remaining = Math.max(0, config.maxRequests - requestCount - 1);
 
-  const allowed = entry.count <= config.maxRequests;
-  const remaining = Math.max(0, config.maxRequests - entry.count);
+  // Record this request if allowed
+  if (allowed) {
+    await supabase.from('rate_limits').insert({
+      key,
+      created_at: new Date(now).toISOString(),
+    });
+  }
+
+  // Clean up old entries periodically (1% chance per request to avoid overhead)
+  if (Math.random() < 0.01) {
+    const cleanupThreshold = new Date(now - config.windowMs * 2).toISOString();
+    await supabase
+      .from('rate_limits')
+      .delete()
+      .lt('created_at', cleanupThreshold);
+  }
 
   return {
     allowed,
     remaining,
-    resetTime: entry.resetTime,
+    resetTime: now + config.windowMs,
     limit: config.maxRequests,
   };
 }
