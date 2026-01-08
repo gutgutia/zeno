@@ -4,14 +4,39 @@ import { NextResponse } from 'next/server';
 import type { Dashboard, BrandingConfig } from '@/types/database';
 import { createVersion } from '@/lib/versions';
 import { getCreditBalance, deductCredits, hasEnoughCredits } from '@/lib/credits';
-import { logUsage } from '@/lib/costs';
+import { logUsage, type ModelId, type TokenUsage } from '@/lib/costs';
+import type { DashboardConfig } from '@/types/dashboard';
+
+// Unified result type for both generation approaches
+interface GenerationResult {
+  config: DashboardConfig;
+  usage: {
+    durationMs: number;
+    modelId: string;
+    // Optional fields (MCP approach has these, Claude Code E2B doesn't)
+    usage?: TokenUsage;
+    costUsd?: number;
+    turnCount?: number;
+  };
+}
 
 // Lazy load the agent to prevent startup issues
-const getAgent = async () => {
+const getAgent = async (): Promise<{
+  generator: (rawContent: string, branding: BrandingConfig | null, userInstructions?: string) => Promise<GenerationResult>;
+  isClaudeCodeE2B: boolean;
+}> => {
   console.log('[Generate] Lazy loading agent module...');
-  const { generateWithAgent } = await import('@/lib/ai/agent');
+  const { generateWithAgent, AGENT_CONFIG, generateWithClaudeCode, isClaudeCodeE2BAvailable } = await import('@/lib/ai/agent');
   console.log('[Generate] Agent module loaded successfully');
-  return generateWithAgent;
+
+  // Check if we should use the new Claude Code E2B approach
+  if (AGENT_CONFIG.useClaudeCodeE2B && isClaudeCodeE2BAvailable()) {
+    console.log('[Generate] Using Claude Code E2B approach (full Claude Code capabilities)');
+    return { generator: generateWithClaudeCode as (rawContent: string, branding: BrandingConfig | null, userInstructions?: string) => Promise<GenerationResult>, isClaudeCodeE2B: true };
+  }
+
+  console.log('[Generate] Using MCP-based agent approach');
+  return { generator: generateWithAgent as (rawContent: string, branding: BrandingConfig | null, userInstructions?: string) => Promise<GenerationResult>, isClaudeCodeE2B: false };
 };
 
 // Allow long-running requests for agent loops
@@ -154,12 +179,12 @@ export async function POST(request: Request, { params }: RouteParams) {
       .eq('id', id);
 
     try {
-      // Agentic generation with E2B Python sandbox
-      console.log(`[${id}] Starting agentic generation with E2B sandbox...`);
-      console.log(`[${id}] About to load agent module...`);
-      const generateWithAgent = await getAgent();
-      console.log(`[${id}] Agent module loaded, calling generateWithAgent...`);
-      const result = await generateWithAgent(
+      // Get the appropriate generator (Claude Code E2B or MCP-based)
+      console.log(`[${id}] Loading generation module...`);
+      const { generator, isClaudeCodeE2B } = await getAgent();
+      console.log(`[${id}] Starting generation (Claude Code E2B: ${isClaudeCodeE2B})...`);
+
+      const result = await generator(
         rawContent,
         effectiveBranding,
         dashboard.user_instructions || undefined
@@ -167,7 +192,14 @@ export async function POST(request: Request, { params }: RouteParams) {
       const config = result.config;
       const agentUsage = result.usage;
       console.log(`[${id}] Generation complete. HTML length: ${config.html?.length || 0}`);
-      console.log(`[${id}] Usage: ${agentUsage.usage.inputTokens} input, ${agentUsage.usage.outputTokens} output, cost: $${agentUsage.costUsd.toFixed(4)}`);
+
+      // Log usage differently based on approach
+      if (isClaudeCodeE2B) {
+        console.log(`[${id}] Duration: ${agentUsage.durationMs}ms (Claude Code E2B - token usage tracked by Claude internally)`);
+      } else if (agentUsage.usage && agentUsage.costUsd !== undefined) {
+        // MCP approach has detailed usage
+        console.log(`[${id}] Usage: ${agentUsage.usage.inputTokens} input, ${agentUsage.usage.outputTokens} output, cost: $${agentUsage.costUsd.toFixed(4)}`);
+      }
 
       // Update the dashboard with the generated config
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -189,19 +221,33 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
 
       // Use actual token counts from agent for credit deduction
-      const actualInputTokens = agentUsage.usage.inputTokens || 0;
-      const actualOutputTokens = agentUsage.usage.outputTokens || 0;
+      // For Claude Code E2B, we use estimated credits since token usage is internal
+      const actualInputTokens = agentUsage.usage?.inputTokens || 0;
+      const actualOutputTokens = agentUsage.usage?.outputTokens || 0;
+
+      // For Claude Code E2B approach, use estimated credits if no token data
+      const useEstimatedCredits = isClaudeCodeE2B || (actualInputTokens === 0 && actualOutputTokens === 0);
 
       // Deduct credits for successful generation
-      const deductionResult = await deductCredits(
-        userId,
-        actualInputTokens,
-        actualOutputTokens,
-        'dashboard_create',
-        id,
-        `Generated dashboard: ${dashboard.title}`,
-        supabase
-      );
+      const deductionResult = useEstimatedCredits
+        ? await deductCredits(
+            userId,
+            150000, // Estimated input tokens for Claude Code generation
+            50000,  // Estimated output tokens
+            'dashboard_create',
+            id,
+            `Generated dashboard (Claude Code E2B): ${dashboard.title}`,
+            supabase
+          )
+        : await deductCredits(
+            userId,
+            actualInputTokens,
+            actualOutputTokens,
+            'dashboard_create',
+            id,
+            `Generated dashboard: ${dashboard.title}`,
+            supabase
+          );
 
       if (!deductionResult.success) {
         console.warn(`[${id}] Failed to deduct credits:`, deductionResult.error);
@@ -221,13 +267,21 @@ export async function POST(request: Request, { params }: RouteParams) {
         .single();
 
       // Log usage to ai_usage_logs
+      // Normalize model ID to valid type
+      const logModelId: ModelId = (agentUsage.modelId === 'opus-4-5' || agentUsage.modelId === 'sonnet-4-5' || agentUsage.modelId === 'haiku-3-5')
+        ? agentUsage.modelId
+        : 'opus-4-5';
+
+      // Use actual usage if available, otherwise estimate
+      const logTokenUsage: TokenUsage = agentUsage.usage || { inputTokens: 150000, outputTokens: 50000 };
+
       await logUsage(supabase, {
         dashboardId: id,
         userId,
         organizationId: membership?.organization_id || null,
         operationType: 'generation',
-        modelId: 'opus-4-5',
-        usage: agentUsage.usage,
+        modelId: logModelId,
+        usage: logTokenUsage,
         agentReportedCost: agentUsage.costUsd,
         durationMs: agentUsage.durationMs,
         turnCount: agentUsage.turnCount,
@@ -235,7 +289,8 @@ export async function POST(request: Request, { params }: RouteParams) {
         status: 'success',
         metadata: {
           userInstructions: dashboard.user_instructions,
-          extendedThinking: true,
+          extendedThinking: !isClaudeCodeE2B,
+          claudeCodeE2B: isClaudeCodeE2B,
         },
       });
 

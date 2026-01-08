@@ -20,6 +20,8 @@ export interface DashboardConfig {
     agentGenerated?: boolean;
     turnCount?: number;
     extendedThinking?: boolean;
+    // Claude Code E2B approach flag
+    claudeCodeE2B?: boolean;
     // Refresh-related fields
     lastRefreshedAt?: string;
     refreshSummary?: string;

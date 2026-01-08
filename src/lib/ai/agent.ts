@@ -132,6 +132,12 @@ export const AGENT_CONFIG = {
   // This is faster, cheaper, and more predictable
   // Falls back to full regeneration for major schema changes
   useDirectRefresh: true,
+
+  // Use Claude Code CLI running inside E2B sandbox for generation
+  // This gives Claude full access to Bash, Read, Write, Edit, Glob, Grep
+  // Should produce higher quality dashboards through iterative development
+  // Set to false to use the MCP-based approach (limited to execute_python only)
+  useClaudeCodeE2B: true,
 };
 // ============================================================================
 
@@ -965,6 +971,11 @@ export async function refreshDashboardWithAgent(
  * Re-export diff utilities for use by endpoints
  */
 export { computeDataDiff, formatDiffForAI, type DataDiff } from '@/lib/data/diff';
+
+/**
+ * Re-export Claude Code E2B generation for use by endpoints
+ */
+export { generateWithClaudeCode, isClaudeCodeE2BAvailable } from './generate-with-claude-code';
 
 /**
  * Result from modifying a dashboard
