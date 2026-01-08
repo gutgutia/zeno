@@ -98,6 +98,7 @@ export async function generateWithClaudeCode(
   const startTime = Date.now();
 
   // Create sandbox with Claude Code template
+  // IMPORTANT: You must build this template first using scripts/build-e2b-template.ts
   console.log('[Claude Code E2B] Creating sandbox with claude-code template...');
 
   let sandbox: Sandbox | null = null;
