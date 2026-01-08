@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { sendWelcomeEmail } from '@/lib/email/send';
+import { sendWelcomeEmail, sendNewUserNotificationEmail } from '@/lib/email/send';
 
 const MAX_ATTEMPTS = 5;
 
@@ -161,10 +161,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to sign in' }, { status: 500 });
     }
 
-    // Send welcome email for new users (async, don't wait)
+    // Send welcome email and admin notification for new users (async, don't wait)
     if (isNewUser) {
       sendWelcomeEmail({ to: normalizedEmail }).catch((err) => {
         console.error('Failed to send welcome email:', err);
+      });
+      sendNewUserNotificationEmail({ userEmail: normalizedEmail }).catch((err) => {
+        console.error('Failed to send new user notification email:', err);
       });
     }
 

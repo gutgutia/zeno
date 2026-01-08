@@ -3,6 +3,9 @@ import { OTPEmail } from './templates/otp-email';
 import { WelcomeEmail } from './templates/welcome-email';
 import { DashboardReadyEmail } from './templates/dashboard-ready-email';
 import { DashboardUpdatedEmail } from './templates/dashboard-updated-email';
+import { NewUserNotificationEmail } from './templates/new-user-notification-email';
+
+const ADMIN_EMAIL = 'abhishek.gutgutia@gmail.com';
 
 export interface SendOTPEmailParams {
   to: string;
@@ -125,6 +128,34 @@ export async function sendDashboardUpdatedEmail({
   if (error) {
     console.error('Failed to send dashboard updated email:', error);
     throw new Error(`Failed to send dashboard updated email: ${error.message}`);
+  }
+
+  return data;
+}
+
+export interface SendNewUserNotificationEmailParams {
+  userEmail: string;
+}
+
+export async function sendNewUserNotificationEmail({
+  userEmail,
+}: SendNewUserNotificationEmailParams) {
+  const signupTime = new Date().toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+
+  const { data, error } = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: ADMIN_EMAIL,
+    subject: `New Zeno signup: ${userEmail}`,
+    react: NewUserNotificationEmail({ userEmail, signupTime }),
+  });
+
+  if (error) {
+    console.error('Failed to send new user notification email:', error);
+    throw new Error(`Failed to send new user notification email: ${error.message}`);
   }
 
   return data;
