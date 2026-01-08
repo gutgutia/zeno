@@ -12,14 +12,7 @@ import { logUsage, type ModelId } from '@/lib/costs';
 import { sendDashboardUpdatedEmail } from '@/lib/email/send';
 import { AGENT_CONFIG } from '@/lib/ai/agent';
 import { refreshDashboardDirect, needsRegeneration } from '@/lib/ai/refresh-direct';
-
-// Lazy load the agent to prevent startup issues with subprocess spawning
-const getRefreshAgent = async () => {
-  console.log('[Refresh] Lazy loading agent module...');
-  const { refreshDashboardWithAgent } = await import('@/lib/ai/agent');
-  console.log('[Refresh] Agent module loaded successfully');
-  return refreshDashboardWithAgent;
-};
+import { refreshWithClaudeCode } from '@/lib/ai/refresh-with-claude-code';
 
 export const maxDuration = 300; // 5 minutes for agent refresh
 
@@ -274,6 +267,7 @@ export async function POST(
         warnings?: string[];
         usage: { usage: { inputTokens: number; outputTokens: number }; costUsd: number; durationMs: number; turnCount: number; modelId: string };
       };
+      let usedClaudeCodeE2B = false;
 
       if (useDirectApproach) {
         // Try direct approach first
@@ -290,52 +284,91 @@ export async function POST(
         // Check if direct approach determined regeneration is needed
         if (needsRegeneration(directResult)) {
           console.log('[Refresh] Direct approach recommends regeneration:', directResult.reason);
-          console.log('[Refresh] Falling back to agent approach for regeneration...');
+          console.log('[Refresh] Falling back to Claude Code E2B for regeneration...');
 
-          // Fall back to agent for regeneration
-          const refreshDashboardWithAgent = await getRefreshAgent();
-          refreshResult = await refreshDashboardWithAgent(
+          // Fall back to Claude Code E2B for regeneration
+          const claudeCodeResult = await refreshWithClaudeCode(
             newContent,
             config,
             branding,
-            {
-              oldRawContent,
-              diff,
-            }
+            diff
           );
+          usedClaudeCodeE2B = true;
+
+          // Convert Claude Code E2B result to expected format
+          refreshResult = {
+            html: claudeCodeResult.html,
+            summary: claudeCodeResult.summary,
+            changes: claudeCodeResult.changes,
+            usage: {
+              usage: { inputTokens: 0, outputTokens: 0 }, // Claude Code tracks internally
+              costUsd: 0,
+              durationMs: claudeCodeResult.usage.durationMs,
+              turnCount: 0,
+              modelId: claudeCodeResult.usage.modelId,
+            },
+          };
         } else {
           // Direct approach succeeded
           refreshResult = directResult;
         }
       } else {
-        // Use agent approach directly
-        const refreshDashboardWithAgent = await getRefreshAgent();
-        refreshResult = await refreshDashboardWithAgent(
+        // Direct approach disabled, use Claude Code E2B directly
+        console.log('[Refresh] Using Claude Code E2B approach (direct disabled)...');
+        const claudeCodeResult = await refreshWithClaudeCode(
           newContent,
           config,
           branding,
-          {
-            oldRawContent,
-            diff,
-          }
+          diff
         );
+        usedClaudeCodeE2B = true;
+
+        // Convert Claude Code E2B result to expected format
+        refreshResult = {
+          html: claudeCodeResult.html,
+          summary: claudeCodeResult.summary,
+          changes: claudeCodeResult.changes,
+          usage: {
+            usage: { inputTokens: 0, outputTokens: 0 }, // Claude Code tracks internally
+            costUsd: 0,
+            durationMs: claudeCodeResult.usage.durationMs,
+            turnCount: 0,
+            modelId: claudeCodeResult.usage.modelId,
+          },
+        };
       }
 
-      console.log(`[Refresh] Usage: ${refreshResult.usage.usage.inputTokens} input, ${refreshResult.usage.usage.outputTokens} output, cost: $${refreshResult.usage.costUsd.toFixed(4)}`);
+      if (refreshResult.usage.usage.inputTokens > 0) {
+        console.log(`[Refresh] Usage: ${refreshResult.usage.usage.inputTokens} input, ${refreshResult.usage.usage.outputTokens} output, cost: $${refreshResult.usage.costUsd.toFixed(4)}`);
+      } else {
+        console.log(`[Refresh] Duration: ${refreshResult.usage.durationMs}ms (Claude Code E2B - token usage tracked internally)`);
+      }
 
       // Deduct credits based on actual usage
+      // For Claude Code E2B, use estimated tokens since usage is tracked internally
       const actualInputTokens = refreshResult.usage.usage.inputTokens || 0;
       const actualOutputTokens = refreshResult.usage.usage.outputTokens || 0;
+      const useEstimatedCredits = usedClaudeCodeE2B && actualInputTokens === 0;
 
-      const deductionResult = await deductCredits(
-        user.id,
-        actualInputTokens,
-        actualOutputTokens,
-        'dashboard_refresh',
-        id,
-        `Refreshed dashboard with new data`,
-        supabase
-      );
+      const deductionResult = useEstimatedCredits
+        ? await deductCredits(
+            user.id,
+            60000,  // Estimated input tokens for Claude Code E2B regeneration
+            25000,  // Estimated output tokens
+            'dashboard_refresh',
+            id,
+            `Refreshed dashboard with new data (Claude Code E2B regeneration)`,
+            supabase
+          )
+        : await deductCredits(
+            user.id,
+            actualInputTokens,
+            actualOutputTokens,
+            'dashboard_refresh',
+            id,
+            `Refreshed dashboard with new data`,
+            supabase
+          );
 
       if (!deductionResult.success) {
         console.warn(`[Refresh] Failed to deduct credits:`, deductionResult.error);
@@ -354,21 +387,26 @@ export async function POST(
         .single();
 
       // Log usage to ai_usage_logs
+      const logModelId = usedClaudeCodeE2B ? 'opus-4-5' : 'sonnet-4-5';
+      const logUsageData = refreshResult.usage.usage.inputTokens > 0
+        ? refreshResult.usage.usage
+        : { inputTokens: 60000, outputTokens: 25000 }; // Estimated for Claude Code E2B
+
       await logUsage(supabase, {
         dashboardId: id,
         userId: user.id,
         organizationId: membership?.organization_id || null,
         operationType: 'data_refresh',
-        modelId: refreshResult.usage.modelId as ModelId, // Use model from agent response
-        usage: refreshResult.usage.usage,
-        agentReportedCost: refreshResult.usage.costUsd,
+        modelId: logModelId as ModelId,
+        usage: logUsageData,
+        agentReportedCost: refreshResult.usage.costUsd || undefined,
         durationMs: refreshResult.usage.durationMs,
-        turnCount: refreshResult.usage.turnCount,
+        turnCount: refreshResult.usage.turnCount || undefined,
         creditsDeducted: deductionResult.success ? deductionResult.credits_used : 0,
         status: 'success',
         metadata: {
           isGoogleSheetSync,
-          extendedThinking: true,
+          claudeCodeE2B: usedClaudeCodeE2B,
         },
       });
 

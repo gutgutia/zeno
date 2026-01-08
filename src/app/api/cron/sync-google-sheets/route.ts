@@ -5,14 +5,9 @@ import { fetchSheetData, fetchMultipleSheets, computeContentHash } from '@/lib/g
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig, Dashboard, Workspace } from '@/types/database';
-
-// Lazy load the agent to prevent startup issues with subprocess spawning
-const getRefreshAgent = async () => {
-  console.log('[Sync] Lazy loading agent module...');
-  const { refreshDashboardWithAgent } = await import('@/lib/ai/agent');
-  console.log('[Sync] Agent module loaded successfully');
-  return refreshDashboardWithAgent;
-};
+import { computeDataDiff } from '@/lib/data/diff';
+import { refreshDashboardDirect, needsRegeneration } from '@/lib/ai/refresh-direct';
+import { refreshWithClaudeCode } from '@/lib/ai/refresh-with-claude-code';
 
 export const maxDuration = 300; // 5 minutes for batch processing
 
@@ -165,17 +160,31 @@ export async function GET(request: NextRequest) {
         );
 
         try {
-          // Lazy load the agent when needed
-          const refreshDashboardWithAgent = await getRefreshAgent();
-          const refreshResult = await refreshDashboardWithAgent(
+          // Compute diff
+          const oldRawContent = dashboard.raw_content || '';
+          const diff = computeDataDiff(oldRawContent, newContent);
+
+          // Try direct approach first
+          let refreshResult: { html: string; summary: string };
+          const directResult = await refreshDashboardDirect(
             newContent,
             config,
             branding,
-            {
-              // Pass old content for diff computation
-              oldRawContent: dashboard.raw_content || '',
-            }
+            { oldRawContent, diff }
           );
+
+          if (needsRegeneration(directResult)) {
+            console.log(`[Sync] Direct approach recommends regeneration for ${dashboard.id}, using Claude Code E2B...`);
+            const claudeCodeResult = await refreshWithClaudeCode(
+              newContent,
+              config,
+              branding,
+              diff
+            );
+            refreshResult = { html: claudeCodeResult.html, summary: claudeCodeResult.summary };
+          } else {
+            refreshResult = directResult;
+          }
 
           // Update dashboard
           const updatedConfig: DashboardConfig = {

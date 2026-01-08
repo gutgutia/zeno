@@ -7,7 +7,9 @@ export {
 } from './prompts';
 export {
   generateWithAgent,
-  refreshDashboardWithAgent,
-  modifyDashboardWithAgent,
+  generateWithClaudeCode,
+  isClaudeCodeE2BAvailable,
 } from './agent';
-export type { RefreshResult, ModifyResult } from './agent';
+export { modifyWithClaudeCode } from './modify-with-claude-code';
+export { refreshWithClaudeCode } from './refresh-with-claude-code';
+export type { ModifyResult } from './agent';

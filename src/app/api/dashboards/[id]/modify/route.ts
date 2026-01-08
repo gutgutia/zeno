@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server';
 import type { Dashboard, BrandingConfig } from '@/types/database';
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
-import { modifyDashboardWithAgent, AGENT_CONFIG } from '@/lib/ai/agent';
+import { AGENT_CONFIG } from '@/lib/ai/agent';
 import { modifyDashboardDirect } from '@/lib/ai/modify-direct';
+import { modifyWithClaudeCode } from '@/lib/ai/modify-with-claude-code';
 import { createVersion } from '@/lib/versions';
 import { deductCredits, hasEnoughCredits, getCreditBalance } from '@/lib/credits';
 import { logUsage } from '@/lib/costs';
@@ -89,41 +90,80 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Get raw content for reference
     const rawContent = dashboard.raw_content || '';
 
-    // Choose modification approach based on config
-    const useDirectApproach = AGENT_CONFIG.useDirectModify;
-    console.log(`[Modify API] Starting modification (${useDirectApproach ? 'direct' : 'agent'} approach)...`);
+    // Modification approach: Direct first, Claude Code E2B fallback
+    // Direct is fast and cheap for simple edits
+    // Claude Code E2B is powerful for complex modifications
+    let modifyResult;
+    let usedClaudeCodeE2B = false;
 
-    // Call the appropriate modify function
-    const modifyResult = useDirectApproach
-      ? await modifyDashboardDirect(
-          currentConfig.html,
-          rawContent,
-          instructions,
-          branding
-        )
-      : await modifyDashboardWithAgent(
+    if (AGENT_CONFIG.useDirectModify) {
+      console.log('[Modify API] Trying direct modification approach...');
+      try {
+        modifyResult = await modifyDashboardDirect(
           currentConfig.html,
           rawContent,
           instructions,
           branding
         );
+        console.log('[Modify API] Direct modification succeeded');
+      } catch (directError) {
+        console.warn('[Modify API] Direct modification failed:', directError instanceof Error ? directError.message : directError);
+        console.log('[Modify API] Falling back to Claude Code E2B...');
 
-    console.log(`[Modify API] Modification complete (${useDirectApproach ? 'direct' : 'agent'})`);
-    console.log(`[Modify API] Usage: ${modifyResult.usage.usage.inputTokens} input, ${modifyResult.usage.usage.outputTokens} output, cost: $${modifyResult.usage.costUsd.toFixed(4)}`);
+        // Fallback to Claude Code E2B for complex modifications
+        modifyResult = await modifyWithClaudeCode(
+          currentConfig.html,
+          rawContent,
+          instructions,
+          branding
+        );
+        usedClaudeCodeE2B = true;
+        console.log('[Modify API] Claude Code E2B modification succeeded');
+      }
+    } else {
+      // Direct approach disabled, use Claude Code E2B directly
+      console.log('[Modify API] Using Claude Code E2B approach (direct disabled)...');
+      modifyResult = await modifyWithClaudeCode(
+        currentConfig.html,
+        rawContent,
+        instructions,
+        branding
+      );
+      usedClaudeCodeE2B = true;
+    }
+
+    console.log(`[Modify API] Modification complete (${usedClaudeCodeE2B ? 'Claude Code E2B' : 'direct'})`);
+    if (modifyResult.usage.usage.inputTokens > 0) {
+      console.log(`[Modify API] Usage: ${modifyResult.usage.usage.inputTokens} input, ${modifyResult.usage.usage.outputTokens} output, cost: $${modifyResult.usage.costUsd.toFixed(4)}`);
+    } else {
+      console.log(`[Modify API] Duration: ${modifyResult.usage.durationMs}ms (Claude Code E2B - token usage tracked internally)`);
+    }
 
     // Deduct credits based on actual usage
+    // For Claude Code E2B, use estimated tokens since usage is tracked internally
     const actualInputTokens = modifyResult.usage.usage.inputTokens || 0;
     const actualOutputTokens = modifyResult.usage.usage.outputTokens || 0;
+    const useEstimatedCredits = usedClaudeCodeE2B && actualInputTokens === 0;
 
-    const deductionResult = await deductCredits(
-      user.id,
-      actualInputTokens,
-      actualOutputTokens,
-      'dashboard_update',
-      id,
-      `Modified dashboard: ${instructions.slice(0, 50)}...`,
-      supabase
-    );
+    const deductionResult = useEstimatedCredits
+      ? await deductCredits(
+          user.id,
+          50000,  // Estimated input tokens for Claude Code E2B modification
+          20000,  // Estimated output tokens
+          'dashboard_update',
+          id,
+          `Modified dashboard (Claude Code E2B): ${instructions.slice(0, 50)}...`,
+          supabase
+        )
+      : await deductCredits(
+          user.id,
+          actualInputTokens,
+          actualOutputTokens,
+          'dashboard_update',
+          id,
+          `Modified dashboard: ${instructions.slice(0, 50)}...`,
+          supabase
+        );
 
     if (!deductionResult.success) {
       console.warn(`[Modify API] Failed to deduct credits:`, deductionResult.error);
@@ -142,21 +182,26 @@ export async function POST(request: Request, { params }: RouteParams) {
       .single();
 
     // Log usage to ai_usage_logs
+    const logModelId = usedClaudeCodeE2B ? 'opus-4-5' : 'sonnet-4-5';
+    const logUsageData = modifyResult.usage.usage.inputTokens > 0
+      ? modifyResult.usage.usage
+      : { inputTokens: 50000, outputTokens: 20000 }; // Estimated for Claude Code E2B
+
     await logUsage(supabase, {
       dashboardId: id,
       userId: user.id,
       organizationId: membership?.organization_id || null,
       operationType: 'modification',
-      modelId: 'sonnet-4-5',
-      usage: modifyResult.usage.usage,
-      agentReportedCost: modifyResult.usage.costUsd,
+      modelId: logModelId,
+      usage: logUsageData,
+      agentReportedCost: modifyResult.usage.costUsd || undefined,
       durationMs: modifyResult.usage.durationMs,
-      turnCount: modifyResult.usage.turnCount,
+      turnCount: modifyResult.usage.turnCount || undefined,
       creditsDeducted: deductionResult.success ? deductionResult.credits_used : 0,
       status: 'success',
       metadata: {
         instructions,
-        extendedThinking: true,
+        claudeCodeE2B: usedClaudeCodeE2B,
       },
     });
 
