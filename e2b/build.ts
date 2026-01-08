@@ -24,8 +24,11 @@ async function build() {
   }
 
   try {
+    // Use a unique alias for your account
+    const alias = 'zeno-claude-code';
+
     const result = await Template.build(template, {
-      alias: 'claude-code',
+      alias,
       cpuCount: 2,
       memoryMB: 2048,
       onBuildLogs: defaultBuildLogger(),
@@ -33,9 +36,9 @@ async function build() {
 
     console.log('\n✅ Template built successfully!');
     console.log(`   Template ID: ${result.templateId}`);
-    console.log(`   Alias: claude-code`);
+    console.log(`   Alias: ${alias}`);
     console.log('\nYou can now use this template with:');
-    console.log("   Sandbox.create('claude-code', { ... })");
+    console.log(`   Sandbox.create('${alias}', { ... })`);
 
   } catch (error) {
     console.error('\n❌ Build failed:', error);
