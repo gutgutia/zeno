@@ -214,8 +214,11 @@ export async function POST(request: Request) {
     // We use fetch to call our own API endpoint with internal auth headers
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const internalSecret = process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(-20) || '';
-    
-    fetch(`${baseUrl}/api/dashboards/${dashboard.id}/generate`, {
+
+    const generateUrl = `${baseUrl}/api/dashboards/${dashboard.id}/generate`;
+    console.log(`[Dashboard Create] Triggering generation at: ${generateUrl}`);
+
+    fetch(generateUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -224,9 +227,14 @@ export async function POST(request: Request) {
         'x-internal-secret': internalSecret,
       },
       body: JSON.stringify({ async: true }),
-    }).catch(err => {
-      console.error('Failed to trigger async generation:', err);
-    });
+    })
+      .then(async (res) => {
+        const text = await res.text();
+        console.log(`[Dashboard Create] Generation response: ${res.status} - ${text.slice(0, 200)}`);
+      })
+      .catch(err => {
+        console.error('[Dashboard Create] Failed to trigger async generation:', err);
+      });
 
     return NextResponse.json({ dashboard: dashboard as Dashboard }, { status: 201 });
   } catch (error) {
