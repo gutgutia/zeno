@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { randomInt } from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendOTPEmail } from '@/lib/email/send';
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit';
+
+// IP-based rate limit: 10 requests per 5 minutes
+const IP_RATE_LIMIT = {
+  maxRequests: 10,
+  windowMs: 5 * 60 * 1000, // 5 minutes
+};
 
 // Generate a cryptographically secure 6-digit OTP code
 function generateOTP(): string {
@@ -10,6 +17,26 @@ function generateOTP(): string {
 
 export async function POST(request: Request) {
   try {
+    // Check IP-based rate limit first (before parsing body)
+    const clientIP = getClientIP(request);
+    const ipRateLimit = checkRateLimit(clientIP, 'send-otp-ip', IP_RATE_LIMIT);
+
+    if (!ipRateLimit.allowed) {
+      const retryAfterSeconds = Math.ceil((ipRateLimit.resetTime - Date.now()) / 1000);
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': retryAfterSeconds.toString(),
+            'X-RateLimit-Limit': ipRateLimit.limit.toString(),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': Math.ceil(ipRateLimit.resetTime / 1000).toString(),
+          },
+        }
+      );
+    }
+
     const body = await request.json();
     const { email } = body;
 
@@ -26,7 +53,7 @@ export async function POST(request: Request) {
     const normalizedEmail = email.toLowerCase().trim();
     const supabase = createAdminClient();
 
-    // Rate limiting: check if there's a recent code (within last minute)
+    // Per-email rate limiting: check if there's a recent code (within last minute)
     const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
     const { data: recentCode } = await supabase
       .from('otp_codes')

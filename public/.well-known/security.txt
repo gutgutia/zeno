@@ -1,0 +1,9 @@
+# Security Policy for zeno.fyi
+# See https://securitytxt.org/ for more information
+
+Contact: mailto:security@zeno.fyi
+Expires: 2027-01-08T00:00:00.000Z
+Preferred-Languages: en
+
+# We appreciate responsible disclosure of security vulnerabilities.
+# Please report any security issues to the contact above.
