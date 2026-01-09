@@ -47,13 +47,7 @@ export function DashboardReadyEmail({
             <table cellPadding="0" cellSpacing="0" border={0} style={successIconTable}>
               <tr>
                 <td style={successIconCell}>
-                  <Img
-                    src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='none' stroke='%230055FF' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E"
-                    width="32"
-                    height="32"
-                    alt="Success"
-                    style={checkmarkIcon}
-                  />
+                  <span style={checkmarkEmoji}>✓</span>
                 </td>
               </tr>
             </table>
@@ -163,9 +157,11 @@ const successIconCell = {
   verticalAlign: 'middle' as const,
 };
 
-const checkmarkIcon = {
-  display: 'inline-block',
-  verticalAlign: 'middle',
+const checkmarkEmoji = {
+  fontSize: '32px',
+  color: '#0055FF',
+  fontWeight: '700',
+  lineHeight: '64px',
 };
 
 const title = {
