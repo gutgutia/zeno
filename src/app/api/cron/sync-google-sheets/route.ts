@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { getValidAccessToken } from '@/lib/google/auth';
 import { fetchSheetData, fetchMultipleSheets, computeContentHash } from '@/lib/google/sheets';
 import { getMergedBranding } from '@/types/database';
@@ -8,6 +9,7 @@ import type { BrandingConfig, Dashboard, Workspace } from '@/types/database';
 import { computeDataDiff } from '@/lib/data/diff';
 import { refreshDashboardDirect, needsRegeneration } from '@/lib/ai/refresh-direct';
 import { refreshWithClaudeCode } from '@/lib/ai/refresh-with-claude-code';
+import { sendDashboardUpdatedEmail } from '@/lib/email/send';
 
 export const maxDuration = 300; // 5 minutes for batch processing
 
@@ -20,6 +22,20 @@ interface SyncResult {
 
 // Type for dashboard with workspace relation
 type DashboardWithWorkspace = Dashboard & { workspace: Workspace | null };
+
+// Get user email by ID
+async function getUserEmail(userId: string): Promise<string | null> {
+  try {
+    const serviceClient = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    const { data } = await serviceClient.auth.admin.getUserById(userId);
+    return data.user?.email || null;
+  } catch {
+    return null;
+  }
+}
 
 // GET /api/cron/sync-google-sheets - Daily sync job for Google Sheets dashboards
 export async function GET(request: NextRequest) {
@@ -215,6 +231,23 @@ export async function GET(request: NextRequest) {
               generation_status: 'completed',
             })
             .eq('id', dashboard.id);
+
+          // Send email notification to the dashboard owner
+          try {
+            const userEmail = await getUserEmail(dashboard.owner_id);
+            if (userEmail) {
+              await sendDashboardUpdatedEmail({
+                to: userEmail,
+                dashboardTitle: dashboard.title,
+                dashboardId: dashboard.id,
+                summary: refreshResult.summary,
+              });
+              console.log(`[Sync] Email notification sent to ${userEmail} for dashboard ${dashboard.id}`);
+            }
+          } catch (emailError) {
+            console.error(`[Sync] Failed to send email notification for ${dashboard.id}:`, emailError);
+            // Don't fail the sync if email fails
+          }
 
           results.push({
             id: dashboard.id,

@@ -85,6 +85,10 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [creditsInfo, setCreditsInfo] = useState<{ needed: number; available: number } | null>(null);
 
+  // Sync settings state
+  const [syncEnabled, setSyncEnabled] = useState<boolean>(false);
+  const [isTogglingSync, setIsTogglingSync] = useState(false);
+
   // Compute CSS variables for branding
   const brandingStyles = useMemo(() => {
     if (!branding?.colors) return {};
@@ -123,6 +127,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
         setDashboard(data.dashboard);
         setBranding(data.branding || null);
         setEditedTitle(data.dashboard.title);
+        setSyncEnabled(data.dashboard.sync_enabled || false);
       }
       setIsLoading(false);
     }
@@ -265,6 +270,38 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
     } finally {
       setIsDeleting(false);
       setIsDeleteDialogOpen(false);
+    }
+  };
+
+  const handleToggleSync = async () => {
+    if (!dashboard?.google_connection_id) {
+      toast.error('This dashboard is not connected to Google Sheets');
+      return;
+    }
+
+    setIsTogglingSync(true);
+    try {
+      const response = await fetch(`/api/dashboards/${id}/sync-settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sync_enabled: !syncEnabled }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update sync settings');
+      }
+
+      const data = await response.json();
+      setSyncEnabled(data.sync_enabled);
+      toast.success(data.sync_enabled
+        ? 'Auto-sync enabled. Dashboard will update daily when data changes.'
+        : 'Auto-sync disabled.');
+    } catch (err) {
+      console.error('Failed to toggle sync:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to update sync settings');
+    } finally {
+      setIsTogglingSync(false);
     }
   };
 
@@ -554,6 +591,37 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                     </svg>
                     Copy Link
                   </DropdownMenuItem>
+                  {/* Auto-sync toggle - only for Google Sheets connected dashboards */}
+                  {dashboard.google_connection_id && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={handleToggleSync}
+                        disabled={isTogglingSync}
+                      >
+                        {syncEnabled ? (
+                          <>
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {isTogglingSync ? 'Updating...' : 'Disable Auto-Sync'}
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            {isTogglingSync ? 'Updating...' : 'Enable Auto-Sync'}
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      {syncEnabled && dashboard.last_synced_at && (
+                        <div className="px-2 py-1.5 text-xs text-[var(--color-gray-500)]">
+                          Last synced: {formatLastUpdated(dashboard.last_synced_at)}
+                        </div>
+                      )}
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     variant="destructive"
