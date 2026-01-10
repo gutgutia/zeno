@@ -218,6 +218,9 @@ export interface Dashboard {
   current_minor_version: number;
   // Soft delete
   deleted_at: string | null;
+  // Organization sharing
+  organization_id: string | null;
+  shared_with_org: boolean;
 }
 
 export interface ChatMessage {

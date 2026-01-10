@@ -19,8 +19,17 @@ export async function GET() {
 
     const userDomain = userEmail.split('@')[1];
 
-    // Use admin client to bypass RLS and find all shares matching user's email or domain
+    // Use admin client to bypass RLS
     const adminSupabase = createAdminClient();
+
+    // Get user's organization memberships
+    const { data: memberships } = await adminSupabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', user.id)
+      .not('accepted_at', 'is', null);
+
+    const userOrgIds = memberships?.map(m => m.organization_id) || [];
 
     // Find all shares that match user's email or domain
     const { data: shares, error: sharesError } = await adminSupabase
@@ -33,12 +42,34 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch shares' }, { status: 500 });
     }
 
-    if (!shares || shares.length === 0) {
-      return NextResponse.json({ dashboards: [] });
+    // Get dashboard IDs from explicit shares
+    const explicitShareDashboardIds = shares?.map(s => s.dashboard_id) || [];
+
+    // Find dashboards shared with user's organizations (shared_with_org = true)
+    let orgSharedDashboards: { id: string; updated_at: string }[] = [];
+    if (userOrgIds.length > 0) {
+      const { data: orgDashboards } = await adminSupabase
+        .from('dashboards')
+        .select('id, updated_at')
+        .eq('shared_with_org', true)
+        .in('organization_id', userOrgIds)
+        .neq('owner_id', user.id) // Exclude own dashboards
+        .is('deleted_at', null);
+
+      orgSharedDashboards = orgDashboards || [];
     }
 
-    // Get unique dashboard IDs
-    const dashboardIds = [...new Set(shares.map(s => s.dashboard_id))];
+    // Combine all dashboard IDs
+    const allDashboardIds = [
+      ...new Set([
+        ...explicitShareDashboardIds,
+        ...orgSharedDashboards.map(d => d.id),
+      ])
+    ];
+
+    if (allDashboardIds.length === 0) {
+      return NextResponse.json({ dashboards: [] });
+    }
 
     // Fetch dashboard details for all shared dashboards
     const { data: dashboards, error: dashboardsError } = await adminSupabase
@@ -51,12 +82,12 @@ export async function GET() {
         is_published,
         updated_at,
         created_at,
-        workspaces!inner (
-          owner_id
-        )
+        owner_id,
+        shared_with_org,
+        organization_id
       `)
-      .in('id', dashboardIds)
-      .is('deleted_at', null) // Exclude soft-deleted dashboards
+      .in('id', allDashboardIds)
+      .is('deleted_at', null)
       .order('updated_at', { ascending: false });
 
     if (dashboardsError) {
@@ -64,25 +95,28 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch dashboards' }, { status: 500 });
     }
 
-    // Filter out dashboards owned by the user (they shouldn't appear in "shared with me")
+    // Filter out dashboards owned by the user and add shared_at info
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sharedDashboards = (dashboards || [] as any[])
-      .filter((d) => {
-        // workspaces can be array or object depending on the Supabase client
-        const workspace = Array.isArray(d.workspaces) ? d.workspaces[0] : d.workspaces;
-        return workspace?.owner_id !== user.id;
-      })
-      .map((d) => ({
-        id: d.id,
-        title: d.title,
-        description: d.description,
-        slug: d.slug,
-        is_published: d.is_published,
-        updated_at: d.updated_at,
-        created_at: d.created_at,
-        // Find when this was shared with the user
-        shared_at: shares.find(s => s.dashboard_id === d.id)?.created_at,
-      }));
+    const sharedDashboards = (dashboards || [])
+      .filter((d) => d.owner_id !== user.id)
+      .map((d) => {
+        // Determine when this was shared with the user
+        // For org-shared dashboards, use updated_at as approximation
+        const explicitShare = shares?.find(s => s.dashboard_id === d.id);
+        const isOrgShared = d.shared_with_org && userOrgIds.includes(d.organization_id);
+
+        return {
+          id: d.id,
+          title: d.title,
+          description: d.description,
+          slug: d.slug,
+          is_published: d.is_published,
+          updated_at: d.updated_at,
+          created_at: d.created_at,
+          shared_at: explicitShare?.created_at || d.updated_at,
+          share_source: isOrgShared && !explicitShare ? 'organization' : 'direct',
+        };
+      });
 
     return NextResponse.json({ dashboards: sharedDashboards });
   } catch (error) {

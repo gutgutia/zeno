@@ -33,7 +33,9 @@ interface ShareDialogProps {
   dashboardId: string;
   dashboardSlug: string;
   isPublished: boolean;
+  sharedWithOrg?: boolean;
   onPublishChange?: (isPublished: boolean) => void;
+  onOrgShareChange?: (sharedWithOrg: boolean) => void;
   trigger?: React.ReactNode;
 }
 
@@ -41,7 +43,9 @@ export function ShareDialog({
   dashboardId,
   dashboardSlug,
   isPublished,
+  sharedWithOrg: initialSharedWithOrg = false,
   onPublishChange,
+  onOrgShareChange,
   trigger,
 }: ShareDialogProps) {
   const [shares, setShares] = useState<DashboardShare[]>([]);
@@ -52,7 +56,10 @@ export function ShareDialog({
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
+  const [isUpdatingOrgShare, setIsUpdatingOrgShare] = useState(false);
   const [ownerDomain, setOwnerDomain] = useState<string | null>(null);
+  const [sharedWithOrg, setSharedWithOrg] = useState(initialSharedWithOrg);
+  const [orgName, setOrgName] = useState<string | null>(null);
   const [orgDomainInfo, setOrgDomainInfo] = useState<{
     subdomain: string | null;
     customDomain: string | null;
@@ -95,15 +102,19 @@ export function ShareDialog({
           setOwnerDomain(data.ownerDomain || null);
         }
 
-        // Fetch dashboard to get org domain info
+        // Fetch dashboard to get org domain info and shared_with_org status
         const dashboardResponse = await fetch(`/api/dashboards/${dashboardId}`);
         if (dashboardResponse.ok) {
-          const dashboard = await dashboardResponse.json();
-          if (dashboard.organization) {
+          const data = await dashboardResponse.json();
+          if (data.organization) {
+            setOrgName(data.organization.name || null);
             setOrgDomainInfo({
-              subdomain: dashboard.organization.subdomain || null,
-              customDomain: dashboard.organization.custom_domain || null,
+              subdomain: data.organization.subdomain || null,
+              customDomain: data.organization.custom_domain || null,
             });
+          }
+          if (data.dashboard) {
+            setSharedWithOrg(data.dashboard.shared_with_org || false);
           }
         }
       } catch (err) {
@@ -148,6 +159,36 @@ export function ShareDialog({
     }
 
     setVisibility(newVisibility);
+  };
+
+  const handleOrgShareToggle = async () => {
+    setIsUpdatingOrgShare(true);
+    const newValue = !sharedWithOrg;
+
+    try {
+      const response = await fetch(`/api/dashboards/${dashboardId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shared_with_org: newValue }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update organization sharing');
+      }
+
+      setSharedWithOrg(newValue);
+      onOrgShareChange?.(newValue);
+      toast.success(
+        newValue
+          ? `Dashboard shared with all ${orgName || 'organization'} members`
+          : 'Dashboard is no longer shared with organization'
+      );
+    } catch (err) {
+      console.error('Failed to update org sharing:', err);
+      toast.error('Failed to update organization sharing');
+    } finally {
+      setIsUpdatingOrgShare(false);
+    }
   };
 
   const handleAddShare = async () => {
@@ -358,6 +399,45 @@ export function ShareDialog({
               </label>
             </div>
           </div>
+
+          {/* Organization sharing toggle - show when not public */}
+          {visibility !== 'public' && orgName && (
+            <div className="pt-2 border-t border-[var(--color-gray-200)]">
+              <div className="flex items-center justify-between p-3 bg-[var(--color-gray-50)] rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    sharedWithOrg ? 'bg-[var(--color-primary)] text-white' : 'bg-[var(--color-gray-200)] text-[var(--color-gray-500)]'
+                  }`}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[var(--color-gray-900)]">
+                      Share with organization
+                    </p>
+                    <p className="text-xs text-[var(--color-gray-500)]">
+                      All members of <span className="font-medium">{orgName}</span> can view
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOrgShareToggle}
+                  disabled={isUpdatingOrgShare}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${
+                    sharedWithOrg ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-gray-300)]'
+                  } ${isUpdatingOrgShare ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      sharedWithOrg ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Share form - only show when 'specific' is selected */}
           {visibility === 'specific' && (

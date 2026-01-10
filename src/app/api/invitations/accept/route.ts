@@ -1,15 +1,17 @@
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
 
 // POST /api/invitations/accept - Accept an organization invitation
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
+    // Use regular client for auth check
+    const authClient = await createClient();
 
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await authClient.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -22,19 +24,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Token is required' }, { status: 400 });
     }
 
+    // Use service client for database operations to bypass RLS
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('Missing Supabase configuration');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    const supabase = createServiceClient(supabaseUrl, serviceRoleKey);
+
     // Find the invitation
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: invitation, error: inviteError } = await (supabase as any)
+    const { data: invitation, error: inviteError } = await supabase
       .from('organization_invitations')
-      .select(`
-        *,
-        organization:organizations(id, name, slug)
-      `)
+      .select('*')
       .eq('token', token)
       .single();
 
     if (inviteError || !invitation) {
       return NextResponse.json({ error: 'Invalid or expired invitation' }, { status: 404 });
+    }
+
+    // Get organization details
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('id, name, slug, seats_purchased')
+      .eq('id', invitation.organization_id)
+      .single();
+
+    if (!org) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
     // Check if invitation is expired
@@ -51,8 +71,7 @@ export async function POST(request: Request) {
     }
 
     // Check if already a member
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existingMember } = await (supabase as any)
+    const { data: existingMember } = await supabase
       .from('organization_members')
       .select('id')
       .eq('organization_id', invitation.organization_id)
@@ -61,8 +80,7 @@ export async function POST(request: Request) {
 
     if (existingMember) {
       // Already a member, just delete the invitation
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
+      await supabase
         .from('organization_invitations')
         .delete()
         .eq('id', invitation.id);
@@ -70,26 +88,18 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         message: 'You are already a member of this organization',
-        organization: invitation.organization,
+        organization: { id: org.id, name: org.name, slug: org.slug },
       });
     }
 
-    // Check seat availability again
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: org } = await (supabase as any)
-      .from('organizations')
-      .select('seats_purchased')
-      .eq('id', invitation.organization_id)
-      .single();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { count: currentMembers } = await (supabase as any)
+    // Check seat availability
+    const { count: currentMembers } = await supabase
       .from('organization_members')
       .select('*', { count: 'exact', head: true })
       .eq('organization_id', invitation.organization_id)
       .not('accepted_at', 'is', null);
 
-    if (org && currentMembers >= org.seats_purchased) {
+    if (org.seats_purchased && (currentMembers || 0) >= org.seats_purchased) {
       return NextResponse.json(
         { error: 'No seats available in this organization' },
         { status: 400 }
@@ -97,8 +107,7 @@ export async function POST(request: Request) {
     }
 
     // Add user as member
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: memberError } = await (supabase as any)
+    const { error: memberError } = await supabase
       .from('organization_members')
       .insert({
         organization_id: invitation.organization_id,
@@ -114,16 +123,15 @@ export async function POST(request: Request) {
     }
 
     // Delete the invitation
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any)
+    await supabase
       .from('organization_invitations')
       .delete()
       .eq('id', invitation.id);
 
     return NextResponse.json({
       success: true,
-      message: `You have joined ${invitation.organization.name}`,
-      organization: invitation.organization,
+      message: `You have joined ${org.name}`,
+      organization: { id: org.id, name: org.name, slug: org.slug },
     });
   } catch (error) {
     console.error('Invitation accept error:', error);
@@ -141,24 +149,34 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Token is required' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    // Use service client to bypass RLS - invitation preview should work for unauthenticated users
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    // Find the invitation (don't require auth for preview)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: invitation, error } = await (supabase as any)
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('Missing Supabase configuration');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    const supabase = createServiceClient(supabaseUrl, serviceRoleKey);
+
+    // Find the invitation
+    const { data: invitation, error } = await supabase
       .from('organization_invitations')
-      .select(`
-        email,
-        role,
-        expires_at,
-        organization:organizations(name, slug)
-      `)
+      .select('email, role, expires_at, organization_id')
       .eq('token', token)
       .single();
 
     if (error || !invitation) {
       return NextResponse.json({ error: 'Invalid invitation' }, { status: 404 });
     }
+
+    // Get organization details separately
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('name, slug')
+      .eq('id', invitation.organization_id)
+      .single();
 
     // Check if expired
     if (new Date(invitation.expires_at) < new Date()) {
@@ -168,7 +186,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       email: invitation.email,
       role: invitation.role,
-      organization: invitation.organization,
+      organization: org || { name: 'Unknown', slug: '' },
       expires_at: invitation.expires_at,
     });
   } catch (error) {

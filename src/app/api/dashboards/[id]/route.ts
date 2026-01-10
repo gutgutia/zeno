@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     // Get the dashboard with organization branding and domain info
     const { data, error } = await supabase
       .from('dashboards')
-      .select('*, organizations!inner(id, created_by, branding, subdomain, custom_domain)')
+      .select('*, organizations!inner(id, name, created_by, branding, subdomain, custom_domain)')
       .eq('id', id)
       .single();
 
@@ -32,6 +32,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     const dashboardData = data as Dashboard & {
       organizations: {
         id: string;
+        name: string;
         created_by: string;
         branding: BrandingConfig | null;
         subdomain: string | null;
@@ -64,6 +65,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     // Extract organization info for share URLs
     const organization = {
+      name: dashboardData.organizations.name,
       subdomain: dashboardData.organizations.subdomain,
       custom_domain: dashboardData.organizations.custom_domain,
     };
@@ -94,7 +96,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const { title, description, config, data, dataSource, is_published } = body;
+    const { title, description, config, data, dataSource, is_published, shared_with_org } = body;
 
     // Get the existing dashboard
     const { data: existingData, error: fetchError } = await supabase
@@ -141,6 +143,9 @@ export async function PUT(request: Request, { params }: RouteParams) {
       if (is_published && !existingDashboard.is_published) {
         updates.published_at = new Date().toISOString();
       }
+    }
+    if (shared_with_org !== undefined) {
+      updates.shared_with_org = shared_with_org;
     }
 
     // Update the dashboard

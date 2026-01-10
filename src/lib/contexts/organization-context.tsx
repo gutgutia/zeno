@@ -21,6 +21,12 @@ interface OrganizationContextType {
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);
 
 const CURRENT_ORG_KEY = 'zeno_current_org_id';
+const CURRENT_ORG_COOKIE = 'zeno_current_org';
+
+// Helper to set cookie (accessible by server)
+function setOrgCookie(orgId: string) {
+  document.cookie = `${CURRENT_ORG_COOKIE}=${orgId}; path=/; max-age=31536000; SameSite=Lax`;
+}
 
 export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -41,9 +47,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
         if (savedOrg) {
           setCurrentOrgState(savedOrg);
+          setOrgCookie(savedOrg.id);
         } else if (orgs.length > 0) {
           // Default to first org (usually personal)
           setCurrentOrgState(orgs[0]);
+          setOrgCookie(orgs[0].id);
         }
       }
     } catch (error) {
@@ -60,6 +68,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const setCurrentOrg = useCallback((org: Organization) => {
     setCurrentOrgState(org);
     localStorage.setItem(CURRENT_ORG_KEY, org.id);
+    setOrgCookie(org.id);
   }, []);
 
   return (

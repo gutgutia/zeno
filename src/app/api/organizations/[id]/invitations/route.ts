@@ -43,18 +43,11 @@ export async function GET(request: Request, { params }: RouteParams) {
       );
     }
 
-    // Get pending invitations
+    // Get pending invitations (without join - invited_by FK goes to auth.users, not profiles)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: invitations, error } = await (supabase as any)
       .from('organization_invitations')
-      .select(`
-        id,
-        email,
-        role,
-        expires_at,
-        created_at,
-        invited_by:profiles!invited_by(name)
-      `)
+      .select('id, email, role, expires_at, created_at, invited_by')
       .eq('organization_id', id)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
@@ -64,7 +57,28 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Failed to fetch invitations' }, { status: 500 });
     }
 
-    return NextResponse.json(invitations || []);
+    // Fetch inviter names separately
+    const invitationsWithInviter = await Promise.all(
+      (invitations || []).map(async (inv: { id: string; email: string; role: string; expires_at: string; created_at: string; invited_by: string }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: profile } = await (supabase as any)
+          .from('profiles')
+          .select('name')
+          .eq('id', inv.invited_by)
+          .single();
+
+        return {
+          id: inv.id,
+          email: inv.email,
+          role: inv.role,
+          expires_at: inv.expires_at,
+          created_at: inv.created_at,
+          invited_by: { name: profile?.name || 'Unknown' },
+        };
+      })
+    );
+
+    return NextResponse.json(invitationsWithInviter);
   } catch (error) {
     console.error('Invitations fetch error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

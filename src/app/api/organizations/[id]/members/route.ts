@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { sendTeamInvitationEmail } from '@/lib/email/send';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -40,17 +41,11 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Not a member of this organization' }, { status: 403 });
     }
 
-    // Get all members with their profile info
+    // Get all members (without join - profiles FK goes to auth.users, not profiles table)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: members, error } = await (supabase as any)
       .from('organization_members')
-      .select(`
-        id,
-        role,
-        invited_at,
-        accepted_at,
-        user:profiles(id, name, avatar_url)
-      `)
+      .select('id, user_id, role, invited_at, accepted_at')
       .eq('organization_id', id)
       .not('accepted_at', 'is', null)
       .order('role', { ascending: true });
@@ -60,19 +55,26 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Failed to fetch members' }, { status: 500 });
     }
 
-    // Get user emails from auth.users (requires service role, so we'll get emails differently)
-    // For now, return members without email - can add email lookup later
-    const membersWithEmail = await Promise.all(
-      (members || []).map(async (m: { id: string; role: string; invited_at: string; accepted_at: string; user: { id: string; name: string; avatar_url: string } }) => {
-        // Get email from auth metadata if available
+    // Fetch profile info separately for each member
+    const membersWithProfile = await Promise.all(
+      (members || []).map(async (m: { id: string; user_id: string; role: string; invited_at: string; accepted_at: string }) => {
+        // Get profile
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: authUser } = await (supabase as any).auth.admin?.getUserById(m.user.id) || {};
+        const { data: profile } = await (supabase as any)
+          .from('profiles')
+          .select('name, avatar_url')
+          .eq('id', m.user_id)
+          .single();
+
+        // Get email from auth (only works with service role client in production)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: authUser } = await (supabase as any).auth.admin?.getUserById(m.user_id) || {};
 
         return {
           id: m.id,
-          user_id: m.user.id,
-          name: m.user.name,
-          avatar_url: m.user.avatar_url,
+          user_id: m.user_id,
+          name: profile?.name || null,
+          avatar_url: profile?.avatar_url || null,
           email: authUser?.user?.email || null,
           role: m.role,
           invited_at: m.invited_at,
@@ -81,7 +83,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       })
     );
 
-    return NextResponse.json(membersWithEmail);
+    return NextResponse.json(membersWithProfile);
   } catch (error) {
     console.error('Members fetch error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -184,7 +186,35 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Failed to create invitation' }, { status: 500 });
     }
 
-    // TODO: Send invitation email with token link
+    // Get organization name and inviter profile for email
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: orgData } = await (supabase as any)
+      .from('organizations')
+      .select('name')
+      .eq('id', id)
+      .single();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: inviterProfile } = await (supabase as any)
+      .from('profiles')
+      .select('name')
+      .eq('id', user.id)
+      .single();
+
+    // Send invitation email
+    try {
+      await sendTeamInvitationEmail({
+        to: email.toLowerCase(),
+        organizationName: orgData?.name || 'a team',
+        inviterName: inviterProfile?.name || undefined,
+        inviteToken: invitation.token,
+        role: inviteRole,
+        expiresAt: invitation.expires_at,
+      });
+    } catch (emailError) {
+      console.error('Error sending invitation email:', emailError);
+      // Don't fail the request if email fails - invitation is still created
+    }
 
     return NextResponse.json({
       success: true,

@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { formatRelativeTime } from '@/lib/utils/format';
-import type { Dashboard, Workspace } from '@/types/database';
+import type { Dashboard } from '@/types/database';
 
 // Force dynamic rendering - this page requires authentication
 export const dynamic = 'force-dynamic';
@@ -63,7 +64,11 @@ export default async function DashboardsPage() {
     redirect('/auth');
   }
 
-  // Get user's organizations
+  // Get current organization from cookie
+  const cookieStore = await cookies();
+  const currentOrgId = cookieStore.get('zeno_current_org')?.value;
+
+  // Get user's organizations to verify membership
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: membershipData } = await (supabase as any)
     .from('organization_members')
@@ -72,38 +77,28 @@ export default async function DashboardsPage() {
 
   const orgIds = membershipData?.map(m => m.organization_id) || [];
 
-  // Get user's workspace (for legacy dashboards without org assignment)
-  const { data: workspaceData } = await supabase
-    .from('workspaces')
-    .select('id')
-    .eq('owner_id', user.id)
-    .eq('type', 'personal')
-    .single();
+  // Determine which org to filter by
+  // If currentOrgId is set and user is a member, use it; otherwise default to first org
+  const activeOrgId = currentOrgId && orgIds.includes(currentOrgId)
+    ? currentOrgId
+    : orgIds[0] || null;
 
-  const workspace = workspaceData as Workspace | null;
-
-  // Get dashboards: user-owned OR in user's organizations
+  // Get dashboards for the current organization only
   let dashboards: DashboardWithShares[] = [];
 
-  // Build query for dashboards with organization info
+  // Build query for dashboards - filter by current org AND owned by user
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
     .from('dashboards')
     .select('*, organizations(name)')
+    .eq('owner_id', user.id) // Only show dashboards owned by the user
     .order('updated_at', { ascending: false });
 
-  // If user has orgs and a workspace, get dashboards from both
-  if (orgIds.length > 0 && workspace?.id) {
-    // Dashboards in user's orgs OR in user's personal workspace
-    query = query.or(`organization_id.in.(${orgIds.join(',')}),workspace_id.eq.${workspace.id}`);
-  } else if (orgIds.length > 0) {
-    // Only org dashboards
-    query = query.in('organization_id', orgIds);
-  } else if (workspace?.id) {
-    // Only personal workspace dashboards
-    query = query.eq('workspace_id', workspace.id);
+  // Filter by current organization
+  if (activeOrgId) {
+    query = query.eq('organization_id', activeOrgId);
   } else {
-    // No access to any dashboards
+    // No org selected - show nothing (shouldn't happen in normal flow)
     query = null;
   }
 
@@ -152,7 +147,6 @@ export default async function DashboardsPage() {
             <DashboardCard
               key={dashboard.id}
               dashboard={dashboard}
-              showOrg={orgIds.length > 1}
             />
           ))}
         </div>
@@ -217,7 +211,7 @@ function EmptyState() {
   );
 }
 
-function DashboardCard({ dashboard, showOrg }: { dashboard: DashboardWithShares; showOrg?: boolean }) {
+function DashboardCard({ dashboard }: { dashboard: DashboardWithShares }) {
   const sharingStatus = getSharingStatus(dashboard);
   const statusConfig = SHARING_STATUS_CONFIG[sharingStatus];
 
@@ -250,14 +244,6 @@ function DashboardCard({ dashboard, showOrg }: { dashboard: DashboardWithShares;
         {/* Footer: Meta info */}
         <div className="flex items-center justify-between text-xs text-[var(--color-gray-500)]">
           <span>Updated {formatRelativeTime(dashboard.updated_at)}</span>
-          {showOrg && dashboard.organization_name && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--color-gray-100)] rounded text-[var(--color-gray-600)]">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              {dashboard.organization_name}
-            </span>
-          )}
         </div>
       </div>
     </Link>

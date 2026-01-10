@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { NextResponse } from 'next/server';
 import type { Organization, OrganizationWithRole } from '@/types/database';
 
@@ -75,12 +76,13 @@ export async function GET() {
 // POST /api/organizations - Create a new organization
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
+    // Use regular client for auth check
+    const authClient = await createClient();
 
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await authClient.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -105,9 +107,19 @@ export async function POST(request: Request) {
       );
     }
 
+    // Use service client for database operations to bypass RLS
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('Missing Supabase configuration');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    const supabase = createServiceClient(supabaseUrl, serviceRoleKey);
+
     // Check if slug is already taken
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existingOrg } = await (supabase as any)
+    const { data: existingOrg } = await supabase
       .from('organizations')
       .select('id')
       .eq('slug', slug)
@@ -121,8 +133,7 @@ export async function POST(request: Request) {
     }
 
     // Create the organization
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: organization, error: createError } = await (supabase as any)
+    const { data: organization, error: createError } = await supabase
       .from('organizations')
       .insert({
         name,

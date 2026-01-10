@@ -87,6 +87,30 @@ export async function middleware(request: NextRequest) {
   const subdomain = getSubdomain(hostname);
 
   if (subdomain) {
+    // Paths that don't require authentication on subdomains
+    const publicPaths = ['/auth', '/api/auth'];
+    const isPublicPath = publicPaths.some(p => pathname.startsWith(p));
+
+    // Check authentication for subdomain access
+    if (!isPublicPath) {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        // Redirect unauthenticated users to /auth on the subdomain
+        const url = request.nextUrl.clone();
+        url.pathname = '/auth';
+
+        const response = NextResponse.redirect(url);
+
+        // Copy cookies from supabase response
+        supabaseResponse.cookies.getAll().forEach((cookie) => {
+          response.cookies.set(cookie.name, cookie.value);
+        });
+
+        return response;
+      }
+    }
+
     // Handle custom domain lookup
     if (subdomain.startsWith('custom:')) {
       const customDomain = subdomain.slice(7);
