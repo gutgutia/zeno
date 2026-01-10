@@ -16,6 +16,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Ensure user has at least one organization (auto-create personal org if needed)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).rpc('get_or_create_user_organization', { p_user_id: user.id });
+
     // Get organizations where user is a member, with their role
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: memberships, error } = await (supabase as any)
