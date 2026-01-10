@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { notFound, redirect } from 'next/navigation';
-import type { Dashboard, BrandingConfig, DashboardShare, Workspace } from '@/types/database';
+import type { Dashboard, BrandingConfig, DashboardShare, Organization } from '@/types/database';
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import Link from 'next/link';
@@ -75,29 +75,29 @@ function GeneratingState() {
   );
 }
 
-export default async function WorkspaceDashboardPage({ params }: PageProps) {
+export default async function OrganizationDashboardPage({ params }: PageProps) {
   const { subdomain, slug } = await params;
 
   const adminSupabase = createAdminClient();
 
-  // First, verify the workspace exists
-  const { data: workspace, error: workspaceError } = await adminSupabase
-    .from('workspaces')
-    .select('id, subdomain, branding, owner_id')
+  // First, verify the organization exists
+  const { data: organization, error: organizationError } = await adminSupabase
+    .from('organizations')
+    .select('id, subdomain, branding, created_by')
     .eq('subdomain', subdomain)
     .single();
 
-  if (workspaceError || !workspace) {
+  if (organizationError || !organization) {
     notFound();
   }
 
-  const typedWorkspace = workspace as Pick<Workspace, 'id' | 'subdomain' | 'branding' | 'owner_id'>;
+  const typedOrganization = organization as Pick<Organization, 'id' | 'subdomain' | 'branding' | 'created_by'>;
 
-  // Find the dashboard by slug within this workspace
+  // Find the dashboard by slug within this organization
   const { data, error } = await adminSupabase
     .from('dashboards')
     .select('*')
-    .eq('workspace_id', typedWorkspace.id)
+    .eq('organization_id', typedOrganization.id)
     .eq('slug', slug)
     .single();
 
@@ -112,8 +112,22 @@ export default async function WorkspaceDashboardPage({ params }: PageProps) {
     const userSupabase = await createClient();
     const { data: { user } } = await userSupabase.auth.getUser();
 
-    // Check if user is the owner
-    const isOwner = user && typedWorkspace.owner_id === user.id;
+    // Check if user is the organization owner or a member
+    let isOwner = user && typedOrganization.created_by === user.id;
+
+    // Also check if user is a member of the organization
+    if (user && !isOwner) {
+      const { data: membership } = await adminSupabase
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', typedOrganization.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (membership) {
+        isOwner = true; // Any org member can view unpublished dashboards
+      }
+    }
 
     if (!isOwner) {
       // Get shares for this dashboard
@@ -151,9 +165,9 @@ export default async function WorkspaceDashboardPage({ params }: PageProps) {
     return <GeneratingState />;
   }
 
-  // Merge workspace branding with dashboard override
+  // Merge organization branding with dashboard override
   const branding = getMergedBranding(
-    typedWorkspace.branding,
+    typedOrganization.branding,
     dashboard.branding_override
   );
 

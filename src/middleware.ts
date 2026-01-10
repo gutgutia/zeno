@@ -1,14 +1,14 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-// Main domains where the app is hosted (subdomains of these are workspace subdomains)
+// Main domains where the app is hosted (subdomains of these are organization subdomains)
 const MAIN_DOMAINS = [
   'zeno.fyi',
   'localhost',
   '127.0.0.1',
 ];
 
-// Subdomains that are reserved for app functionality (not workspaces)
+// Subdomains that are reserved for app functionality (not organizations)
 const RESERVED_SUBDOMAINS = ['www', 'app', 'api', 'admin'];
 
 /**
@@ -91,17 +91,17 @@ export async function middleware(request: NextRequest) {
     if (subdomain.startsWith('custom:')) {
       const customDomain = subdomain.slice(7);
 
-      // Look up workspace by custom domain
-      const { data: workspace } = await supabase
-        .from('workspaces')
+      // Look up organization by custom domain
+      const { data: organization } = await supabase
+        .from('organizations')
         .select('id, subdomain')
         .eq('custom_domain', customDomain)
         .single();
 
-      if (workspace) {
-        // Rewrite to workspace route
+      if (organization) {
+        // Rewrite to organization route
         const url = request.nextUrl.clone();
-        url.pathname = `/w/${workspace.subdomain || workspace.id}${pathname}`;
+        url.pathname = `/w/${organization.subdomain || organization.id}${pathname}`;
         return NextResponse.rewrite(url, {
           request,
           headers: supabaseResponse.headers,
@@ -112,8 +112,8 @@ export async function middleware(request: NextRequest) {
       return supabaseResponse;
     }
 
-    // Regular subdomain - rewrite to workspace route
-    // e.g., acme.zeno.app/my-dashboard -> /w/acme/my-dashboard
+    // Regular subdomain - rewrite to organization route
+    // e.g., acme.zeno.fyi/my-dashboard -> /w/acme/my-dashboard
     const url = request.nextUrl.clone();
     url.pathname = `/w/${subdomain}${pathname}`;
 

@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import type { Dashboard, BrandingConfig, Workspace } from '@/types/database';
+import type { Dashboard, BrandingConfig, Organization } from '@/types/database';
 
 interface PageProps {
   params: Promise<{ subdomain: string }>;
@@ -9,30 +9,30 @@ interface PageProps {
 
 export const dynamic = 'force-dynamic';
 
-export default async function WorkspaceHomePage({ params }: PageProps) {
+export default async function OrganizationHomePage({ params }: PageProps) {
   const { subdomain } = await params;
 
   const adminSupabase = createAdminClient();
 
-  // Look up workspace by subdomain
-  const { data: workspace, error: workspaceError } = await adminSupabase
-    .from('workspaces')
+  // Look up organization by subdomain
+  const { data: organization, error: organizationError } = await adminSupabase
+    .from('organizations')
     .select('*')
     .eq('subdomain', subdomain)
     .single();
 
-  if (workspaceError || !workspace) {
+  if (organizationError || !organization) {
     notFound();
   }
 
-  const typedWorkspace = workspace as Workspace;
-  const branding = typedWorkspace.branding as BrandingConfig | null;
+  const typedOrganization = organization as Organization;
+  const branding = typedOrganization.branding as BrandingConfig | null;
 
-  // Get all published dashboards for this workspace
+  // Get all published dashboards for this organization
   const { data: dashboards } = await adminSupabase
     .from('dashboards')
     .select('id, title, slug, description, config, is_published, created_at')
-    .eq('workspace_id', typedWorkspace.id)
+    .eq('organization_id', typedOrganization.id)
     .eq('is_published', true)
     .order('created_at', { ascending: false });
 
@@ -62,7 +62,7 @@ export default async function WorkspaceHomePage({ params }: PageProps) {
             )}
             <div>
               <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">
-                {branding?.companyName || typedWorkspace.name}
+                {branding?.companyName || typedOrganization.name}
               </h1>
               <p className="text-[var(--color-gray-600)] mt-1">
                 Dashboards
