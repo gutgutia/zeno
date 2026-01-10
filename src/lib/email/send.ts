@@ -1,5 +1,5 @@
 import { resend, FROM_EMAIL } from './resend';
-import { OTPEmail } from './templates/otp-email';
+import { OTPEmail, WhiteLabelOptions } from './templates/otp-email';
 import { WelcomeEmail } from './templates/welcome-email';
 import { DashboardReadyEmail } from './templates/dashboard-ready-email';
 import { DashboardUpdatedEmail } from './templates/dashboard-updated-email';
@@ -11,18 +11,26 @@ export interface SendOTPEmailParams {
   to: string;
   code: string;
   expiresInMinutes?: number;
+  whiteLabel?: WhiteLabelOptions;
 }
 
 export async function sendOTPEmail({
   to,
   code,
   expiresInMinutes = 10,
+  whiteLabel,
 }: SendOTPEmailParams) {
+  // Use white-label sender name if provided, otherwise default
+  const fromName = whiteLabel?.senderName || 'Zeno';
+  const subject = whiteLabel?.companyName
+    ? 'Your login code'
+    : 'Your Zeno login code';
+
   const { data, error } = await resend.emails.send({
-    from: FROM_EMAIL,
+    from: `${fromName} <${FROM_EMAIL.split('<')[1]?.replace('>', '') || 'noreply@zeno.fyi'}>`,
     to,
-    subject: 'Your Zeno login code',
-    react: OTPEmail({ code, expiresInMinutes }),
+    subject,
+    react: OTPEmail({ code, expiresInMinutes, whiteLabel }),
   });
 
   if (error) {

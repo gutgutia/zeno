@@ -96,7 +96,17 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const allowedFields = ['name', 'branding', 'subdomain', 'custom_domain', 'billing_email'];
+    const allowedFields = [
+      'name',
+      'branding',
+      'subdomain',
+      'custom_domain',
+      'billing_email',
+      // White-label settings
+      'white_label_enabled',
+      'favicon_url',
+      'email_sender_name',
+    ];
     const updateData: Record<string, unknown> = {};
 
     for (const field of allowedFields) {

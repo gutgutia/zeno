@@ -6,6 +6,10 @@ import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import Link from 'next/link';
 import { WorkspacePageRenderer } from './WorkspacePageRenderer';
+import type { Metadata } from 'next';
+
+// Type for organization fields we need
+type OrgFields = Pick<Organization, 'id' | 'subdomain' | 'branding' | 'created_by' | 'name' | 'white_label_enabled' | 'favicon_url'>;
 
 interface PageProps {
   params: Promise<{ subdomain: string; slug: string }>;
@@ -83,7 +87,7 @@ export default async function OrganizationDashboardPage({ params }: PageProps) {
   // First, verify the organization exists
   const { data: organization, error: organizationError } = await adminSupabase
     .from('organizations')
-    .select('id, subdomain, branding, created_by')
+    .select('id, subdomain, branding, created_by, name, white_label_enabled, favicon_url')
     .eq('subdomain', subdomain)
     .single();
 
@@ -91,7 +95,7 @@ export default async function OrganizationDashboardPage({ params }: PageProps) {
     notFound();
   }
 
-  const typedOrganization = organization as Pick<Organization, 'id' | 'subdomain' | 'branding' | 'created_by'>;
+  const typedOrganization = organization as OrgFields;
 
   // Find the dashboard by slug within this organization
   const { data, error } = await adminSupabase
@@ -176,29 +180,46 @@ export default async function OrganizationDashboardPage({ params }: PageProps) {
     ...(branding.colors?.background && { backgroundColor: branding.colors.background }),
   };
 
-  return (
-    <div className="min-h-screen" style={brandingStyles}>
-      {/* Render the page content */}
-      <WorkspacePageRenderer
-        html={config.html}
-        charts={config.charts}
-        data={chartData}
-        branding={branding}
-        title={dashboard.title}
-        subdomain={subdomain}
-      />
+  // White-label settings
+  const showPoweredBy = !typedOrganization.white_label_enabled;
+  const companyName = branding.companyName || typedOrganization.name || 'Dashboard';
+  const pageTitle = typedOrganization.white_label_enabled
+    ? `${dashboard.title} | ${companyName}`
+    : `${dashboard.title} | ${companyName} - Zeno`;
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-[var(--color-gray-200)] mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <p className="text-sm text-[var(--color-gray-500)] text-center">
-            Powered by{' '}
-            <a href="https://zeno.fyi" className="text-[var(--color-primary)] hover:underline">
-              Zeno
-            </a>
-          </p>
-        </div>
-      </footer>
-    </div>
+  return (
+    <>
+      {/* Dynamic head content */}
+      <title>{pageTitle}</title>
+      {typedOrganization.white_label_enabled && typedOrganization.favicon_url && (
+        <link rel="icon" href={typedOrganization.favicon_url} />
+      )}
+
+      <div className="min-h-screen" style={brandingStyles}>
+        {/* Render the page content */}
+        <WorkspacePageRenderer
+          html={config.html}
+          charts={config.charts}
+          data={chartData}
+          branding={branding}
+          title={dashboard.title}
+          subdomain={subdomain}
+        />
+
+        {/* Footer - conditionally shown based on white-label settings */}
+        {showPoweredBy && (
+          <footer className="bg-white border-t border-[var(--color-gray-200)] mt-auto">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+              <p className="text-sm text-[var(--color-gray-500)] text-center">
+                Powered by{' '}
+                <a href="https://zeno.fyi" className="text-[var(--color-primary)] hover:underline">
+                  Zeno
+                </a>
+              </p>
+            </div>
+          </footer>
+        )}
+      </div>
+    </>
   );
 }

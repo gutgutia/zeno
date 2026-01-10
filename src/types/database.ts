@@ -81,6 +81,11 @@ export interface Organization {
   custom_domain_error: string | null;
   vercel_domain_id: string | null;
 
+  // White-label settings (shell/chrome, not dashboard content)
+  white_label_enabled: boolean;
+  favicon_url: string | null;
+  email_sender_name: string | null;
+
   // Metadata
   created_by: string;
   created_at: string;

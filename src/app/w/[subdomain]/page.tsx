@@ -46,9 +46,23 @@ export default async function OrganizationHomePage({ params }: PageProps) {
     ...(branding?.colors?.background && { backgroundColor: branding.colors.background }),
   };
 
+  // White-label settings
+  const showPoweredBy = !typedOrganization.white_label_enabled;
+  const companyName = branding?.companyName || typedOrganization.name;
+  const pageTitle = typedOrganization.white_label_enabled
+    ? `Dashboards | ${companyName}`
+    : `Dashboards | ${companyName} - Zeno`;
+
   return (
-    <div className="min-h-screen" style={brandStyles}>
-      {/* Header */}
+    <>
+      {/* Dynamic head content */}
+      <title>{pageTitle}</title>
+      {typedOrganization.white_label_enabled && typedOrganization.favicon_url && (
+        <link rel="icon" href={typedOrganization.favicon_url} />
+      )}
+
+      <div className="min-h-screen" style={brandStyles}>
+        {/* Header */}
       <header className="bg-white border-b border-[var(--color-gray-200)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center gap-4">
@@ -113,17 +127,20 @@ export default async function OrganizationHomePage({ params }: PageProps) {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-[var(--color-gray-200)] mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <p className="text-sm text-[var(--color-gray-500)] text-center">
-            Powered by{' '}
-            <a href="https://zeno.app" className="text-[var(--color-primary)] hover:underline">
-              Zeno
-            </a>
-          </p>
-        </div>
-      </footer>
-    </div>
+        {/* Footer - conditionally shown based on white-label settings */}
+        {showPoweredBy && (
+          <footer className="bg-white border-t border-[var(--color-gray-200)] mt-auto">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+              <p className="text-sm text-[var(--color-gray-500)] text-center">
+                Powered by{' '}
+                <a href="https://zeno.fyi" className="text-[var(--color-primary)] hover:underline">
+                  Zeno
+                </a>
+              </p>
+            </div>
+          </footer>
+        )}
+      </div>
+    </>
   );
 }

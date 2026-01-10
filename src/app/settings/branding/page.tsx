@@ -59,7 +59,7 @@ export default function BrandingSettingsPage() {
   const [logoError, setLogoError] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  // Form state
+  // Form state - Dashboard branding
   const [companyName, setCompanyName] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#6366f1');
@@ -69,6 +69,14 @@ export default function BrandingSettingsPage() {
   const [chartColors, setChartColors] = useState<string[]>(DEFAULT_CHART_COLORS);
   const [fontFamily, setFontFamily] = useState<BrandingConfig['fontFamily']>('system');
   const [styleGuide, setStyleGuide] = useState('');
+
+  // White-label settings (shell/chrome, separate from dashboard branding)
+  const [whiteLabelEnabled, setWhiteLabelEnabled] = useState(false);
+  const [faviconUrl, setFaviconUrl] = useState('');
+  const [emailSenderName, setEmailSenderName] = useState('');
+  const [isUploadingFavicon, setIsUploadingFavicon] = useState(false);
+  const [faviconError, setFaviconError] = useState<string | null>(null);
+  const faviconInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch organization data
   useEffect(() => {
@@ -100,6 +108,10 @@ export default function BrandingSettingsPage() {
             setFontFamily(branding.fontFamily || 'system');
             setStyleGuide(branding.styleGuide || '');
           }
+          // Populate white-label settings
+          setWhiteLabelEnabled(selectedOrg.white_label_enabled || false);
+          setFaviconUrl(selectedOrg.favicon_url || '');
+          setEmailSenderName(selectedOrg.email_sender_name || '');
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -187,7 +199,13 @@ export default function BrandingSettingsPage() {
       const response = await fetch(`/api/organizations/${organization.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ branding }),
+        body: JSON.stringify({
+          branding,
+          // White-label settings
+          white_label_enabled: whiteLabelEnabled,
+          favicon_url: faviconUrl || null,
+          email_sender_name: emailSenderName || null,
+        }),
       });
 
       if (!response.ok) {
@@ -279,6 +297,44 @@ export default function BrandingSettingsPage() {
     } finally {
       setIsUploadingLogo(false);
     }
+  };
+
+  const handleFaviconUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingFavicon(true);
+    setFaviconError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'favicon');
+
+      const response = await fetch('/api/branding/logo', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload favicon');
+      }
+
+      setFaviconUrl(data.logoUrl);
+    } catch (err) {
+      setFaviconError(err instanceof Error ? err.message : 'Failed to upload favicon');
+    } finally {
+      setIsUploadingFavicon(false);
+      if (faviconInputRef.current) {
+        faviconInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveFavicon = () => {
+    setFaviconUrl('');
   };
 
   if (isLoading || isPlanLoading) {
@@ -838,6 +894,146 @@ export default function BrandingSettingsPage() {
               Be specific about your preferences for chart styles, language tone, and data presentation.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* White Label Settings */}
+      <Card className="border-2 border-[var(--color-gray-300)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-[var(--color-gray-600)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            White Label Settings
+          </CardTitle>
+          <CardDescription>
+            Remove Zeno branding from shared dashboards and customize the viewer experience.
+            This affects the page shell (footer, page titles, emails) - not the dashboard content itself.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Enable Toggle */}
+          <div className="flex items-center justify-between p-4 bg-[var(--color-gray-50)] rounded-lg">
+            <div>
+              <p className="font-medium text-[var(--color-gray-900)]">Enable White Label</p>
+              <p className="text-sm text-[var(--color-gray-500)]">
+                Remove &quot;Powered by Zeno&quot; and use your own branding
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={whiteLabelEnabled}
+              onClick={() => setWhiteLabelEnabled(!whiteLabelEnabled)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                whiteLabelEnabled ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-gray-300)]'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  whiteLabelEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* White Label Options (shown when enabled) */}
+          {whiteLabelEnabled && (
+            <div className="space-y-4 pt-2">
+              {/* Favicon */}
+              <div className="space-y-2">
+                <Label>Custom Favicon</Label>
+                <p className="text-xs text-[var(--color-gray-500)] mb-2">
+                  Displayed in browser tabs when viewers access shared dashboards
+                </p>
+                <div className="flex items-center gap-4">
+                  {/* Favicon Preview */}
+                  <div className="w-12 h-12 border-2 border-dashed border-[var(--color-gray-200)] rounded-lg flex items-center justify-center bg-[var(--color-gray-50)] overflow-hidden">
+                    {faviconUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={faviconUrl}
+                        alt="Favicon"
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    ) : (
+                      <svg className="w-6 h-6 text-[var(--color-gray-400)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </div>
+
+                  {/* Upload Controls */}
+                  <div className="flex-1">
+                    <input
+                      ref={faviconInputRef}
+                      type="file"
+                      accept="image/png,image/x-icon,image/svg+xml"
+                      onChange={handleFaviconUpload}
+                      className="hidden"
+                      id="favicon-upload"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => faviconInputRef.current?.click()}
+                        disabled={isUploadingFavicon}
+                      >
+                        {isUploadingFavicon ? 'Uploading...' : 'Upload Favicon'}
+                      </Button>
+                      {faviconUrl && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRemoveFavicon}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-xs text-[var(--color-gray-500)] mt-1">
+                      PNG, ICO, or SVG. Recommended: 32x32px
+                    </p>
+                    {faviconError && (
+                      <p className="text-xs text-red-600 mt-1">{faviconError}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Email Sender Name */}
+              <div className="space-y-2">
+                <Label htmlFor="emailSenderName">Email Sender Name</Label>
+                <p className="text-xs text-[var(--color-gray-500)] mb-2">
+                  Used as the &quot;From&quot; name in authentication emails sent to dashboard viewers
+                </p>
+                <Input
+                  id="emailSenderName"
+                  value={emailSenderName}
+                  onChange={(e) => setEmailSenderName(e.target.value)}
+                  placeholder={companyName || 'Your Company Name'}
+                  className="max-w-md"
+                />
+              </div>
+
+              {/* Info Box */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>What changes with white label enabled:</strong>
+                </p>
+                <ul className="text-sm text-blue-700 mt-2 space-y-1 list-disc list-inside">
+                  <li>&quot;Powered by Zeno&quot; footer is removed from dashboard pages</li>
+                  <li>Page titles use your company name instead of Zeno</li>
+                  <li>Your favicon appears in browser tabs</li>
+                  <li>Authentication emails use your sender name</li>
+                </ul>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

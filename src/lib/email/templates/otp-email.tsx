@@ -13,30 +13,50 @@ import {
 import * as React from 'react';
 import { EMAIL_LOGO_URL, EMAIL_LOGO_SMALL_WIDTH, EMAIL_LOGO_SMALL_HEIGHT } from '../assets';
 
+// White-label options for customizing the email
+export interface WhiteLabelOptions {
+  companyName?: string;
+  logoUrl?: string;
+  senderName?: string;
+}
+
 interface OTPEmailProps {
   code: string;
   expiresInMinutes?: number;
   appUrl?: string;
+  whiteLabel?: WhiteLabelOptions;
 }
 
 export function OTPEmail({
   code,
   expiresInMinutes = 10,
   appUrl = 'https://zeno.fyi',
+  whiteLabel,
 }: OTPEmailProps) {
+  // Determine branding based on white-label settings
+  const isWhiteLabeled = !!whiteLabel?.companyName;
+  const companyName = whiteLabel?.companyName || 'Zeno';
+  const logoSrc = whiteLabel?.logoUrl || EMAIL_LOGO_URL;
+  const previewText = isWhiteLabeled
+    ? `Your login code: ${code}`
+    : `Your Zeno login code: ${code}`;
+  const signInText = isWhiteLabeled
+    ? `Enter the following code to sign in. This code will expire in ${expiresInMinutes} minutes.`
+    : `Enter the following code to sign in to your Zeno account. This code will expire in ${expiresInMinutes} minutes.`;
+
   return (
     <Html>
       <Head />
-      <Preview>Your Zeno login code: {code}</Preview>
+      <Preview>{previewText}</Preview>
       <Body style={main}>
         <Container style={container}>
           {/* Header */}
           <Section style={header}>
             <Img
-              src={EMAIL_LOGO_URL}
-              width={EMAIL_LOGO_SMALL_WIDTH}
-              height={EMAIL_LOGO_SMALL_HEIGHT}
-              alt="Zeno"
+              src={logoSrc}
+              width={whiteLabel?.logoUrl ? 'auto' : EMAIL_LOGO_SMALL_WIDTH}
+              height={whiteLabel?.logoUrl ? 40 : EMAIL_LOGO_SMALL_HEIGHT}
+              alt={companyName}
               style={logo}
             />
           </Section>
@@ -44,10 +64,7 @@ export function OTPEmail({
           {/* Content */}
           <Section style={content}>
             <Heading style={greeting}>Your login code</Heading>
-            <Text style={message}>
-              Enter the following code to sign in to your Zeno account. This
-              code will expire in {expiresInMinutes} minutes.
-            </Text>
+            <Text style={message}>{signInText}</Text>
 
             {/* Code Box */}
             <Section style={codeContainer}>
@@ -66,14 +83,20 @@ export function OTPEmail({
 
           {/* Footer */}
           <Section style={footer}>
-            <Text style={footerText}>
-              This email was sent by{' '}
-              <Link href="https://zeno.fyi" style={footerLink}>
-                Zeno
-              </Link>
-              .<br />
-              Paste data. Get a dashboard. Share in seconds.
-            </Text>
+            {isWhiteLabeled ? (
+              <Text style={footerText}>
+                This email was sent by {companyName}.
+              </Text>
+            ) : (
+              <Text style={footerText}>
+                This email was sent by{' '}
+                <Link href="https://zeno.fyi" style={footerLink}>
+                  Zeno
+                </Link>
+                .<br />
+                Paste data. Get a dashboard. Share in seconds.
+              </Text>
+            )}
           </Section>
         </Container>
       </Body>
