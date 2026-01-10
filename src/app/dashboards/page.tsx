@@ -92,6 +92,7 @@ export default async function DashboardsPage() {
     .from('dashboards')
     .select('*, organizations(name)')
     .eq('owner_id', user.id) // Only show dashboards owned by the user
+    .is('deleted_at', null) // Exclude soft-deleted dashboards
     .order('updated_at', { ascending: false });
 
   // Filter by current organization
