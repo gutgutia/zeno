@@ -179,11 +179,21 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get the dashboard (need to check both deleted and non-deleted)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existingData, error: fetchError } = await (supabase as any)
+    // Use service client to bypass RLS for fetching and updating
+    const { createServiceClient } = await import('@/lib/supabase/service');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    const serviceClient = createServiceClient(supabaseUrl, serviceRoleKey);
+
+    // Get the dashboard
+    const { data: existingData, error: fetchError } = await serviceClient
       .from('dashboards')
-      .select('*, organizations!inner(id, created_by)')
+      .select('*, organizations(id)')
       .eq('id', id)
       .single();
 
@@ -191,25 +201,28 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dashboard not found' }, { status: 404 });
     }
 
-    // Type assertion for joined data
     const existingDashboard = existingData as Dashboard & {
-      organizations: { id: string; created_by: string };
+      organizations: { id: string } | null;
     };
 
-    // Check ownership - user must be organization owner or member
-    const isOwner = existingDashboard.organizations.created_by === user.id;
+    // Check ownership - user must be the dashboard owner
+    const isDashboardOwner = existingDashboard.owner_id === user.id;
 
-    if (!isOwner) {
-      // Check if user is a member of the organization
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: membership } = await (supabase as any)
-        .from('organization_members')
-        .select('role')
-        .eq('organization_id', existingDashboard.organizations.id)
-        .eq('user_id', user.id)
-        .single();
+    if (!isDashboardOwner) {
+      // Check if user is an admin/owner of the organization
+      if (existingDashboard.organization_id) {
+        const { data: membership } = await serviceClient
+          .from('organization_members')
+          .select('role')
+          .eq('organization_id', existingDashboard.organization_id)
+          .eq('user_id', user.id)
+          .single();
 
-      if (!membership) {
+        // Only org admins/owners can delete other people's dashboards
+        if (!membership || !['owner', 'admin'].includes(membership.role)) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+      } else {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
     }
@@ -220,13 +233,13 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     }
 
     // Soft delete: set deleted_at timestamp
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: updateError } = await (supabase as any)
+    const { error: updateError } = await serviceClient
       .from('dashboards')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
 
     if (updateError) {
+      console.error('Delete error:', updateError);
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 

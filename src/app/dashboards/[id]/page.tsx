@@ -580,7 +580,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
-                    onClick={() => {
+                    onSelect={() => {
                       const url = `${window.location.origin}/d/${dashboard.slug}`;
                       navigator.clipboard.writeText(url);
                       toast.success('Link copied to clipboard!');
@@ -596,7 +596,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        onClick={handleToggleSync}
+                        onSelect={handleToggleSync}
                         disabled={isTogglingSync}
                       >
                         {syncEnabled ? (
@@ -625,7 +625,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     variant="destructive"
-                    onClick={() => setIsDeleteDialogOpen(true)}
+                    onSelect={() => setIsDeleteDialogOpen(true)}
                   >
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
