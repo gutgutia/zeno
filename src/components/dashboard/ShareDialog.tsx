@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,10 +12,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import type { DashboardShare } from '@/types/database';
+import type { DashboardShare, ShareViewerType } from '@/types/database';
 import { toast } from 'sonner';
 
 type Visibility = 'private' | 'public' | 'specific';
+
+// Detect viewer type based on domain matching
+function detectViewerType(ownerDomain: string | null, shareValue: string, shareType: 'email' | 'domain'): ShareViewerType {
+  if (!ownerDomain) return 'external';
+
+  if (shareType === 'domain') {
+    return shareValue.toLowerCase() === ownerDomain.toLowerCase() ? 'internal' : 'external';
+  } else {
+    const shareDomain = shareValue.toLowerCase().split('@')[1];
+    return shareDomain === ownerDomain.toLowerCase() ? 'internal' : 'external';
+  }
+}
 
 interface ShareDialogProps {
   dashboardId: string;
@@ -36,9 +48,20 @@ export function ShareDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [newShareValue, setNewShareValue] = useState('');
   const [shareType, setShareType] = useState<'email' | 'domain'>('email');
+  const [viewerTypeOverride, setViewerTypeOverride] = useState<ShareViewerType | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
+  const [ownerDomain, setOwnerDomain] = useState<string | null>(null);
+
+  // Auto-detect viewer type based on input
+  const detectedViewerType = useMemo(() => {
+    if (!newShareValue.trim()) return null;
+    return detectViewerType(ownerDomain, newShareValue.trim(), shareType);
+  }, [ownerDomain, newShareValue, shareType]);
+
+  // Final viewer type to send (override or detected)
+  const finalViewerType = viewerTypeOverride || detectedViewerType;
 
   // Determine current visibility
   const getVisibility = (): Visibility => {
@@ -64,6 +87,7 @@ export function ShareDialog({
         if (response.ok) {
           const data = await response.json();
           setShares(data.shares);
+          setOwnerDomain(data.ownerDomain || null);
         }
       } catch (err) {
         console.error('Failed to fetch shares:', err);
@@ -122,6 +146,7 @@ export function ShareDialog({
         body: JSON.stringify({
           share_type: shareType,
           share_value: newShareValue.trim(),
+          viewer_type: finalViewerType || 'auto',
         }),
       });
 
@@ -134,10 +159,12 @@ export function ShareDialog({
 
       setShares((prev) => [data.share, ...prev]);
       setNewShareValue('');
+      setViewerTypeOverride(null); // Reset override
+      const isInternal = data.share.viewer_type === 'internal';
       toast.success(
         shareType === 'email'
-          ? `Shared with ${newShareValue.trim()}`
-          : `Shared with @${newShareValue.trim()}`
+          ? `Shared with ${newShareValue.trim()} as ${isInternal ? 'team member' : 'external viewer'}`
+          : `Shared with @${newShareValue.trim()} as ${isInternal ? 'team members' : 'external viewers'}`
       );
     } catch (err) {
       setError('Failed to add share');
@@ -309,7 +336,10 @@ export function ShareDialog({
               <div className="flex gap-2">
                 <select
                   value={shareType}
-                  onChange={(e) => setShareType(e.target.value as 'email' | 'domain')}
+                  onChange={(e) => {
+                    setShareType(e.target.value as 'email' | 'domain');
+                    setViewerTypeOverride(null); // Reset override when changing type
+                  }}
                   className="px-3 py-2 border border-[var(--color-gray-200)] rounded-lg text-sm bg-white"
                 >
                   <option value="email">Email</option>
@@ -317,7 +347,10 @@ export function ShareDialog({
                 </select>
                 <Input
                   value={newShareValue}
-                  onChange={(e) => setNewShareValue(e.target.value)}
+                  onChange={(e) => {
+                    setNewShareValue(e.target.value);
+                    setViewerTypeOverride(null); // Reset override when typing
+                  }}
                   placeholder={shareType === 'email' ? 'user@example.com' : 'company.com'}
                   className="flex-1"
                   onKeyDown={(e) => {
@@ -331,6 +364,54 @@ export function ShareDialog({
                   {isAdding ? '...' : 'Add'}
                 </Button>
               </div>
+
+              {/* Viewer type detection/selection */}
+              {newShareValue.trim() && detectedViewerType && (
+                <div className="p-3 bg-[var(--color-gray-50)] rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-[var(--color-gray-600)]">Access type:</span>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setViewerTypeOverride(viewerTypeOverride === 'internal' ? null : 'internal')}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                          finalViewerType === 'internal'
+                            ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                            : 'bg-white text-[var(--color-gray-500)] border border-[var(--color-gray-200)] hover:border-[var(--color-gray-300)]'
+                        }`}
+                      >
+                        Team member
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewerTypeOverride(viewerTypeOverride === 'external' ? null : 'external')}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                          finalViewerType === 'external'
+                            ? 'bg-amber-100 text-amber-700 border border-amber-300'
+                            : 'bg-white text-[var(--color-gray-500)] border border-[var(--color-gray-200)] hover:border-[var(--color-gray-300)]'
+                        }`}
+                      >
+                        External viewer
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-[var(--color-gray-500)]">
+                    {finalViewerType === 'internal' ? (
+                      <>
+                        <span className="font-medium">Team member:</span> Will create a Zeno account and join your organization
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium">External viewer:</span> Can view this dashboard only, no account created
+                      </>
+                    )}
+                    {!viewerTypeOverride && detectedViewerType && (
+                      <span className="text-[var(--color-gray-400)]"> (auto-detected)</span>
+                    )}
+                  </p>
+                </div>
+              )}
+
               {error && <p className="text-sm text-[var(--color-error)]">{error}</p>}
               <p className="text-xs text-[var(--color-gray-500)]">
                 {shareType === 'email'
@@ -342,7 +423,7 @@ export function ShareDialog({
               {isLoading ? (
                 <div className="text-center py-4 text-[var(--color-gray-500)]">Loading...</div>
               ) : shares.length > 0 ? (
-                <div className="space-y-2 max-h-32 overflow-y-auto">
+                <div className="space-y-2 max-h-40 overflow-y-auto">
                   {shares.map((share) => (
                     <div
                       key={share.id}
@@ -358,6 +439,13 @@ export function ShareDialog({
                           <p className="text-sm font-medium text-[var(--color-gray-900)]">
                             {share.share_type === 'domain' ? `@${share.share_value}` : share.share_value}
                           </p>
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            share.viewer_type === 'internal'
+                              ? 'bg-blue-50 text-blue-600'
+                              : 'bg-amber-50 text-amber-600'
+                          }`}>
+                            {share.viewer_type === 'internal' ? 'Team' : 'External'}
+                          </span>
                         </div>
                       </div>
                       <button

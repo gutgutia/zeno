@@ -214,13 +214,26 @@ export interface ChatMessage {
   created_at: string;
 }
 
+export type ShareViewerType = 'auto' | 'internal' | 'external';
+
 export interface DashboardShare {
   id: string;
   dashboard_id: string;
   share_type: 'domain' | 'email';
   share_value: string; // email address or domain (e.g., 'acme.com')
+  viewer_type: ShareViewerType; // Controls auth behavior: auto (domain-based), internal (create account), external (verify-only)
   created_by: string | null;
   created_at: string;
+}
+
+export interface ExternalViewerSession {
+  id: string;
+  email: string;
+  dashboard_id: string;
+  token_hash: string;
+  expires_at: string;
+  created_at: string;
+  last_accessed_at: string;
 }
 
 // Version change types

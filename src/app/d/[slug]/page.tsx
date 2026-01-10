@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { notFound } from 'next/navigation';
-import type { Dashboard, BrandingConfig, DashboardShare } from '@/types/database';
+import { cookies } from 'next/headers';
+import { createHash } from 'crypto';
+import type { Dashboard, BrandingConfig, DashboardShare, ExternalViewerSession } from '@/types/database';
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import Link from 'next/link';
@@ -9,6 +11,60 @@ import { SharedDashboardHeader } from '@/components/layout/shared-dashboard-head
 import { DashboardTitleBar } from '@/components/dashboard/DashboardTitleBar';
 import { PageRenderer } from '@/components/dashboard/PageRenderer';
 import { SharedDashboardAuthGate } from '@/components/dashboard/SharedDashboardAuthGate';
+
+// Cookie name for external viewer sessions
+const EXTERNAL_SESSION_COOKIE = 'zeno_external_session';
+
+// Check for valid external viewer session
+async function checkExternalViewerSession(
+  supabase: ReturnType<typeof createAdminClient>,
+  dashboardId: string
+): Promise<{ valid: boolean; email?: string }> {
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get(EXTERNAL_SESSION_COOKIE);
+
+  if (!sessionCookie) {
+    return { valid: false };
+  }
+
+  try {
+    const { token, dashboardId: cookieDashboardId } = JSON.parse(decodeURIComponent(sessionCookie.value));
+
+    // Ensure the cookie is for this dashboard
+    if (cookieDashboardId !== dashboardId) {
+      return { valid: false };
+    }
+
+    // Hash the token to look up the session
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+
+    // Find the session
+    const { data: session, error } = await supabase
+      .from('external_viewer_sessions')
+      .select('*')
+      .eq('token_hash', tokenHash)
+      .eq('dashboard_id', dashboardId)
+      .gt('expires_at', new Date().toISOString())
+      .single();
+
+    if (error || !session) {
+      return { valid: false };
+    }
+
+    const sessionData = session as ExternalViewerSession;
+
+    // Update last accessed time (fire and forget)
+    supabase
+      .from('external_viewer_sessions')
+      .update({ last_accessed_at: new Date().toISOString() })
+      .eq('id', sessionData.id)
+      .then(() => {});
+
+    return { valid: true, email: sessionData.email };
+  } catch {
+    return { valid: false };
+  }
+}
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -127,22 +183,38 @@ export default async function PublicDashboardPage({ params }: PageProps) {
         notFound();
       }
 
-      // If not authenticated, show auth gate with blurred placeholder
-      if (!user) {
+      // Check for Supabase authenticated user
+      let hasAccess = false;
+      let viewerEmail = '';
+
+      if (user) {
+        // Supabase authenticated user (internal users)
+        hasAccess = checkShareAccess(dashboardShares, user.email || '');
+        viewerEmail = user.email || '';
+      } else {
+        // Check for external viewer session (cookie-based)
+        const externalSession = await checkExternalViewerSession(adminSupabase, dashboardData.id);
+        if (externalSession.valid && externalSession.email) {
+          // Verify the session email still has access
+          hasAccess = checkShareAccess(dashboardShares, externalSession.email);
+          viewerEmail = externalSession.email;
+        }
+      }
+
+      // If not authenticated at all, show auth gate
+      if (!user && !viewerEmail) {
         return (
           <SharedDashboardAuthGate
             dashboardTitle={dashboardData.title}
             slug={slug}
+            dashboardId={dashboardData.id}
           />
         );
       }
 
-      // Check if user's email matches any share
-      const hasAccess = checkShareAccess(dashboardShares, user.email || '');
-
+      // User/viewer is authenticated but doesn't have access (access may have been revoked)
       if (!hasAccess) {
-        // User is authenticated but doesn't have access (access may have been revoked)
-        return <AccessDenied userEmail={user.email || ''} dashboardTitle={dashboardData.title} />;
+        return <AccessDenied userEmail={viewerEmail} dashboardTitle={dashboardData.title} />;
       }
     }
   }

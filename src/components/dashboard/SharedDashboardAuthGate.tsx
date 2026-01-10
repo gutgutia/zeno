@@ -8,12 +8,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
+// Cookie name for external viewer sessions
+const EXTERNAL_SESSION_COOKIE = 'zeno_external_session';
+
+// Helper to set a cookie
+function setExternalSessionCookie(token: string, dashboardId: string, expiresAt: string) {
+  const expires = new Date(expiresAt);
+  const value = JSON.stringify({ token, dashboardId });
+  document.cookie = `${EXTERNAL_SESSION_COOKIE}=${encodeURIComponent(value)}; expires=${expires.toUTCString()}; path=/; SameSite=Strict; Secure`;
+}
+
 interface SharedDashboardAuthGateProps {
   dashboardTitle: string;
   slug: string;
+  dashboardId: string;
 }
 
-export function SharedDashboardAuthGate({ dashboardTitle, slug }: SharedDashboardAuthGateProps) {
+export function SharedDashboardAuthGate({ dashboardTitle, slug, dashboardId }: SharedDashboardAuthGateProps) {
   const [step, setStep] = useState<'email' | 'verify'>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -66,10 +77,11 @@ export function SharedDashboardAuthGate({ dashboardTitle, slug }: SharedDashboar
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/verify-otp', {
+      // Use the new verify-share-access endpoint that handles viewer types
+      const response = await fetch('/api/auth/verify-share-access', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ email, code, dashboardSlug: slug }),
       });
 
       const data = await response.json();
@@ -79,18 +91,26 @@ export function SharedDashboardAuthGate({ dashboardTitle, slug }: SharedDashboar
         return;
       }
 
-      const { error } = await supabase.auth.verifyOtp({
-        token_hash: data.token_hash,
-        type: 'magiclink',
-      });
+      if (data.viewerType === 'internal') {
+        // Internal user: Complete Supabase authentication
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: data.token_hash,
+          type: 'magiclink',
+        });
 
-      if (error) {
-        toast.error(error.message);
-        return;
+        if (error) {
+          toast.error(error.message);
+          return;
+        }
+
+        toast.success(data.isNewUser ? 'Welcome! Your account has been created.' : 'Successfully signed in!');
+      } else {
+        // External viewer: Store session token in cookie
+        setExternalSessionCookie(data.external_session_token, dashboardId, data.expires_at);
+        toast.success('Access granted!');
       }
 
-      toast.success(data.isNewUser ? 'Welcome to Zeno!' : 'Successfully signed in!');
-      // Refresh the page to load the dashboard with the authenticated user
+      // Refresh the page to load the dashboard
       router.refresh();
     } catch {
       toast.error('Something went wrong. Please try again.');

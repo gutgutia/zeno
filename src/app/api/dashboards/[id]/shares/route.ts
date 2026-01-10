@@ -1,8 +1,22 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import type { DashboardShare } from '@/types/database';
+import type { DashboardShare, ShareViewerType } from '@/types/database';
 import { resend, FROM_EMAIL } from '@/lib/email/resend';
 import { ShareNotificationEmail } from '@/lib/email/templates/share-notification-email';
+
+// Determine viewer type based on domain matching
+function detectViewerType(ownerEmail: string, shareValue: string, shareType: 'email' | 'domain'): ShareViewerType {
+  const ownerDomain = ownerEmail.toLowerCase().split('@')[1];
+
+  if (shareType === 'domain') {
+    // Domain share - compare domains directly
+    return shareValue.toLowerCase() === ownerDomain ? 'internal' : 'external';
+  } else {
+    // Email share - extract domain from email
+    const shareDomain = shareValue.toLowerCase().split('@')[1];
+    return shareDomain === ownerDomain ? 'internal' : 'external';
+  }
+}
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -46,7 +60,13 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ shares: shares as DashboardShare[] });
+    // Include owner's email domain for viewer type auto-detection in UI
+    const ownerDomain = user.email ? user.email.toLowerCase().split('@')[1] : null;
+
+    return NextResponse.json({
+      shares: shares as DashboardShare[],
+      ownerDomain, // Used by UI for auto-detecting viewer type
+    });
   } catch (error) {
     console.error('Error fetching shares:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -65,7 +85,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const { share_type, share_value } = body;
+    const { share_type, share_value, viewer_type: requestedViewerType } = body;
 
     // Validate input
     if (!share_type || !['domain', 'email'].includes(share_type)) {
@@ -74,6 +94,11 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     if (!share_value || typeof share_value !== 'string') {
       return NextResponse.json({ error: 'share_value is required' }, { status: 400 });
+    }
+
+    // Validate viewer_type if provided
+    if (requestedViewerType && !['auto', 'internal', 'external'].includes(requestedViewerType)) {
+      return NextResponse.json({ error: 'Invalid viewer_type' }, { status: 400 });
     }
 
     // Validate format
@@ -114,6 +139,13 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Determine viewer_type
+    // If 'auto' or not specified, detect based on domain matching
+    let finalViewerType: ShareViewerType = requestedViewerType || 'auto';
+    if (finalViewerType === 'auto') {
+      finalViewerType = detectViewerType(user.email || '', normalizedValue, share_type);
+    }
+
     // Create share
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: share, error } = await (supabase as any)
@@ -122,6 +154,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         dashboard_id: id,
         share_type,
         share_value: normalizedValue,
+        viewer_type: finalViewerType,
         created_by: user.id,
       })
       .select()
