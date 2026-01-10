@@ -53,6 +53,10 @@ export function ShareDialog({
   const [error, setError] = useState<string | null>(null);
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
   const [ownerDomain, setOwnerDomain] = useState<string | null>(null);
+  const [orgDomainInfo, setOrgDomainInfo] = useState<{
+    subdomain: string | null;
+    customDomain: string | null;
+  } | null>(null);
 
   // Auto-detect viewer type based on input
   const detectedViewerType = useMemo(() => {
@@ -78,16 +82,29 @@ export function ShareDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPublished, shares.length]);
 
-  // Fetch shares on mount
+  // Fetch shares and org domain info on mount
   useEffect(() => {
-    async function fetchShares() {
+    async function fetchSharesAndOrgInfo() {
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/dashboards/${dashboardId}/shares`);
-        if (response.ok) {
-          const data = await response.json();
+        // Fetch shares
+        const sharesResponse = await fetch(`/api/dashboards/${dashboardId}/shares`);
+        if (sharesResponse.ok) {
+          const data = await sharesResponse.json();
           setShares(data.shares);
           setOwnerDomain(data.ownerDomain || null);
+        }
+
+        // Fetch dashboard to get org domain info
+        const dashboardResponse = await fetch(`/api/dashboards/${dashboardId}`);
+        if (dashboardResponse.ok) {
+          const dashboard = await dashboardResponse.json();
+          if (dashboard.organization) {
+            setOrgDomainInfo({
+              subdomain: dashboard.organization.subdomain || null,
+              customDomain: dashboard.organization.custom_domain || null,
+            });
+          }
         }
       } catch (err) {
         console.error('Failed to fetch shares:', err);
@@ -95,7 +112,7 @@ export function ShareDialog({
         setIsLoading(false);
       }
     }
-    fetchShares();
+    fetchSharesAndOrgInfo();
   }, [dashboardId]);
 
   const handleVisibilityChange = async (newVisibility: Visibility) => {
@@ -190,13 +207,26 @@ export function ShareDialog({
     }
   };
 
-  const handleCopyLink = () => {
-    const url = `${window.location.origin}/d/${dashboardSlug}`;
-    navigator.clipboard.writeText(url);
-    toast.success('Link copied to clipboard');
+  // Build the share URL based on org's domain settings
+  const getDashboardUrl = () => {
+    // Priority: custom domain > subdomain > fallback
+    if (orgDomainInfo?.customDomain) {
+      return `https://${orgDomainInfo.customDomain}/${dashboardSlug}`;
+    }
+    if (orgDomainInfo?.subdomain) {
+      return `https://${orgDomainInfo.subdomain}.zeno.fyi/${dashboardSlug}`;
+    }
+    // Fallback to current origin with /d/ path
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://zeno.fyi';
+    return `${origin}/d/${dashboardSlug}`;
   };
 
-  const dashboardUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/d/${dashboardSlug}`;
+  const dashboardUrl = getDashboardUrl();
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(dashboardUrl);
+    toast.success('Link copied to clipboard');
+  };
 
   return (
     <Dialog>

@@ -18,10 +18,10 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get the dashboard with workspace branding
+    // Get the dashboard with organization branding and domain info
     const { data, error } = await supabase
       .from('dashboards')
-      .select('*, workspaces!inner(owner_id, branding)')
+      .select('*, organizations!inner(id, created_by, branding, subdomain, custom_domain)')
       .eq('id', id)
       .single();
 
@@ -30,26 +30,51 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     const dashboardData = data as Dashboard & {
-      workspaces: { owner_id: string; branding: BrandingConfig | null };
+      organizations: {
+        id: string;
+        created_by: string;
+        branding: BrandingConfig | null;
+        subdomain: string | null;
+        custom_domain: string | null;
+      };
     };
 
-    // Check ownership
-    if (dashboardData.workspaces.owner_id !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Check ownership - user must be organization owner or member
+    const isOwner = dashboardData.organizations.created_by === user.id;
+
+    if (!isOwner) {
+      // Check if user is a member of the organization
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', dashboardData.organizations.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!membership) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
-    // Merge workspace branding with dashboard override
+    // Merge organization branding with dashboard override
     const effectiveBranding = getMergedBranding(
-      dashboardData.workspaces.branding,
+      dashboardData.organizations.branding,
       dashboardData.branding_override
     );
 
-    // Remove nested workspace from response, add merged branding
-    const { workspaces: _, ...dashboard } = dashboardData;
+    // Extract organization info for share URLs
+    const organization = {
+      subdomain: dashboardData.organizations.subdomain,
+      custom_domain: dashboardData.organizations.custom_domain,
+    };
+
+    // Remove nested organization from response, add merged branding and org info
+    const { organizations: _, ...dashboard } = dashboardData;
 
     return NextResponse.json({
       dashboard,
       branding: effectiveBranding,
+      organization,
     });
   } catch (error) {
     console.error('Error fetching dashboard:', error);
@@ -74,7 +99,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
     // Get the existing dashboard
     const { data: existingData, error: fetchError } = await supabase
       .from('dashboards')
-      .select('*, workspaces!inner(owner_id)')
+      .select('*, organizations!inner(id, created_by)')
       .eq('id', id)
       .single();
 
@@ -84,12 +109,24 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
     // Type assertion for joined data
     const existingDashboard = existingData as Dashboard & {
-      workspaces: { owner_id: string };
+      organizations: { id: string; created_by: string };
     };
 
-    // Check ownership
-    if (existingDashboard.workspaces.owner_id !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Check ownership - user must be organization owner or member
+    const isOwner = existingDashboard.organizations.created_by === user.id;
+
+    if (!isOwner) {
+      // Check if user is a member of the organization
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', existingDashboard.organizations.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!membership) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     // Build update object
@@ -141,7 +178,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: existingData, error: fetchError } = await (supabase as any)
       .from('dashboards')
-      .select('*, workspaces!inner(owner_id)')
+      .select('*, organizations!inner(id, created_by)')
       .eq('id', id)
       .single();
 
@@ -151,12 +188,25 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     // Type assertion for joined data
     const existingDashboard = existingData as Dashboard & {
-      workspaces: { owner_id: string };
+      organizations: { id: string; created_by: string };
     };
 
-    // Check ownership
-    if (existingDashboard.workspaces.owner_id !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Check ownership - user must be organization owner or member
+    const isOwner = existingDashboard.organizations.created_by === user.id;
+
+    if (!isOwner) {
+      // Check if user is a member of the organization
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: membership } = await (supabase as any)
+        .from('organization_members')
+        .select('role')
+        .eq('organization_id', existingDashboard.organizations.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!membership) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     // Check if already deleted
