@@ -18,7 +18,17 @@ export async function GET() {
 
     // Ensure user has at least one organization (auto-create personal org if needed)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).rpc('get_or_create_user_organization', { p_user_id: user.id });
+    const { data: orgId } = await (supabase as any).rpc('get_or_create_user_organization', { p_user_id: user.id });
+
+    // If an org was created/returned, assign any orphaned dashboards to it
+    if (orgId) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
+        .from('dashboards')
+        .update({ organization_id: orgId })
+        .eq('owner_id', user.id)
+        .is('organization_id', null);
+    }
 
     // Get organizations where user is a member, with their role
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
