@@ -53,6 +53,9 @@ export interface BrandingConfig {
   styleGuide?: string;
 }
 
+// Custom domain verification status
+export type CustomDomainStatus = 'pending' | 'verifying' | 'verified' | 'failed';
+
 // Organization (billing entity)
 export interface Organization {
   id: string;
@@ -71,6 +74,12 @@ export interface Organization {
   branding: BrandingConfig | null;
   subdomain: string | null;
   custom_domain: string | null;
+
+  // Custom domain verification
+  custom_domain_status: CustomDomainStatus | null;
+  custom_domain_verified_at: string | null;
+  custom_domain_error: string | null;
+  vercel_domain_id: string | null;
 
   // Metadata
   created_by: string;
