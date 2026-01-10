@@ -67,6 +67,8 @@ export async function POST(request: Request) {
       googleSheetId,
       googleSheetName,
       syncEnabled,
+      // Organization assignment
+      organizationId,
     } = body;
 
     // Title is now optional - we'll generate it if not provided
@@ -177,6 +179,7 @@ export async function POST(request: Request) {
       .insert({
         workspace_id: workspace.id,
         owner_id: user.id,
+        organization_id: organizationId || null,
         title: finalTitle,
         slug,
         description: finalDescription,

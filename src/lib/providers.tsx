@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, Suspense } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { PostHogProvider } from '@/lib/posthog';
+import { OrganizationProvider } from '@/lib/contexts/organization-context';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -22,7 +23,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <Suspense fallback={null}>
       <PostHogProvider>
         <QueryClientProvider client={queryClient}>
-          {children}
+          <OrganizationProvider>
+            {children}
+          </OrganizationProvider>
           <Toaster position="top-right" />
         </QueryClientProvider>
       </PostHogProvider>

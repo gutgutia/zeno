@@ -16,6 +16,7 @@ import { GoogleSheetPicker } from '@/components/sheets/GoogleSheetPicker';
 import { UpgradePrompt } from '@/components/billing/UpgradePrompt';
 import { UpgradeModal } from '@/components/billing/UpgradeModal';
 import { usePlan } from '@/lib/hooks';
+import { useOrganization } from '@/lib/contexts/organization-context';
 import type { ParsedData, DataSchema, ContentType } from '@/types/dashboard';
 import type { DataSource } from '@/types/database';
 
@@ -41,6 +42,18 @@ function NewDashboardPageContent() {
   // Plan features
   const { features } = usePlan();
   const canUseGoogleSheets = features.google_sheets;
+
+  // Organization context
+  const { organizations, currentOrg } = useOrganization();
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const hasMultipleOrgs = organizations.length > 1;
+
+  // Initialize selected org from current org
+  useEffect(() => {
+    if (currentOrg && !selectedOrgId) {
+      setSelectedOrgId(currentOrg.id);
+    }
+  }, [currentOrg, selectedOrgId]);
 
   // Check for Google connection callback
   const googleConnected = searchParams.get('google_connected');
@@ -451,6 +464,8 @@ function NewDashboardPageContent() {
             ? dataSource.selectedSheets.join(', ')
             : null,
           syncEnabled: dataSource?.type === 'google_sheets' ? enableSync : false,
+          // Organization assignment
+          organizationId: selectedOrgId,
         }),
       });
 
@@ -556,6 +571,28 @@ function NewDashboardPageContent() {
       {/* Step 1: Input */}
       {step === 'input' && (
         <>
+          {/* Organization Selector - only show if user has multiple orgs */}
+          {hasMultipleOrgs && (
+            <div className="mb-6">
+              <Label htmlFor="organization">Organization</Label>
+              <p className="text-sm text-[var(--color-gray-500)] mb-1.5">
+                Choose which organization this dashboard belongs to
+              </p>
+              <select
+                id="organization"
+                value={selectedOrgId || ''}
+                onChange={(e) => setSelectedOrgId(e.target.value)}
+                className="w-full sm:w-auto min-w-[200px] px-3 py-2 border border-[var(--color-gray-300)] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+              >
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Title Input */}
           <div className="mb-6">
             <Label htmlFor="title">Dashboard Title (optional)</Label>

@@ -9,9 +9,10 @@ import type { Dashboard, Workspace } from '@/types/database';
 // Force dynamic rendering - this page requires authentication
 export const dynamic = 'force-dynamic';
 
-// Extended dashboard type with share count
+// Extended dashboard type with share count and organization
 interface DashboardWithShares extends Dashboard {
   share_count: number;
+  organization_name?: string;
 }
 
 // Sharing status types
@@ -62,7 +63,16 @@ export default async function DashboardsPage() {
     redirect('/auth');
   }
 
-  // Get user's workspace
+  // Get user's organizations
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: membershipData } = await (supabase as any)
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id) as { data: { organization_id: string }[] | null };
+
+  const orgIds = membershipData?.map(m => m.organization_id) || [];
+
+  // Get user's workspace (for legacy dashboards without org assignment)
   const { data: workspaceData } = await supabase
     .from('workspaces')
     .select('id')
@@ -72,16 +82,33 @@ export default async function DashboardsPage() {
 
   const workspace = workspaceData as Workspace | null;
 
-  // Get dashboards with share counts (only if workspace exists)
+  // Get dashboards: user-owned OR in user's organizations
   let dashboards: DashboardWithShares[] = [];
-  if (workspace?.id) {
-    // First get dashboards
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: dashboardData } = await (supabase as any)
-      .from('dashboards')
-      .select('*')
-      .eq('workspace_id', workspace.id)
-      .order('updated_at', { ascending: false }) as { data: Dashboard[] | null };
+
+  // Build query for dashboards with organization info
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from('dashboards')
+    .select('*, organizations(name)')
+    .order('updated_at', { ascending: false });
+
+  // If user has orgs and a workspace, get dashboards from both
+  if (orgIds.length > 0 && workspace?.id) {
+    // Dashboards in user's orgs OR in user's personal workspace
+    query = query.or(`organization_id.in.(${orgIds.join(',')}),workspace_id.eq.${workspace.id}`);
+  } else if (orgIds.length > 0) {
+    // Only org dashboards
+    query = query.in('organization_id', orgIds);
+  } else if (workspace?.id) {
+    // Only personal workspace dashboards
+    query = query.eq('workspace_id', workspace.id);
+  } else {
+    // No access to any dashboards
+    query = null;
+  }
+
+  if (query) {
+    const { data: dashboardData } = await query as { data: Dashboard[] | null };
 
     if (dashboardData) {
       // Get share counts for all dashboards
@@ -102,6 +129,7 @@ export default async function DashboardsPage() {
       dashboards = dashboardData.map(d => ({
         ...d,
         share_count: shareCounts.get(d.id) || 0,
+        organization_name: (d.organizations as { name: string } | null)?.name,
       })) as DashboardWithShares[];
     }
   }
@@ -119,7 +147,11 @@ export default async function DashboardsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {dashboards.map((dashboard) => (
-            <DashboardCard key={dashboard.id} dashboard={dashboard} />
+            <DashboardCard
+              key={dashboard.id}
+              dashboard={dashboard}
+              showOrg={orgIds.length > 1}
+            />
           ))}
         </div>
       )}
@@ -183,7 +215,7 @@ function EmptyState() {
   );
 }
 
-function DashboardCard({ dashboard }: { dashboard: DashboardWithShares }) {
+function DashboardCard({ dashboard, showOrg }: { dashboard: DashboardWithShares; showOrg?: boolean }) {
   const sharingStatus = getSharingStatus(dashboard);
   const statusConfig = SHARING_STATUS_CONFIG[sharingStatus];
 
@@ -198,24 +230,32 @@ function DashboardCard({ dashboard }: { dashboard: DashboardWithShares }) {
           <h3 className="font-semibold text-[var(--color-gray-900)] group-hover:text-[var(--color-primary)] transition-colors line-clamp-1">
             {dashboard.title}
           </h3>
-          
+
           {/* Sharing status badge */}
           <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusConfig.className}`}>
             {statusConfig.icon}
             {statusConfig.label}
           </span>
         </div>
-        
+
         {/* Description */}
         <p className="text-sm text-[var(--color-gray-600)] line-clamp-2 mb-4 min-h-[40px]">
           {dashboard.description || (
             <span className="text-[var(--color-gray-400)] italic">No description</span>
           )}
         </p>
-        
+
         {/* Footer: Meta info */}
-        <div className="text-xs text-[var(--color-gray-500)]">
+        <div className="flex items-center justify-between text-xs text-[var(--color-gray-500)]">
           <span>Updated {formatRelativeTime(dashboard.updated_at)}</span>
+          {showOrg && dashboard.organization_name && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--color-gray-100)] rounded text-[var(--color-gray-600)]">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              {dashboard.organization_name}
+            </span>
+          )}
         </div>
       </div>
     </Link>

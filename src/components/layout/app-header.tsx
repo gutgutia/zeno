@@ -5,12 +5,19 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth, usePlan } from '@/lib/hooks';
+import { useOrganization } from '@/lib/contexts/organization-context';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { UpgradeModal } from '@/components/billing/UpgradeModal';
@@ -19,6 +26,7 @@ import { CreditDisplay } from '@/components/billing/CreditDisplay';
 export function AppHeader() {
   const { user, signOut } = useAuth();
   const { plan, isLoading: isPlanLoading } = usePlan();
+  const { organizations, currentOrg, setCurrentOrg } = useOrganization();
   const router = useRouter();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
@@ -29,6 +37,7 @@ export function AppHeader() {
 
   const userInitial = user?.email?.charAt(0).toUpperCase() || 'U';
   const isFreePlan = plan === 'free';
+  const hasMultipleOrgs = organizations.length > 1;
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-[var(--color-gray-200)]">
@@ -73,13 +82,58 @@ export function AppHeader() {
                   </Avatar>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-64">
                 <div className="px-2 py-1.5">
                   <p className="text-sm font-medium text-[var(--color-gray-900)]">
                     {user?.email}
                   </p>
+                  {currentOrg && (
+                    <p className="text-xs text-[var(--color-gray-500)] mt-0.5">
+                      {currentOrg.name}
+                    </p>
+                  )}
                 </div>
                 <DropdownMenuSeparator />
+
+                {/* Organization Switcher */}
+                {hasMultipleOrgs && (
+                  <>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="cursor-pointer">
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        Switch Organization
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="w-56">
+                        <DropdownMenuLabel>Organizations</DropdownMenuLabel>
+                        <DropdownMenuRadioGroup
+                          value={currentOrg?.id || ''}
+                          onValueChange={(value) => {
+                            const org = organizations.find((o) => o.id === value);
+                            if (org) {
+                              setCurrentOrg(org);
+                              router.refresh();
+                            }
+                          }}
+                        >
+                          {organizations.map((org) => (
+                            <DropdownMenuRadioItem key={org.id} value={org.id} className="cursor-pointer">
+                              <div className="flex flex-col">
+                                <span>{org.name}</span>
+                                <span className="text-xs text-[var(--color-gray-400)] capitalize">
+                                  {org.role}
+                                </span>
+                              </div>
+                            </DropdownMenuRadioItem>
+                          ))}
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+
                 <DropdownMenuItem asChild>
                   <Link href="/dashboards">My Dashboards</Link>
                 </DropdownMenuItem>
