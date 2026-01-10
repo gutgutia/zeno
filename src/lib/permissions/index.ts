@@ -76,16 +76,17 @@ export async function getUserOrganizations(
   supabase: SupabaseClient,
   userId: string
 ): Promise<Array<{ id: string; name: string; role: OrganizationRole }>> {
-  const { data } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any)
     .from('organization_members')
     .select('organization_id, role, organizations(id, name)')
-    .eq('user_id', userId);
+    .eq('user_id', userId) as { data: Array<{ role: string; organizations: { id: string; name: string } }> | null };
 
   if (!data) return [];
 
   return data.map((m) => ({
-    id: (m.organizations as { id: string; name: string }).id,
-    name: (m.organizations as { id: string; name: string }).name,
+    id: m.organizations.id,
+    name: m.organizations.name,
     role: m.role as OrganizationRole,
   }));
 }
@@ -115,7 +116,8 @@ export async function getDashboardPermission(
   userId: string
 ): Promise<DashboardPermission> {
   // Get dashboard with owner and organization info
-  const { data: dashboard } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: dashboard } = await (supabase as any)
     .from('dashboards')
     .select(`
       id,
@@ -124,7 +126,7 @@ export async function getDashboardPermission(
       workspaces!inner(owner_id)
     `)
     .eq('id', dashboardId)
-    .single();
+    .single() as { data: { id: string; owner_id: string; organization_id: string | null; workspaces: { owner_id: string } } | null };
 
   if (!dashboard) return 'none';
 
@@ -132,7 +134,7 @@ export async function getDashboardPermission(
   // Using both owner_id (new) and workspaces.owner_id (legacy) for compatibility
   const isCreator =
     dashboard.owner_id === userId ||
-    (dashboard.workspaces as { owner_id: string })?.owner_id === userId;
+    dashboard.workspaces?.owner_id === userId;
 
   if (isCreator) {
     return 'admin';
@@ -217,13 +219,14 @@ export async function checkDashboardOwnershipLegacy(
   dashboardId: string,
   userId: string
 ): Promise<boolean> {
-  const { data } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any)
     .from('dashboards')
     .select('workspaces!inner(owner_id)')
     .eq('id', dashboardId)
-    .single();
+    .single() as { data: { workspaces: { owner_id: string } } | null };
 
-  return (data?.workspaces as { owner_id: string })?.owner_id === userId;
+  return data?.workspaces?.owner_id === userId;
 }
 
 // ============================================

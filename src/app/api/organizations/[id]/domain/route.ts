@@ -27,12 +27,13 @@ async function checkOrgAccess(
   orgId: string,
   userId: string
 ): Promise<boolean> {
-  const { data } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any)
     .from('organization_members')
     .select('role')
     .eq('organization_id', orgId)
     .eq('user_id', userId)
-    .single();
+    .single() as { data: { role: string } | null };
 
   return data?.role === 'owner' || data?.role === 'admin';
 }
@@ -60,11 +61,12 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     // Get organization with domain info
-    const { data: org, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: org, error } = await (supabase as any)
       .from('organizations')
       .select('id, custom_domain, custom_domain_status, custom_domain_verified_at, custom_domain_error, subdomain')
       .eq('id', id)
-      .single();
+      .single() as { data: Organization | null; error: unknown };
 
     if (error || !org) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });

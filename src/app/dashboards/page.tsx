@@ -108,7 +108,9 @@ export default async function DashboardsPage() {
   }
 
   if (query) {
-    const { data: dashboardData } = await query as { data: Dashboard[] | null };
+    // Query includes organizations join, so we need a custom type
+    type DashboardWithOrg = Dashboard & { organizations: { name: string } | null };
+    const { data: dashboardData } = await query as { data: DashboardWithOrg[] | null };
 
     if (dashboardData) {
       // Get share counts for all dashboards
@@ -129,7 +131,7 @@ export default async function DashboardsPage() {
       dashboards = dashboardData.map(d => ({
         ...d,
         share_count: shareCounts.get(d.id) || 0,
-        organization_name: (d.organizations as { name: string } | null)?.name,
+        organization_name: d.organizations?.name,
       })) as DashboardWithShares[];
     }
   }

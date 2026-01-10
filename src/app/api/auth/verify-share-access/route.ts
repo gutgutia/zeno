@@ -158,7 +158,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Dashboard not found' }, { status: 404 });
     }
 
-    const dashboardData = dashboard as { id: string; workspaces: { owner_id: string } };
+    const dashboardData = dashboard as unknown as { id: string; workspaces: { owner_id: string } };
 
     // Get the owner's email for domain comparison
     const { data: ownerUser } = await supabase.auth.admin.getUserById(dashboardData.workspaces.owner_id);
