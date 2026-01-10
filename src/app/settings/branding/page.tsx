@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/card';
 import { usePlan } from '@/lib/hooks';
 import { UpgradePrompt } from '@/components/billing/UpgradePrompt';
-import type { Workspace, BrandingConfig } from '@/types/database';
+import type { BrandingConfig, OrganizationWithRole } from '@/types/database';
 
 const FONT_OPTIONS = [
   { value: 'system', label: 'System Default' },
@@ -42,7 +42,7 @@ export default function BrandingSettingsPage() {
   const { features, isLoading: isPlanLoading } = usePlan();
   const canCustomizeBranding = features.custom_branding;
 
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [organization, setOrganization] = useState<OrganizationWithRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,23 +70,25 @@ export default function BrandingSettingsPage() {
   const [fontFamily, setFontFamily] = useState<BrandingConfig['fontFamily']>('system');
   const [styleGuide, setStyleGuide] = useState('');
 
-  // Fetch workspace data
+  // Fetch organization data
   useEffect(() => {
-    async function fetchWorkspace() {
+    async function fetchOrganization() {
       try {
-        const response = await fetch('/api/workspaces');
+        const response = await fetch('/api/organizations');
         if (!response.ok) {
-          throw new Error('Failed to fetch workspaces');
+          throw new Error('Failed to fetch organizations');
         }
         const data = await response.json();
-        const workspaces = data.workspaces as Workspace[];
+        const orgs = data.organizations || [];
 
-        // Get the first personal workspace
-        const personalWorkspace = workspaces.find((w) => w.type === 'personal');
-        if (personalWorkspace) {
-          setWorkspace(personalWorkspace);
+        // Get the user's owned organization (primary org)
+        const ownedOrg = orgs.find((org: OrganizationWithRole) => org.role === 'owner');
+        const selectedOrg = ownedOrg || orgs[0];
+
+        if (selectedOrg) {
+          setOrganization(selectedOrg);
           // Populate form with existing branding
-          const branding = personalWorkspace.branding;
+          const branding = selectedOrg.branding as BrandingConfig | null;
           if (branding) {
             setCompanyName(branding.companyName || '');
             setLogoUrl(branding.logoUrl || '');
@@ -106,7 +108,7 @@ export default function BrandingSettingsPage() {
       }
     }
 
-    fetchWorkspace();
+    fetchOrganization();
   }, []);
 
   const handleExtractBrand = async () => {
@@ -161,7 +163,7 @@ export default function BrandingSettingsPage() {
   };
 
   const handleSave = async () => {
-    if (!workspace) return;
+    if (!organization) return;
 
     setIsSaving(true);
     setError(null);
@@ -182,8 +184,8 @@ export default function BrandingSettingsPage() {
         styleGuide: styleGuide || undefined,
       };
 
-      const response = await fetch(`/api/workspaces/${workspace.id}`, {
-        method: 'PUT',
+      const response = await fetch(`/api/organizations/${organization.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ branding }),
       });
@@ -192,8 +194,8 @@ export default function BrandingSettingsPage() {
         throw new Error('Failed to save branding settings');
       }
 
-      const data = await response.json();
-      setWorkspace(data.workspace);
+      const updatedOrg = await response.json();
+      setOrganization({ ...organization, ...updatedOrg });
       setSuccess(true);
 
       // Clear success message after 3 seconds
@@ -287,10 +289,10 @@ export default function BrandingSettingsPage() {
     );
   }
 
-  if (!workspace) {
+  if (!organization) {
     return (
       <div className="text-center py-16">
-        <p className="text-[var(--color-gray-500)]">No workspace found.</p>
+        <p className="text-[var(--color-gray-500)]">No organization found.</p>
       </div>
     );
   }

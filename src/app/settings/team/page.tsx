@@ -87,10 +87,11 @@ export default function TeamPage() {
       const response = await fetch('/api/organizations');
       if (response.ok) {
         const data = await response.json();
+        const orgs = data.organizations || [];
         // Get the user's owned organization (primary org)
-        const ownedOrg = data.find((org: OrganizationWithRole) => org.role === 'owner');
-        if (ownedOrg || data[0]) {
-          setOrganization(ownedOrg || data[0]);
+        const ownedOrg = orgs.find((org: OrganizationWithRole) => org.role === 'owner');
+        if (ownedOrg || orgs[0]) {
+          setOrganization(ownedOrg || orgs[0]);
         } else {
           // No org found - create one for this legacy user
           await ensureOrganization();
@@ -114,8 +115,9 @@ export default function TeamPage() {
         const orgsResponse = await fetch('/api/organizations');
         if (orgsResponse.ok) {
           const data = await orgsResponse.json();
-          const ownedOrg = data.find((org: OrganizationWithRole) => org.role === 'owner');
-          setOrganization(ownedOrg || data[0] || null);
+          const orgs = data.organizations || [];
+          const ownedOrg = orgs.find((org: OrganizationWithRole) => org.role === 'owner');
+          setOrganization(ownedOrg || orgs[0] || null);
         }
       }
     } catch (error) {

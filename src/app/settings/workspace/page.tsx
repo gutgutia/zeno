@@ -11,10 +11,10 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import type { Workspace } from '@/types/database';
+import type { OrganizationWithRole } from '@/types/database';
 
 export default function WorkspaceSettingsPage() {
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [organization, setOrganization] = useState<OrganizationWithRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCheckingSubdomain, setIsCheckingSubdomain] = useState(false);
@@ -27,23 +27,24 @@ export default function WorkspaceSettingsPage() {
   const [subdomainError, setSubdomainError] = useState<string | null>(null);
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
 
-  // Fetch workspace data
+  // Fetch organization data
   useEffect(() => {
-    async function fetchWorkspace() {
+    async function fetchOrganization() {
       try {
-        const response = await fetch('/api/workspaces');
+        const response = await fetch('/api/organizations');
         if (!response.ok) {
-          throw new Error('Failed to fetch workspaces');
+          throw new Error('Failed to fetch organizations');
         }
         const data = await response.json();
-        const workspaces = data.workspaces as Workspace[];
+        const orgs = data.organizations || [];
 
-        // Get the first personal workspace
-        const personalWorkspace = workspaces.find((w) => w.type === 'personal');
-        if (personalWorkspace) {
-          setWorkspace(personalWorkspace);
-          setName(personalWorkspace.name);
-          setSubdomain(personalWorkspace.subdomain || '');
+        // Get the user's owned organization (primary org)
+        const ownedOrg = orgs.find((org: OrganizationWithRole) => org.role === 'owner');
+        const selectedOrg = ownedOrg || orgs[0];
+        if (selectedOrg) {
+          setOrganization(selectedOrg);
+          setName(selectedOrg.name);
+          setSubdomain(selectedOrg.subdomain || '');
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -52,7 +53,7 @@ export default function WorkspaceSettingsPage() {
       }
     }
 
-    fetchWorkspace();
+    fetchOrganization();
   }, []);
 
   // Validate subdomain format
@@ -81,7 +82,7 @@ export default function WorkspaceSettingsPage() {
     }
 
     // If subdomain is same as current, it's available
-    if (subdomain === (workspace?.subdomain || '')) {
+    if (subdomain === (organization?.subdomain || '')) {
       setSubdomainError(null);
       setSubdomainAvailable(null);
       return;
@@ -99,7 +100,8 @@ export default function WorkspaceSettingsPage() {
 
     const timer = setTimeout(async () => {
       try {
-        const response = await fetch(`/api/workspaces/check-subdomain?subdomain=${encodeURIComponent(subdomain)}`);
+        // Check subdomain availability against organizations table
+        const response = await fetch(`/api/organizations/check-subdomain?subdomain=${encodeURIComponent(subdomain)}`);
         const data = await response.json();
 
         if (data.available) {
@@ -117,10 +119,10 @@ export default function WorkspaceSettingsPage() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [subdomain, workspace?.subdomain]);
+  }, [subdomain, organization?.subdomain]);
 
   const handleSave = async () => {
-    if (!workspace) return;
+    if (!organization) return;
 
     // Validate before saving
     const formatError = validateSubdomain(subdomain);
@@ -138,8 +140,8 @@ export default function WorkspaceSettingsPage() {
     setSuccess(false);
 
     try {
-      const response = await fetch(`/api/workspaces/${workspace.id}`, {
-        method: 'PUT',
+      const response = await fetch(`/api/organizations/${organization.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
@@ -152,8 +154,8 @@ export default function WorkspaceSettingsPage() {
         throw new Error(errorData.error || 'Failed to save settings');
       }
 
-      const data = await response.json();
-      setWorkspace(data.workspace);
+      const updatedOrg = await response.json();
+      setOrganization({ ...organization, ...updatedOrg });
       setSuccess(true);
       setSubdomainAvailable(null);
 
@@ -174,10 +176,10 @@ export default function WorkspaceSettingsPage() {
     );
   }
 
-  if (!workspace) {
+  if (!organization) {
     return (
       <div className="text-center py-16">
-        <p className="text-[var(--color-gray-500)]">No workspace found.</p>
+        <p className="text-[var(--color-gray-500)]">No organization found.</p>
       </div>
     );
   }
@@ -190,10 +192,10 @@ export default function WorkspaceSettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">
-          Workspace Settings
+          Organization Settings
         </h1>
         <p className="text-[var(--color-gray-600)] mt-1">
-          Configure your workspace name and custom subdomain
+          Configure your organization name and custom subdomain
         </p>
       </div>
 
@@ -209,12 +211,12 @@ export default function WorkspaceSettingsPage() {
         </div>
       )}
 
-      {/* Workspace Name */}
+      {/* Organization Name */}
       <Card>
         <CardHeader>
-          <CardTitle>Workspace Name</CardTitle>
+          <CardTitle>Organization Name</CardTitle>
           <CardDescription>
-            The name of your workspace (visible to you only)
+            The name of your organization (visible to team members)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -224,7 +226,7 @@ export default function WorkspaceSettingsPage() {
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="My Workspace"
+              placeholder="My Organization"
             />
           </div>
         </CardContent>
@@ -235,7 +237,7 @@ export default function WorkspaceSettingsPage() {
         <CardHeader>
           <CardTitle>Custom Subdomain</CardTitle>
           <CardDescription>
-            Create a branded URL for your workspace dashboards
+            Create a branded URL for your organization&apos;s dashboards
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -278,7 +280,7 @@ export default function WorkspaceSettingsPage() {
               <p className="text-sm text-green-600">Subdomain is available!</p>
             )}
             <p className="text-xs text-[var(--color-gray-500)]">
-              Choose a unique subdomain for your workspace. This will be the URL where your published dashboards are accessible.
+              Choose a unique subdomain for your organization. This will be the URL where your published dashboards are accessible.
             </p>
           </div>
 
@@ -286,7 +288,7 @@ export default function WorkspaceSettingsPage() {
           {subdomainUrl && !subdomainError && (
             <div className="p-4 bg-[var(--color-gray-50)] rounded-lg">
               <p className="text-sm font-medium text-[var(--color-gray-700)] mb-2">
-                Your workspace will be accessible at:
+                Your organization will be accessible at:
               </p>
               <div className="space-y-1">
                 <p className="font-mono text-sm text-[var(--color-primary)]">
@@ -309,32 +311,32 @@ export default function WorkspaceSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Current Workspace Info */}
+      {/* Current Organization Info */}
       <Card>
         <CardHeader>
-          <CardTitle>Workspace Information</CardTitle>
+          <CardTitle>Organization Information</CardTitle>
           <CardDescription>
-            Technical details about your workspace
+            Technical details about your organization
           </CardDescription>
         </CardHeader>
         <CardContent>
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <dt className="text-[var(--color-gray-500)]">Workspace ID</dt>
-              <dd className="font-mono text-[var(--color-gray-700)]">{workspace.id}</dd>
+              <dt className="text-[var(--color-gray-500)]">Organization ID</dt>
+              <dd className="font-mono text-[var(--color-gray-700)]">{organization.id}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-[var(--color-gray-500)]">Internal Slug</dt>
-              <dd className="font-mono text-[var(--color-gray-700)]">{workspace.slug}</dd>
+              <dd className="font-mono text-[var(--color-gray-700)]">{organization.slug}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-[var(--color-gray-500)]">Type</dt>
-              <dd className="text-[var(--color-gray-700)] capitalize">{workspace.type}</dd>
+              <dt className="text-[var(--color-gray-500)]">Your Role</dt>
+              <dd className="text-[var(--color-gray-700)] capitalize">{organization.role}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-[var(--color-gray-500)]">Created</dt>
               <dd className="text-[var(--color-gray-700)]">
-                {new Date(workspace.created_at).toLocaleDateString()}
+                {new Date(organization.created_at).toLocaleDateString()}
               </dd>
             </div>
           </dl>

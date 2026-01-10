@@ -23,7 +23,7 @@ export default function SettingsLayout({
                     href="/settings/workspace"
                     className="block px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
                   >
-                    Workspace
+                    Organization
                   </Link>
                 </li>
                 <li>
