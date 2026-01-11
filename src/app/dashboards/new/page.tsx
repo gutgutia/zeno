@@ -43,17 +43,8 @@ function NewDashboardPageContent() {
   const { features } = usePlan();
   const canUseGoogleSheets = features.google_sheets;
 
-  // Organization context
-  const { organizations, currentOrg } = useOrganization();
-  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
-  const hasMultipleOrgs = organizations.length > 1;
-
-  // Initialize selected org from current org
-  useEffect(() => {
-    if (currentOrg && !selectedOrgId) {
-      setSelectedOrgId(currentOrg.id);
-    }
-  }, [currentOrg, selectedOrgId]);
+  // Organization context - always use current org
+  const { currentOrg } = useOrganization();
 
   // Check for Google connection callback
   const googleConnected = searchParams.get('google_connected');
@@ -96,6 +87,9 @@ function NewDashboardPageContent() {
   // Upgrade modal state
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [creditsInfo, setCreditsInfo] = useState<{ needed: number; available: number } | null>(null);
+
+  // Content summary collapsed state
+  const [contentSummaryOpen, setContentSummaryOpen] = useState(false);
 
   // Token estimation
   const tokenCount = useMemo(() => estimateTokens(rawContent), [rawContent]);
@@ -464,8 +458,8 @@ function NewDashboardPageContent() {
             ? dataSource.selectedSheets.join(', ')
             : null,
           syncEnabled: dataSource?.type === 'google_sheets' ? enableSync : false,
-          // Organization assignment
-          organizationId: selectedOrgId,
+          // Organization assignment - use current org
+          organizationId: currentOrg?.id,
         }),
       });
 
@@ -571,28 +565,6 @@ function NewDashboardPageContent() {
       {/* Step 1: Input */}
       {step === 'input' && (
         <>
-          {/* Organization Selector - only show if user has multiple orgs */}
-          {hasMultipleOrgs && (
-            <div className="mb-6">
-              <Label htmlFor="organization">Organization</Label>
-              <p className="text-sm text-[var(--color-gray-500)] mb-1.5">
-                Choose which organization this dashboard belongs to
-              </p>
-              <select
-                id="organization"
-                value={selectedOrgId || ''}
-                onChange={(e) => setSelectedOrgId(e.target.value)}
-                className="w-full sm:w-auto min-w-[200px] px-3 py-2 border border-[var(--color-gray-300)] rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-              >
-                {organizations.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           {/* Title Input */}
           <div className="mb-6">
             <Label htmlFor="title">Dashboard Title (optional)</Label>
@@ -814,128 +786,7 @@ function NewDashboardPageContent() {
       {/* Step 2: Instructions */}
       {step === 'instructions' && (
         <div className="space-y-6">
-          {/* Content Summary */}
-          <div className="bg-white rounded-xl border border-[var(--color-gray-200)] shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-4">
-              Content Summary
-            </h2>
-
-            <div className="flex flex-wrap gap-4 mb-4">
-              <div className="px-4 py-2 bg-[var(--color-primary-light)] rounded-lg">
-                <span className="text-sm text-[var(--color-primary)] font-medium">
-                  {getContentTypeLabel(contentType)}
-                </span>
-                <p className="text-xs text-[var(--color-gray-500)] mt-0.5">
-                  {getContentTypeDescription(contentType)}
-                </p>
-              </div>
-
-              {/* Data source indicator */}
-              {dataSource?.type === 'google_sheets' && (
-                <div className="px-4 py-2 bg-green-50 rounded-lg flex items-center gap-2">
-                  <svg className="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/>
-                  </svg>
-                  <span className="text-sm text-green-700 font-medium">Google Sheets</span>
-                </div>
-              )}
-
-              {dataSource?.selectedSheets && dataSource.selectedSheets.length > 0 && (
-                <div className="px-4 py-2 bg-[var(--color-gray-100)] rounded-lg">
-                  <span className="text-sm font-medium">
-                    {dataSource.selectedSheets.length} sheet{dataSource.selectedSheets.length > 1 ? 's' : ''}
-                  </span>
-                </div>
-              )}
-
-              {schema && (
-                <>
-                  <div className="px-4 py-2 bg-[var(--color-gray-100)] rounded-lg">
-                    <span className="text-sm font-medium">{schema.rowCount} rows</span>
-                  </div>
-                  <div className="px-4 py-2 bg-[var(--color-gray-100)] rounded-lg">
-                    <span className="text-sm font-medium">{schema.columns.length} columns</span>
-                  </div>
-                </>
-              )}
-              <div className="px-4 py-2 bg-[var(--color-gray-100)] rounded-lg">
-                <span className="text-sm font-medium">{tokenCount.toLocaleString()} tokens</span>
-              </div>
-            </div>
-
-            {/* Data Preview */}
-            {schema && parsedData && (
-              <div className="mt-4">
-                <h3 className="text-sm font-medium text-[var(--color-gray-700)] mb-2">
-                  Detected Columns
-                </h3>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {schema.columns.map((col) => (
-                    <span
-                      key={col.name}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--color-gray-100)] rounded-full text-sm"
-                    >
-                      <span className="font-medium">{col.name}</span>
-                      <span className="text-[var(--color-gray-500)]">({col.type})</span>
-                    </span>
-                  ))}
-                </div>
-
-                <h3 className="text-sm font-medium text-[var(--color-gray-700)] mb-2">
-                  Sample Data
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[var(--color-gray-200)]">
-                        {parsedData.columns.slice(0, 6).map((col) => (
-                          <th
-                            key={col}
-                            className="text-left py-2 px-3 font-medium text-[var(--color-gray-700)] bg-[var(--color-gray-50)]"
-                          >
-                            {col}
-                          </th>
-                        ))}
-                        {parsedData.columns.length > 6 && (
-                          <th className="text-left py-2 px-3 font-medium text-[var(--color-gray-500)] bg-[var(--color-gray-50)]">
-                            +{parsedData.columns.length - 6} more
-                          </th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {schema.sampleRows.slice(0, 3).map((row, i) => (
-                        <tr key={i} className="border-b border-[var(--color-gray-100)]">
-                          {parsedData.columns.slice(0, 6).map((col) => (
-                            <td key={col} className="py-2 px-3 text-[var(--color-gray-600)]">
-                              {String(row[col] ?? '')}
-                            </td>
-                          ))}
-                          {parsedData.columns.length > 6 && (
-                            <td className="py-2 px-3 text-[var(--color-gray-400)]">...</td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {contentType === 'text' && (
-              <div className="mt-4">
-                <h3 className="text-sm font-medium text-[var(--color-gray-700)] mb-2">
-                  Content Preview
-                </h3>
-                <div className="bg-[var(--color-gray-50)] rounded-lg p-4 text-sm text-[var(--color-gray-600)] max-h-32 overflow-y-auto">
-                  {rawContent.slice(0, 500)}
-                  {rawContent.length > 500 && '...'}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Instructions Input */}
+          {/* Instructions Input - Primary focus */}
           <div className="bg-white rounded-xl border border-[var(--color-gray-200)] shadow-sm p-6">
             <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-2">
               Instructions (Optional)
@@ -949,11 +800,158 @@ function NewDashboardPageContent() {
 • Show me customer status breakdown by owner
 • Create a professional summary with key metrics
 • Highlight the most important trends
-• Make it look like a executive report"
+• Make it look like an executive report"
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               className="min-h-[120px]"
+              autoFocus
             />
+          </div>
+
+          {/* Content Summary - Collapsible */}
+          <div className="bg-white rounded-xl border border-[var(--color-gray-200)] shadow-sm overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setContentSummaryOpen(!contentSummaryOpen)}
+              className="w-full px-6 py-4 flex items-center justify-between hover:bg-[var(--color-gray-50)] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold text-[var(--color-gray-900)]">
+                  Content Summary
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  <span className="px-2 py-0.5 bg-[var(--color-primary-light)] rounded text-xs text-[var(--color-primary)] font-medium">
+                    {getContentTypeLabel(contentType)}
+                  </span>
+                  {schema && (
+                    <span className="px-2 py-0.5 bg-[var(--color-gray-100)] rounded text-xs font-medium">
+                      {schema.rowCount} rows × {schema.columns.length} cols
+                    </span>
+                  )}
+                  {dataSource?.type === 'google_sheets' && (
+                    <span className="px-2 py-0.5 bg-green-50 rounded text-xs text-green-700 font-medium">
+                      Google Sheets
+                    </span>
+                  )}
+                </div>
+              </div>
+              <svg
+                className={`w-5 h-5 text-[var(--color-gray-400)] transition-transform ${contentSummaryOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {contentSummaryOpen && (
+              <div className="px-6 pb-6 border-t border-[var(--color-gray-100)]">
+                <div className="flex flex-wrap gap-4 mt-4 mb-4">
+                  <div className="px-4 py-2 bg-[var(--color-primary-light)] rounded-lg">
+                    <span className="text-sm text-[var(--color-primary)] font-medium">
+                      {getContentTypeLabel(contentType)}
+                    </span>
+                    <p className="text-xs text-[var(--color-gray-500)] mt-0.5">
+                      {getContentTypeDescription(contentType)}
+                    </p>
+                  </div>
+
+                  {dataSource?.selectedSheets && dataSource.selectedSheets.length > 0 && (
+                    <div className="px-4 py-2 bg-[var(--color-gray-100)] rounded-lg">
+                      <span className="text-sm font-medium">
+                        {dataSource.selectedSheets.length} sheet{dataSource.selectedSheets.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  )}
+
+                  {schema && (
+                    <>
+                      <div className="px-4 py-2 bg-[var(--color-gray-100)] rounded-lg">
+                        <span className="text-sm font-medium">{schema.rowCount} rows</span>
+                      </div>
+                      <div className="px-4 py-2 bg-[var(--color-gray-100)] rounded-lg">
+                        <span className="text-sm font-medium">{schema.columns.length} columns</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="px-4 py-2 bg-[var(--color-gray-100)] rounded-lg">
+                    <span className="text-sm font-medium">{tokenCount.toLocaleString()} tokens</span>
+                  </div>
+                </div>
+
+                {/* Data Preview */}
+                {schema && parsedData && (
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-[var(--color-gray-700)] mb-2">
+                      Detected Columns
+                    </h3>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {schema.columns.map((col) => (
+                        <span
+                          key={col.name}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--color-gray-100)] rounded-full text-sm"
+                        >
+                          <span className="font-medium">{col.name}</span>
+                          <span className="text-[var(--color-gray-500)]">({col.type})</span>
+                        </span>
+                      ))}
+                    </div>
+
+                    <h3 className="text-sm font-medium text-[var(--color-gray-700)] mb-2">
+                      Sample Data
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-[var(--color-gray-200)]">
+                            {parsedData.columns.slice(0, 6).map((col) => (
+                              <th
+                                key={col}
+                                className="text-left py-2 px-3 font-medium text-[var(--color-gray-700)] bg-[var(--color-gray-50)]"
+                              >
+                                {col}
+                              </th>
+                            ))}
+                            {parsedData.columns.length > 6 && (
+                              <th className="text-left py-2 px-3 font-medium text-[var(--color-gray-500)] bg-[var(--color-gray-50)]">
+                                +{parsedData.columns.length - 6} more
+                              </th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {schema.sampleRows.slice(0, 3).map((row, i) => (
+                            <tr key={i} className="border-b border-[var(--color-gray-100)]">
+                              {parsedData.columns.slice(0, 6).map((col) => (
+                                <td key={col} className="py-2 px-3 text-[var(--color-gray-600)]">
+                                  {String(row[col] ?? '')}
+                                </td>
+                              ))}
+                              {parsedData.columns.length > 6 && (
+                                <td className="py-2 px-3 text-[var(--color-gray-400)]">...</td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {contentType === 'text' && (
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium text-[var(--color-gray-700)] mb-2">
+                      Content Preview
+                    </h3>
+                    <div className="bg-[var(--color-gray-50)] rounded-lg p-4 text-sm text-[var(--color-gray-600)] max-h-32 overflow-y-auto">
+                      {rawContent.slice(0, 500)}
+                      {rawContent.length > 500 && '...'}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Options - only show for Google Sheets */}
