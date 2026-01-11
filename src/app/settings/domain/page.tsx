@@ -292,27 +292,98 @@ export default function DomainSettingsPage() {
         </div>
 
         {/* DNS Instructions */}
-        {domainConfig?.custom_domain && domainConfig?.custom_domain_status !== 'verified' && (
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="text-sm font-medium text-blue-900 mb-2">DNS Configuration Required</h3>
-            <p className="text-sm text-blue-700 mb-3">
-              Add the following CNAME record to your DNS settings:
-            </p>
-            <div className="bg-white p-3 rounded border border-blue-200 font-mono text-sm">
-              <div className="grid grid-cols-2 gap-2">
-                <span className="text-[var(--color-gray-500)]">Type:</span>
-                <span>CNAME</span>
-                <span className="text-[var(--color-gray-500)]">Name:</span>
-                <span>{domainConfig.custom_domain.split('.')[0]}</span>
-                <span className="text-[var(--color-gray-500)]">Value:</span>
-                <span className="break-all">{domainConfig.cname_target}</span>
-              </div>
+        {domainConfig?.custom_domain && domainConfig?.custom_domain_status !== 'verified' && (() => {
+          const domain = domainConfig.custom_domain;
+          const parts = domain.split('.');
+          // Root domain = exactly 2 parts (e.g., lakhmay.com) or 2 parts with common TLD (e.g., co.uk would be 3)
+          const isRootDomain = parts.length === 2 || (parts.length === 3 && ['co', 'com', 'org', 'net'].includes(parts[1]));
+          const subdomain = isRootDomain ? '@' : parts.slice(0, -2).join('.');
+
+          return (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-4">
+              <h3 className="text-sm font-medium text-blue-900">DNS Configuration Required</h3>
+
+              {isRootDomain ? (
+                <>
+                  <div className="text-sm text-blue-700">
+                    <p className="mb-2">
+                      <strong>Root domains</strong> (like {domain}) require special setup because most DNS providers
+                      don&apos;t support CNAME records on the root/apex domain.
+                    </p>
+                  </div>
+
+                  {/* Option 1: A Records */}
+                  <div className="bg-white p-3 rounded border border-blue-200">
+                    <p className="text-sm font-medium text-blue-900 mb-2">Option 1: A Records (works with all providers)</p>
+                    <div className="font-mono text-sm space-y-1">
+                      <div className="grid grid-cols-[80px_1fr] gap-2">
+                        <span className="text-[var(--color-gray-500)]">Type:</span>
+                        <span>A</span>
+                        <span className="text-[var(--color-gray-500)]">Name:</span>
+                        <span>@ <span className="text-[var(--color-gray-400)]">(or leave blank)</span></span>
+                        <span className="text-[var(--color-gray-500)]">Value:</span>
+                        <span>76.76.21.21</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Option 2: CNAME Flattening */}
+                  <div className="bg-white p-3 rounded border border-blue-200">
+                    <p className="text-sm font-medium text-blue-900 mb-2">Option 2: CNAME Flattening (Cloudflare, Route53, etc.)</p>
+                    <p className="text-xs text-[var(--color-gray-600)] mb-2">
+                      If your DNS provider supports CNAME flattening or ALIAS records:
+                    </p>
+                    <div className="font-mono text-sm space-y-1">
+                      <div className="grid grid-cols-[80px_1fr] gap-2">
+                        <span className="text-[var(--color-gray-500)]">Type:</span>
+                        <span>CNAME <span className="text-[var(--color-gray-400)]">(or ALIAS)</span></span>
+                        <span className="text-[var(--color-gray-500)]">Name:</span>
+                        <span>@</span>
+                        <span className="text-[var(--color-gray-500)]">Value:</span>
+                        <span className="break-all">{domainConfig.cname_target}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* www subdomain */}
+                  <div className="bg-white p-3 rounded border border-blue-200">
+                    <p className="text-sm font-medium text-blue-900 mb-2">Also add for www (recommended)</p>
+                    <div className="font-mono text-sm space-y-1">
+                      <div className="grid grid-cols-[80px_1fr] gap-2">
+                        <span className="text-[var(--color-gray-500)]">Type:</span>
+                        <span>CNAME</span>
+                        <span className="text-[var(--color-gray-500)]">Name:</span>
+                        <span>www</span>
+                        <span className="text-[var(--color-gray-500)]">Value:</span>
+                        <span className="break-all">{domainConfig.cname_target}</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-blue-700">
+                    Add the following CNAME record to your DNS settings:
+                  </p>
+                  <div className="bg-white p-3 rounded border border-blue-200 font-mono text-sm">
+                    <div className="grid grid-cols-[80px_1fr] gap-2">
+                      <span className="text-[var(--color-gray-500)]">Type:</span>
+                      <span>CNAME</span>
+                      <span className="text-[var(--color-gray-500)]">Name:</span>
+                      <span>{subdomain}</span>
+                      <span className="text-[var(--color-gray-500)]">Value:</span>
+                      <span className="break-all">{domainConfig.cname_target}</span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <p className="text-xs text-blue-600">
+                DNS changes can take up to 48 hours to propagate, but usually complete within a few minutes.
+              </p>
             </div>
-            <p className="text-xs text-blue-600 mt-3">
-              DNS changes can take up to 48 hours to propagate, but usually complete within a few minutes.
-            </p>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Actions */}
         <div className="flex gap-3 pt-4">
