@@ -53,7 +53,18 @@ TECHNICAL NOTES:
 - Output a complete HTML document with embedded CSS and JavaScript
 - You may use CDN resources (Google Fonts, Chart.js, etc.) if appropriate
 - If using charts, ensure canvas containers have explicit height (e.g., 300px) and use maintainAspectRatio: false
-- Make it responsive and polished
+
+MOBILE-FIRST DESIGN (CRITICAL):
+- Design for mobile screens first (320px-480px), then enhance for larger screens
+- Use responsive CSS: flexbox/grid with flex-wrap, percentage widths, and media queries
+- Stack elements vertically on mobile, allow horizontal layouts on desktop (min-width: 768px)
+- Ensure touch targets are at least 44x44 pixels for buttons and interactive elements
+- Use readable font sizes: minimum 16px for body text, 14px for secondary text
+- Add proper viewport meta tag: <meta name="viewport" content="width=device-width, initial-scale=1">
+- Charts should be full-width on mobile and resize gracefully
+- Tables should have horizontal scroll wrapper on mobile: overflow-x: auto
+- Avoid fixed widths - use max-width with percentage fallbacks
+- Test mental model: content should be usable on a phone held vertically
 
 OUTPUT FORMAT:
 When ready, respond with ONLY this JSON (no markdown, no explanation):
@@ -125,6 +136,7 @@ GUIDELINES:
 - DO NOT read or output entire files unless absolutely necessary
 - Preserve existing structure and styling unless asked to change
 - Keep branding consistent
+- MAINTAIN MOBILE RESPONSIVENESS: Ensure any changes preserve mobile-friendly design (responsive layouts, 44px+ touch targets, readable fonts, viewport meta tag)
 
 OUTPUT FORMAT:
 When done, respond with ONLY this JSON (no markdown, no explanation):

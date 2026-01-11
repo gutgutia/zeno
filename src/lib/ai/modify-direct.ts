@@ -135,6 +135,7 @@ Return a JSON object with:
 - For new elements: find a suitable insertion point (like before a closing tag)
 - For removals: replace with empty string
 - Keep edits atomic and independent when possible
+- MAINTAIN MOBILE RESPONSIVENESS: Ensure any changes preserve mobile-friendly design (responsive layouts, 44px+ touch targets, readable fonts)
 
 ## Example Output
 {

@@ -68,6 +68,13 @@ CRITICAL: While you need to update the dashboard substantially, try to preserve:
 - The color scheme and fonts
 - The general layout structure if appropriate
 
+MOBILE-FIRST DESIGN (CRITICAL):
+- Ensure the regenerated content is mobile-responsive
+- Use flexbox/grid with responsive breakpoints
+- Touch targets must be at least 44x44 pixels
+- Tables should have horizontal scroll wrappers (overflow-x: auto)
+- Charts should be full-width on mobile
+
 You have access to a Python sandbox via the execute_python tool.
 - New data is at /tmp/data.txt
 - Existing dashboard HTML is at /tmp/existing.html (for style reference)
