@@ -174,10 +174,10 @@ export function GoogleSheetPicker({
   const [error, setError] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
-  const [pickerOpened, setPickerOpened] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<{ setVisible: (visible: boolean) => void } | null>(null);
 
-  // Load Google APIs and get access token
+  // Load Google APIs and get access token on mount
   useEffect(() => {
     let cancelled = false;
 
@@ -224,9 +224,10 @@ export function GoogleSheetPicker({
       return;
     }
 
-    // Don't open if already opened
+    // Reuse existing picker if available
     if (pickerRef.current) {
       pickerRef.current.setVisible(true);
+      setPickerOpen(true);
       return;
     }
 
@@ -244,9 +245,9 @@ export function GoogleSheetPicker({
         .setCallback((data: GooglePickerResponse) => {
           if (data.action === window.google.picker.Action.PICKED && data.docs && data.docs.length > 0) {
             const doc = data.docs[0];
-            // Hide the picker immediately
+            // Hide the picker
             pickerRef.current?.setVisible(false);
-            pickerRef.current = null;
+            setPickerOpen(false);
             // Call onSelect
             onSelect({
               id: doc.id,
@@ -254,87 +255,74 @@ export function GoogleSheetPicker({
               modifiedTime: new Date(doc.lastEditedUtc).toISOString(),
             });
           } else if (data.action === window.google.picker.Action.CANCEL) {
-            // User cancelled - hide picker and call onCancel
+            // User cancelled - just close picker, stay on this screen
             pickerRef.current?.setVisible(false);
-            pickerRef.current = null;
-            onCancel();
+            setPickerOpen(false);
+            // Don't call onCancel - let user stay on Google Sheets tab
           }
         })
         .build();
 
       pickerRef.current = picker;
       picker.setVisible(true);
-      setPickerOpened(true);
+      setPickerOpen(true);
     } catch (err) {
       console.error('Error opening picker:', err);
       setError(err instanceof Error ? err.message : 'Failed to open Google Picker');
     }
-  }, [accessToken, clientId, onSelect, onCancel]);
-
-  // Auto-open picker once when ready
-  useEffect(() => {
-    if (!isLoading && accessToken && clientId && !error && !pickerOpened) {
-      openPicker();
-    }
-  }, [isLoading, accessToken, clientId, error, pickerOpened, openPicker]);
+  }, [accessToken, clientId, onSelect]);
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] shadow-sm p-8 text-center">
+      <div className="text-center py-8">
         <div className="w-8 h-8 border-2 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-[var(--color-gray-600)]">Loading Google Picker...</p>
+        <p className="text-[var(--color-gray-600)]">Preparing Google Sheets...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-white rounded-xl border border-[var(--color-error)] shadow-sm p-6">
-        <div className="text-center mb-4">
-          <div className="w-12 h-12 bg-[var(--color-error)]/10 rounded-full flex items-center justify-center mx-auto mb-3">
-            <svg className="w-6 h-6 text-[var(--color-error)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <p className="text-[var(--color-error)]">{error}</p>
+      <div className="text-center py-8">
+        <div className="w-12 h-12 bg-[var(--color-error)]/10 rounded-full flex items-center justify-center mx-auto mb-3">
+          <svg className="w-6 h-6 text-[var(--color-error)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
         </div>
-        <div className="flex justify-center gap-3">
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button onClick={openPicker}>
-            Retry
-          </Button>
-        </div>
+        <p className="text-[var(--color-error)] mb-4">{error}</p>
+        <Button onClick={() => { setError(null); setIsLoading(true); }}>
+          Retry
+        </Button>
       </div>
     );
   }
 
-  // Show a placeholder while the picker modal is open
+  // Main UI - show intro screen, user clicks button to open picker
   return (
-    <div className="bg-white rounded-xl border border-[var(--color-gray-200)] shadow-sm p-6">
-      <div className="text-center py-8">
-        <div className="w-16 h-16 bg-[#0F9D58]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-[#0F9D58]" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 7h2v2H7zm0 4h2v2H7zm0 4h2v2H7zm4-8h6v2h-6zm0 4h6v2h-6zm0 4h6v2h-6z"/>
-          </svg>
-        </div>
-        <h3 className="text-lg font-semibold text-[var(--color-gray-900)] mb-2">
-          Select a Google Sheet
-        </h3>
-        <p className="text-[var(--color-gray-600)] mb-6 max-w-md mx-auto">
-          Choose a spreadsheet from the Google Picker window.
-          If the picker didn&apos;t open, click the button below.
-        </p>
-        <div className="flex justify-center gap-3">
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button onClick={openPicker}>
-            Open Google Picker
-          </Button>
-        </div>
+    <div className="text-center py-8">
+      <div className="w-16 h-16 bg-[#0F9D58]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg className="w-8 h-8 text-[#0F9D58]" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 7h2v2H7zm0 4h2v2H7zm0 4h2v2H7zm4-8h6v2h-6zm0 4h6v2h-6zm0 4h6v2h-6z"/>
+        </svg>
       </div>
+      <h3 className="text-lg font-semibold text-[var(--color-gray-900)] mb-2">
+        Import from Google Sheets
+      </h3>
+      <p className="text-[var(--color-gray-600)] mb-6 max-w-md mx-auto">
+        Select a spreadsheet from your Google Drive. Your dashboard can automatically
+        sync when the sheet is updated.
+      </p>
+      <Button onClick={openPicker} className="inline-flex items-center gap-2">
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 7h2v2H7zm0 4h2v2H7zm0 4h2v2H7zm4-8h6v2h-6zm0 4h6v2h-6zm0 4h6v2h-6z"/>
+        </svg>
+        Select Google Sheet
+      </Button>
+      {pickerOpen && (
+        <p className="text-sm text-[var(--color-gray-500)] mt-4">
+          Google Picker is open. Select a spreadsheet to continue.
+        </p>
+      )}
     </div>
   );
 }
