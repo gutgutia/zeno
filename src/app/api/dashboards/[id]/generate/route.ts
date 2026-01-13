@@ -65,6 +65,10 @@ interface RouteParams {
 export async function POST(request: Request, { params }: RouteParams) {
   const { id } = await params;
 
+  console.log('='.repeat(60));
+  console.log(`[Generate] POST /api/dashboards/${id}/generate - STARTING`);
+  console.log('='.repeat(60));
+
   try {
     // Check for internal service call (from dashboard creation)
     const internalUserId = request.headers.get('x-internal-user-id');

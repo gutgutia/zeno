@@ -15,6 +15,7 @@ import { SheetSelector } from '@/components/sheets/SheetSelector';
 import { GoogleSheetPicker } from '@/components/sheets/GoogleSheetPicker';
 import { UpgradePrompt } from '@/components/billing/UpgradePrompt';
 import { UpgradeModal } from '@/components/billing/UpgradeModal';
+import { VoiceRecorder } from '@/components/voice/VoiceRecorder';
 import { usePlan } from '@/lib/hooks';
 import { useOrganization } from '@/lib/contexts/organization-context';
 import type { ParsedData, DataSchema, ContentType } from '@/types/dashboard';
@@ -79,6 +80,9 @@ function NewDashboardPageContent() {
   // Instructions state
   const [instructions, setInstructions] = useState('');
   const [enableSync, setEnableSync] = useState(true);
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const instructionsRef = useRef<HTMLTextAreaElement>(null);
+  const cursorPositionRef = useRef<number>(0);
 
   // UI state
   const [error, setError] = useState<string | null>(null);
@@ -555,6 +559,49 @@ function NewDashboardPageContent() {
     }
   };
 
+  // Handle voice transcript - insert at cursor position
+  const handleVoiceTranscript = useCallback((transcript: string) => {
+    const cursorPos = cursorPositionRef.current;
+    const before = instructions.slice(0, cursorPos);
+    const after = instructions.slice(cursorPos);
+
+    // Add space before transcript if there's text before and it doesn't end with space
+    const needsSpaceBefore = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
+    // Add space after transcript if there's text after and it doesn't start with space
+    const needsSpaceAfter = after.length > 0 && !after.startsWith(' ') && !after.startsWith('\n');
+
+    const newText = before +
+      (needsSpaceBefore ? ' ' : '') +
+      transcript +
+      (needsSpaceAfter ? ' ' : '') +
+      after;
+
+    setInstructions(newText);
+
+    // Update cursor position to end of inserted text
+    const newCursorPos = cursorPos + (needsSpaceBefore ? 1 : 0) + transcript.length + (needsSpaceAfter ? 1 : 0);
+    cursorPositionRef.current = newCursorPos;
+
+    // Focus textarea and set cursor position after state update
+    setTimeout(() => {
+      if (instructionsRef.current) {
+        instructionsRef.current.focus();
+        instructionsRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+  }, [instructions]);
+
+  // Open voice recorder and save cursor position
+  const handleStartVoiceRecording = useCallback(() => {
+    // Save current cursor position before opening recorder
+    if (instructionsRef.current) {
+      cursorPositionRef.current = instructionsRef.current.selectionStart;
+    } else {
+      cursorPositionRef.current = instructions.length;
+    }
+    setShowVoiceRecorder(true);
+  }, [instructions.length]);
+
   const getContentTypeLabel = (type: ContentType) => {
     switch (type) {
       case 'data': return 'Structured Data';
@@ -842,17 +889,44 @@ function NewDashboardPageContent() {
               Tell us what you&apos;d like to see. Leave blank and we&apos;ll create something great automatically.
             </p>
 
-            <Textarea
-              placeholder="Examples:
+            <div className="relative">
+              <Textarea
+                ref={instructionsRef}
+                placeholder="Examples:
 • Show me customer status breakdown by owner
 • Create a professional summary with key metrics
 • Highlight the most important trends
 • Make it look like an executive report"
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              className="min-h-[120px]"
-              autoFocus
-            />
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                onSelect={(e) => {
+                  cursorPositionRef.current = (e.target as HTMLTextAreaElement).selectionStart;
+                }}
+                className="min-h-[120px] pr-12"
+                autoFocus
+              />
+              {/* Voice input button */}
+              <button
+                type="button"
+                onClick={handleStartVoiceRecording}
+                className="absolute right-3 top-3 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Click to speak your instructions"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Content Summary - Collapsible */}
@@ -1087,6 +1161,14 @@ function NewDashboardPageContent() {
         creditsNeeded={creditsInfo?.needed}
         creditsAvailable={creditsInfo?.available}
       />
+
+      {/* Voice Recorder Modal */}
+      {showVoiceRecorder && (
+        <VoiceRecorder
+          onTranscript={handleVoiceTranscript}
+          onClose={() => setShowVoiceRecorder(false)}
+        />
+      )}
     </div>
   );
 }
