@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
 import type { Dashboard, Workspace } from '@/types/database';
 import { generateDashboardMetadata } from '@/lib/ai/metadata';
+import { hasEnoughCredits, getCreditBalance } from '@/lib/credits';
 
 // GET /api/dashboards - List all dashboards for the current user
 export async function GET() {
@@ -54,6 +55,19 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check credits before creating dashboard (generation costs ~25 credits)
+    const ESTIMATED_GENERATION_CREDITS = 25;
+    const hasCredits = await hasEnoughCredits(user.id, ESTIMATED_GENERATION_CREDITS);
+    if (!hasCredits) {
+      const balance = await getCreditBalance(user.id);
+      return NextResponse.json({
+        error: 'Insufficient credits',
+        credits_required: ESTIMATED_GENERATION_CREDITS,
+        credits_available: balance?.balance || 0,
+        upgrade_url: '/settings/billing',
+      }, { status: 402 });
     }
 
     const body = await request.json();
