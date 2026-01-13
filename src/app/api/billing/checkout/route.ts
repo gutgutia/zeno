@@ -99,6 +99,25 @@ export async function POST(request: Request) {
       organization_id = await ensureOrganization(supabase, user.id, user.email || '');
     }
 
+    // For credit packs, get user's organization if they're a member of one
+    // This ensures credits are added to the org balance (which is what the UI shows)
+    if (type === 'credit_pack' && !organization_id) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: membership } = await (supabase as any)
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .not('accepted_at', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (membership?.organization_id) {
+        organization_id = membership.organization_id;
+        console.log(`[Checkout] Credit pack: Using org ${organization_id} for user ${user.id}`);
+      }
+    }
+
     if (!type || (type !== 'subscription' && type !== 'credit_pack')) {
       return NextResponse.json({ error: 'Invalid checkout type' }, { status: 400 });
     }

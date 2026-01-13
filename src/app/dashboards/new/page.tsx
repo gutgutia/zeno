@@ -168,6 +168,28 @@ function NewDashboardPageContent() {
     }
   }, []);
 
+  // Force save state synchronously (used before navigation to Stripe)
+  const saveStateNow = useCallback(() => {
+    try {
+      const state = {
+        step: 'instructions' as Step, // Always save as instructions when buying credits
+        title,
+        rawContent,
+        parsedData,
+        schema,
+        dataSource,
+        contentType,
+        instructions,
+        activeTab,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      console.log('[Dashboard Create] Saved state to localStorage before Stripe redirect');
+    } catch (err) {
+      console.error('Failed to save state to localStorage:', err);
+    }
+  }, [title, rawContent, parsedData, schema, dataSource, contentType, instructions, activeTab]);
+
   // Load workspace and check Google connection on mount
   useEffect(() => {
     loadWorkspace();
@@ -606,6 +628,8 @@ function NewDashboardPageContent() {
             needed: data.credits_required || 25,
             available: data.credits_available || 0,
           });
+          // Save state synchronously BEFORE showing modal (in case user buys credits)
+          saveStateNow();
           setUpgradeModalOpen(true);
           setIsLoading(false);
           setStep('instructions'); // Go back to instructions step
@@ -1427,6 +1451,7 @@ function NewDashboardPageContent() {
         reason="credits"
         creditsNeeded={creditsInfo?.needed}
         creditsAvailable={creditsInfo?.available}
+        onBeforeRedirect={saveStateNow}
       />
     </div>
   );

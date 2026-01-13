@@ -20,6 +20,7 @@ interface UpgradeModalProps {
   creditsNeeded?: number;
   creditsAvailable?: number;
   onCreditsAdded?: () => void; // Called when credits are successfully added
+  onBeforeRedirect?: () => void; // Called right before redirecting to Stripe (to save state)
 }
 
 const creditPacks = [
@@ -63,6 +64,7 @@ export function UpgradeModal({
   creditsNeeded,
   creditsAvailable,
   onCreditsAdded,
+  onBeforeRedirect,
 }: UpgradeModalProps) {
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
@@ -105,6 +107,11 @@ export function UpgradeModal({
         throw new Error(data.error || 'Failed to create checkout session');
       }
 
+      // Call onBeforeRedirect to allow parent to save state
+      if (onBeforeRedirect) {
+        onBeforeRedirect();
+      }
+
       // Redirect to Stripe Checkout
       window.location.href = data.url;
     } catch (error) {
@@ -131,6 +138,11 @@ export function UpgradeModal({
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Call onBeforeRedirect to allow parent to save state
+      if (onBeforeRedirect) {
+        onBeforeRedirect();
       }
 
       // Redirect to Stripe Checkout
