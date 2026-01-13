@@ -2,6 +2,19 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import type { ParsedData, DataSchema, ColumnInfo } from '@/types/dashboard';
 
+// Document file extensions supported (parsed server-side via document-parser.ts)
+const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'odt', 'odp', 'ods', 'rtf'];
+
+// Check if a file extension is a document type
+export function isDocumentType(extension: string): boolean {
+  return DOCUMENT_EXTENSIONS.includes(extension.toLowerCase());
+}
+
+// Get list of supported document extensions for display
+export function getSupportedDocumentExtensions(): string[] {
+  return [...DOCUMENT_EXTENSIONS];
+}
+
 export interface ParseOptions {
   hasHeader?: boolean;
   delimiter?: string;
@@ -239,7 +252,8 @@ export function generateSchema(parsedData: ParsedData): DataSchema {
   };
 }
 
-// Main entry point for parsing any data format
+// Main entry point for parsing tabular data (CSV, Excel, etc.)
+// Note: Document types (PDF, DOCX, etc.) should be parsed via /api/parse endpoint
 export async function parseData(
   input: string | File | ArrayBuffer,
   options: ParseOptions = {}
@@ -250,10 +264,15 @@ export async function parseData(
     // Text input - CSV or TSV
     parsedData = parseCSV(input, options);
   } else if (input instanceof File) {
-    // File input
-    const extension = input.name.split('.').pop()?.toLowerCase();
+    const extension = input.name.split('.').pop()?.toLowerCase() || '';
 
-    if (extension === 'csv' || extension === 'tsv' || extension === 'txt') {
+    // Document types should be handled via API route
+    if (isDocumentType(extension)) {
+      throw new Error(`Document files (${extension}) must be parsed via /api/parse endpoint`);
+    }
+
+    // Handle tabular data files
+    if (extension === 'csv' || extension === 'tsv' || extension === 'txt' || extension === 'md' || extension === 'json') {
       const text = await input.text();
       parsedData = parseCSV(text, options);
     } else if (extension === 'xlsx' || extension === 'xls') {
@@ -268,7 +287,6 @@ export async function parseData(
   }
 
   const schema = generateSchema(parsedData);
-
   return { data: parsedData, schema };
 }
 

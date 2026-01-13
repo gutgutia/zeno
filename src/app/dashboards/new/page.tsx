@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { parseData, getFileSheets, type ExcelSheetInfo } from '@/lib/data/parser';
+import { parseData, getFileSheets, isDocumentType, type ExcelSheetInfo } from '@/lib/data/parser';
 import { detectContentTypeQuick } from '@/lib/ai/content-detection';
 import { estimateTokens, isContentTooLarge, MAX_TOKENS } from '@/types/dashboard';
 import { SheetSelector } from '@/components/sheets/SheetSelector';
@@ -206,7 +206,54 @@ function NewDashboardPageContent() {
     setError(null);
 
     try {
-      const extension = file.name.split('.').pop()?.toLowerCase();
+      const extension = file.name.split('.').pop()?.toLowerCase() || '';
+
+      // Handle document types (PDF, DOCX, PPTX, etc.) via API
+      if (isDocumentType(extension)) {
+        // Send file to server for parsing
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/parse', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          setError(errorData.error || 'Failed to parse document.');
+          setIsLoading(false);
+          return;
+        }
+
+        const result = await response.json();
+
+        if (isContentTooLarge(result.text)) {
+          setError(`Document is too large (${estimateTokens(result.text).toLocaleString()} tokens). Maximum is ${MAX_TOKENS.toLocaleString()} tokens.`);
+          setIsLoading(false);
+          return;
+        }
+
+        setRawContent(result.text);
+        setContentType('text');
+        setParsedData(null); // Documents are not tabular
+        setSchema(null);
+        setDataSource({
+          type: 'upload',
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+        });
+
+        if (!title) {
+          const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+          setTitle(nameWithoutExt);
+        }
+
+        setStep('instructions');
+        setIsLoading(false);
+        return;
+      }
 
       // For Excel files, check if there are multiple sheets
       if (extension === 'xlsx' || extension === 'xls') {
@@ -248,7 +295,7 @@ function NewDashboardPageContent() {
           availableSheets: sheets?.map(s => s.name),
         });
       } else {
-        // Text file
+        // Text file (CSV, TSV, TXT, MD, JSON)
         const fileContent = await file.text();
 
         if (isContentTooLarge(fileContent)) {
@@ -675,12 +722,12 @@ function NewDashboardPageContent() {
                       Click to upload or drag and drop
                     </p>
                     <p className="text-sm text-[var(--color-gray-500)]">
-                      CSV, TSV, TXT, XLS, XLSX, MD, or any text file
+                      CSV, Excel, PDF, Word, PowerPoint, and more
                     </p>
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".csv,.tsv,.txt,.xls,.xlsx,.md,.json"
+                      accept=".csv,.tsv,.txt,.xls,.xlsx,.md,.json,.pdf,.docx,.doc,.pptx,.ppt,.odt,.odp,.ods,.rtf"
                       onChange={handleFileUpload}
                       className="hidden"
                     />
