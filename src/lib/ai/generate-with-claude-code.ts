@@ -154,8 +154,8 @@ export async function generateWithClaudeCode(
       // Try to extract stdout/stderr from the error
       const err = cmdError as { result?: { stdout?: string; stderr?: string; exitCode?: number }; message?: string };
       if (err.result) {
-        console.log('[Claude Code E2B] Error stdout:', err.result.stdout?.slice(0, 1000) || '(empty)');
-        console.log('[Claude Code E2B] Error stderr:', err.result.stderr?.slice(0, 1000) || '(empty)');
+        console.log('[Claude Code E2B] Error stdout:', err.result.stdout?.slice(0, 10000) || '(empty)');
+        console.log('[Claude Code E2B] Error stderr:', err.result.stderr?.slice(0, 10000) || '(empty)');
         console.log('[Claude Code E2B] Error exit code:', err.result.exitCode);
       }
 
@@ -173,12 +173,12 @@ export async function generateWithClaudeCode(
     console.log('[Claude Code E2B] Exit code:', result.exitCode);
 
     if (result.stderr) {
-      console.log('[Claude Code E2B] Stderr:', result.stderr.slice(0, 500));
+      console.log('[Claude Code E2B] Stderr:', result.stderr.slice(0, 10000));
     }
 
-    // Log stdout for debugging (truncated)
+    // Log stdout for debugging
     if (result.stdout) {
-      console.log('[Claude Code E2B] Stdout preview:', result.stdout.slice(0, 500));
+      console.log('[Claude Code E2B] Stdout:', result.stdout.slice(0, 10000));
     }
 
     // Read the generated HTML

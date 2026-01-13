@@ -72,7 +72,7 @@ export async function modifyWithClaudeCode(
   branding: BrandingConfig | null
 ): Promise<ModifyResultWithUsage> {
   console.log('[Modify Claude Code] Starting modification...');
-  console.log('[Modify Claude Code] Instructions:', instructions.slice(0, 100));
+  console.log('[Modify Claude Code] Instructions:', instructions.slice(0, 500));
   const startTime = Date.now();
 
   let sandbox: Sandbox | null = null;
@@ -105,6 +105,14 @@ export async function modifyWithClaudeCode(
     );
 
     console.log('[Modify Claude Code] Exit code:', result.exitCode);
+
+    // Log stdout/stderr for debugging
+    if (result.stderr) {
+      console.log('[Modify Claude Code] Stderr:', result.stderr.slice(0, 10000));
+    }
+    if (result.stdout) {
+      console.log('[Modify Claude Code] Stdout:', result.stdout.slice(0, 10000));
+    }
 
     // Read the output
     let html: string;

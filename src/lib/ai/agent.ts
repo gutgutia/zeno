@@ -157,9 +157,9 @@ function printAgentLog(log: AgentLogEntry[], totalCost?: number) {
     const prefix = `[Turn ${entry.turn}] [${entry.type.toUpperCase()}]`;
     console.log(`\n${prefix}`);
     console.log('-'.repeat(40));
-    // Truncate long content for readability
-    const content = entry.content.length > 500
-      ? entry.content.slice(0, 500) + '... (truncated)'
+    // Truncate very long content for readability
+    const content = entry.content.length > 10000
+      ? entry.content.slice(0, 10000) + '... (truncated)'
       : entry.content;
     console.log(content);
   }
@@ -189,8 +189,8 @@ const executePythonTool = tool(
     }
 
     try {
-      // Log the Python code being executed (truncated for readability)
-      const codePreview = code.length > 300 ? code.slice(0, 300) + '\n... (truncated)' : code;
+      // Log the Python code being executed
+      const codePreview = code.length > 5000 ? code.slice(0, 5000) + '\n... (truncated)' : code;
       console.log('[Python] Executing:\n' + '-'.repeat(40));
       console.log(codePreview);
       console.log('-'.repeat(40));
@@ -207,8 +207,8 @@ const executePythonTool = tool(
         };
       }
 
-      // Log the output (truncated for readability)
-      const outputPreview = stdout.length > 500 ? stdout.slice(0, 500) + '\n... (truncated)' : stdout;
+      // Log the output
+      const outputPreview = stdout.length > 10000 ? stdout.slice(0, 10000) + '\n... (truncated)' : stdout;
       console.log('[Python] Output:\n' + '-'.repeat(40));
       console.log(outputPreview || '(no output)');
       console.log('-'.repeat(40));

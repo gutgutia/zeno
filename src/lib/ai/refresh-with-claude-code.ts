@@ -131,6 +131,14 @@ export async function refreshWithClaudeCode(
 
     console.log('[Refresh Claude Code] Exit code:', result.exitCode);
 
+    // Log stdout/stderr for debugging
+    if (result.stderr) {
+      console.log('[Refresh Claude Code] Stderr:', result.stderr.slice(0, 10000));
+    }
+    if (result.stdout) {
+      console.log('[Refresh Claude Code] Stdout:', result.stdout.slice(0, 10000));
+    }
+
     // Read the output
     let html: string;
     try {
