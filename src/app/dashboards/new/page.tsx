@@ -147,8 +147,13 @@ function NewDashboardPageContent() {
   const checkGoogleConnection = async (wsId: string) => {
     setIsCheckingGoogle(true);
     try {
-      const response = await fetch(`/api/google/spreadsheets?workspace_id=${wsId}`);
-      setHasGoogleConnection(response.ok);
+      const response = await fetch(`/api/google/connection/status?workspace_id=${wsId}`);
+      if (response.ok) {
+        const { connected } = await response.json();
+        setHasGoogleConnection(connected);
+      } else {
+        setHasGoogleConnection(false);
+      }
     } catch {
       setHasGoogleConnection(false);
     } finally {
