@@ -9,7 +9,7 @@ interface VoiceRecorderProps {
 }
 
 export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
-  const [hasStarted, setHasStarted] = useState(false); // Whether user clicked to start
+  const [permissionState, setPermissionState] = useState<'checking' | 'granted' | 'prompt' | 'denied'>('checking');
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -22,6 +22,57 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Check permission state on mount and auto-start if granted
+  useEffect(() => {
+    const checkPermissionAndStart = async () => {
+      console.log('[VoiceRecorder] Starting permission check...');
+
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.log('[VoiceRecorder] getUserMedia not supported');
+        setError('Your browser does not support audio recording.');
+        setPermissionState('denied');
+        return;
+      }
+
+      // Check permission state (note: Safari doesn't support microphone permission query)
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+          console.log('[VoiceRecorder] Permission query result:', status.state);
+
+          if (status.state === 'granted') {
+            // Permission already granted - start recording immediately
+            setPermissionState('granted');
+            startRecording();
+          } else if (status.state === 'denied') {
+            setPermissionState('denied');
+            setError('Microphone access is blocked. Please click the lock icon in your browser\'s address bar, find "Microphone", set it to "Allow", and refresh the page.');
+          } else {
+            // 'prompt' - need user gesture
+            setPermissionState('prompt');
+          }
+
+          // Listen for permission changes
+          status.addEventListener('change', () => {
+            console.log('[VoiceRecorder] Permission changed to:', status.state);
+          });
+        } catch (permErr) {
+          // Permission query not supported (Safari), assume we need to prompt
+          console.log('[VoiceRecorder] Permission query not supported:', permErr);
+          setPermissionState('prompt');
+        }
+      } else {
+        // Permissions API not supported, assume we need to prompt
+        console.log('[VoiceRecorder] Permissions API not available');
+        setPermissionState('prompt');
+      }
+    };
+
+    checkPermissionAndStart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -64,37 +115,21 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
   }, []);
 
   const startRecording = async () => {
+    console.log('[VoiceRecorder] startRecording called');
     try {
-      setHasStarted(true);
       setError(null);
+      setPermissionState('granted');
       audioChunksRef.current = [];
 
-      // Check if getUserMedia is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setError('Your browser does not support audio recording. Please try Chrome, Firefox, or Safari.');
-        return;
-      }
-
-      // Check permission state first (if supported)
-      if (navigator.permissions && navigator.permissions.query) {
-        try {
-          const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-          if (permissionStatus.state === 'denied') {
-            setError('Microphone access is blocked. Please click the lock icon in your browser\'s address bar, find "Microphone", and set it to "Allow", then try again.');
-            return;
-          }
-        } catch {
-          // Permission query not supported, continue anyway
-        }
-      }
-
       // Request microphone access
+      console.log('[VoiceRecorder] Requesting getUserMedia...');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
         }
       });
+      console.log('[VoiceRecorder] getUserMedia success, got stream');
       streamRef.current = stream;
 
       // Set up audio analyser for visualizer
@@ -148,9 +183,11 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
       }, 1000);
 
     } catch (err) {
-      console.error('Error starting recording:', err);
+      console.error('[VoiceRecorder] Error starting recording:', err);
       if (err instanceof Error) {
+        console.log('[VoiceRecorder] Error name:', err.name, 'message:', err.message);
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setPermissionState('denied');
           setError('Microphone access is blocked. Please click the lock icon in your browser\'s address bar, find "Microphone", set it to "Allow", and refresh the page.');
         } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
           setError('No microphone found. Please connect a microphone and try again.');
@@ -220,8 +257,19 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
-        {!hasStarted && !error ? (
-          // Initial state - prompt user to start
+        {permissionState === 'checking' ? (
+          // Checking permission state
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              <svg className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            </div>
+            <p className="text-gray-600 dark:text-gray-400">Preparing...</p>
+          </div>
+        ) : permissionState === 'prompt' && !error ? (
+          // Need user gesture to request permission
           <div className="text-center">
             <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
               <svg className="w-10 h-10 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -229,10 +277,10 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
               </svg>
             </div>
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Voice Input
+              Enable Microphone
             </h3>
             <p className="text-gray-500 dark:text-gray-400 mb-6">
-              Click the button below to start recording your instructions
+              Click the button below to allow microphone access and start recording
             </p>
             <Button
               onClick={startRecording}
@@ -242,7 +290,7 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
               <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
               </svg>
-              Start Recording
+              Allow & Start Recording
             </Button>
             <button
               onClick={onClose}
@@ -264,7 +312,7 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
               <Button variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button onClick={() => { setError(null); setHasStarted(false); }}>
+              <Button onClick={() => { setError(null); setPermissionState('prompt'); }}>
                 Try Again
               </Button>
             </div>
