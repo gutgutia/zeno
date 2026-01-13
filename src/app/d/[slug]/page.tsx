@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createHash } from 'crypto';
+import type { Metadata } from 'next';
 import type { Dashboard, BrandingConfig, DashboardShare, ExternalViewerSession } from '@/types/database';
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
@@ -14,6 +15,71 @@ import { SharedDashboardAuthGate } from '@/components/dashboard/SharedDashboardA
 
 // Cookie name for external viewer sessions
 const EXTERNAL_SESSION_COOKIE = 'zeno_external_session';
+
+interface PageProps {
+  params: Promise<{ slug: string }>;
+}
+
+// Generate dynamic metadata for public dashboards
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const baseUrl = 'https://zeno.fyi';
+
+  try {
+    const adminSupabase = createAdminClient();
+
+    const { data: dashboard } = await adminSupabase
+      .from('dashboards')
+      .select('title, description, is_published')
+      .eq('slug', slug)
+      .single();
+
+    if (!dashboard) {
+      return {
+        title: 'Dashboard Not Found | Zeno',
+        description: 'This dashboard could not be found.',
+      };
+    }
+
+    const title = dashboard.title || 'Dashboard';
+    const description = dashboard.description || `View the ${title} dashboard on Zeno - AI-powered data visualization.`;
+
+    return {
+      title: `${title} | Zeno`,
+      description,
+      openGraph: {
+        title: `${title} | Zeno`,
+        description,
+        url: `${baseUrl}/d/${slug}`,
+        siteName: 'Zeno',
+        type: 'website',
+        images: [
+          {
+            url: `${baseUrl}/social/og-image.png`,
+            width: 1200,
+            height: 630,
+            alt: title,
+          },
+        ],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: `${title} | Zeno`,
+        description,
+        images: [`${baseUrl}/social/og-image.png`],
+      },
+      // Only allow indexing for published dashboards
+      robots: dashboard.is_published
+        ? { index: true, follow: true }
+        : { index: false, follow: false },
+    };
+  } catch {
+    return {
+      title: 'Dashboard | Zeno',
+      description: 'View this dashboard on Zeno - AI-powered data visualization.',
+    };
+  }
+}
 
 // Check for valid external viewer session
 async function checkExternalViewerSession(
@@ -64,10 +130,6 @@ async function checkExternalViewerSession(
   } catch {
     return { valid: false };
   }
-}
-
-interface PageProps {
-  params: Promise<{ slug: string }>;
 }
 
 export const dynamic = 'force-dynamic';

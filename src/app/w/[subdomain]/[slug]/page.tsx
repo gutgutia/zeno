@@ -15,6 +15,78 @@ interface PageProps {
   params: Promise<{ subdomain: string; slug: string }>;
 }
 
+// Generate dynamic metadata for organization dashboards
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { subdomain, slug } = await params;
+
+  try {
+    const adminSupabase = createAdminClient();
+
+    // Get organization
+    const { data: organization } = await adminSupabase
+      .from('organizations')
+      .select('name, white_label_enabled, branding, favicon_url')
+      .eq('subdomain', subdomain)
+      .single();
+
+    if (!organization) {
+      return { title: 'Dashboard Not Found' };
+    }
+
+    // Get dashboard
+    const { data: orgData } = await adminSupabase
+      .from('organizations')
+      .select('id')
+      .eq('subdomain', subdomain)
+      .single();
+
+    if (!orgData) {
+      return { title: 'Dashboard Not Found' };
+    }
+
+    const { data: dashboard } = await adminSupabase
+      .from('dashboards')
+      .select('title, description, is_published, branding_override')
+      .eq('organization_id', orgData.id)
+      .eq('slug', slug)
+      .single();
+
+    if (!dashboard) {
+      return { title: 'Dashboard Not Found' };
+    }
+
+    const branding = getMergedBranding(
+      organization.branding as BrandingConfig | null,
+      dashboard.branding_override as BrandingConfig | null
+    );
+    const companyName = branding.companyName || organization.name || 'Dashboard';
+    const title = organization.white_label_enabled
+      ? `${dashboard.title} | ${companyName}`
+      : `${dashboard.title} | ${companyName} - Zeno`;
+    const description = dashboard.description || `View the ${dashboard.title} dashboard.`;
+
+    const metadata: Metadata = {
+      title,
+      description,
+      // For white-label, don't index under Zeno branding
+      robots: dashboard.is_published && !organization.white_label_enabled
+        ? { index: true, follow: true }
+        : { index: false, follow: false },
+    };
+
+    // Add favicon for white-label organizations
+    if (organization.white_label_enabled && organization.favicon_url) {
+      metadata.icons = {
+        icon: organization.favicon_url,
+      };
+    }
+
+    return metadata;
+  } catch {
+    return { title: 'Dashboard' };
+  }
+}
+
 export const dynamic = 'force-dynamic';
 
 // Check if user has access to a shared dashboard
@@ -182,20 +254,9 @@ export default async function OrganizationDashboardPage({ params }: PageProps) {
 
   // White-label settings
   const showPoweredBy = !typedOrganization.white_label_enabled;
-  const companyName = branding.companyName || typedOrganization.name || 'Dashboard';
-  const pageTitle = typedOrganization.white_label_enabled
-    ? `${dashboard.title} | ${companyName}`
-    : `${dashboard.title} | ${companyName} - Zeno`;
 
   return (
-    <>
-      {/* Dynamic head content */}
-      <title>{pageTitle}</title>
-      {typedOrganization.white_label_enabled && typedOrganization.favicon_url && (
-        <link rel="icon" href={typedOrganization.favicon_url} />
-      )}
-
-      <div className="min-h-screen" style={brandingStyles}>
+    <div className="min-h-screen" style={brandingStyles}>
         {/* Render the page content */}
         <WorkspacePageRenderer
           html={config.html}
@@ -219,7 +280,6 @@ export default async function OrganizationDashboardPage({ params }: PageProps) {
             </div>
           </footer>
         )}
-      </div>
-    </>
+    </div>
   );
 }

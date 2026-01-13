@@ -1,5 +1,14 @@
+import type { Metadata } from 'next';
 import { AppHeader } from '@/components/layout';
 import Link from 'next/link';
+
+// Prevent search engines from indexing settings pages
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default function SettingsLayout({
   children,
