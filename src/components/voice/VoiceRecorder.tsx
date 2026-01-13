@@ -9,6 +9,7 @@ interface VoiceRecorderProps {
 }
 
 export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
+  const [hasStarted, setHasStarted] = useState(false); // Whether user clicked to start
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -64,6 +65,7 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
 
   const startRecording = async () => {
     try {
+      setHasStarted(true);
       setError(null);
       audioChunksRef.current = [];
 
@@ -215,16 +217,41 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Auto-start recording when component mounts
-  useEffect(() => {
-    startRecording();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
-        {error ? (
+        {!hasStarted && !error ? (
+          // Initial state - prompt user to start
+          <div className="text-center">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              <svg className="w-10 h-10 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Voice Input
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">
+              Click the button below to start recording your instructions
+            </p>
+            <Button
+              onClick={startRecording}
+              size="lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+              Start Recording
+            </Button>
+            <button
+              onClick={onClose}
+              className="mt-4 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-sm block mx-auto"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : error ? (
           // Error state
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
@@ -237,7 +264,7 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
               <Button variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button onClick={() => { setError(null); startRecording(); }}>
+              <Button onClick={() => { setError(null); setHasStarted(false); }}>
                 Try Again
               </Button>
             </div>
