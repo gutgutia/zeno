@@ -1069,14 +1069,14 @@ function NewDashboardPageContent() {
                   onSelect={(e) => {
                     cursorPositionRef.current = (e.target as HTMLTextAreaElement).selectionStart;
                   }}
-                  className="min-h-[120px] pr-12"
+                  className="min-h-[120px] pb-12"
                   autoFocus
                 />
-                {/* Voice input button */}
+                {/* Voice input button - bottom right */}
                 <button
                   type="button"
                   onClick={startRecording}
-                  className="absolute right-3 top-3 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="absolute right-2 bottom-2 p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                   title="Click to speak your instructions"
                 >
                   <svg
