@@ -89,6 +89,7 @@ function NewDashboardPageContent() {
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioMimeTypeRef = useRef<string>('audio/webm');
   const streamRef = useRef<MediaStream | null>(null);
   const recordingTimerRef = useRef<number | null>(null);
   const recordingStartTimeRef = useRef<number>(0);
@@ -606,8 +607,18 @@ function NewDashboardPageContent() {
     setRecordingError(null);
 
     try {
+      // Determine file extension from mime type
+      const getExtension = (mimeType: string) => {
+        if (mimeType.includes('webm')) return 'webm';
+        if (mimeType.includes('mp4')) return 'mp4';
+        if (mimeType.includes('mpeg')) return 'mp3';
+        if (mimeType.includes('ogg')) return 'ogg';
+        return 'webm'; // Default
+      };
+      const extension = getExtension(audioBlob.type);
+
       const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.webm');
+      formData.append('audio', audioBlob, `recording.${extension}`);
 
       const response = await fetch('/api/transcribe', {
         method: 'POST',
@@ -666,12 +677,20 @@ function NewDashboardPageContent() {
       });
       streamRef.current = stream;
 
-      // Set up media recorder
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : 'audio/webm'
-      });
+      // Set up media recorder with browser-compatible format
+      // Safari doesn't support webm, so we need to check multiple formats
+      const getMimeType = () => {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return 'audio/webm;codecs=opus';
+        if (MediaRecorder.isTypeSupported('audio/webm')) return 'audio/webm';
+        if (MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
+        if (MediaRecorder.isTypeSupported('audio/mpeg')) return 'audio/mpeg';
+        return ''; // Let browser choose default
+      };
+      const mimeType = getMimeType();
+      audioMimeTypeRef.current = mimeType || 'audio/webm';
+      const mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
@@ -684,8 +703,8 @@ function NewDashboardPageContent() {
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
 
-        // Create audio blob and transcribe
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        // Create audio blob with correct mime type and transcribe
+        const audioBlob = new Blob(audioChunksRef.current, { type: audioMimeTypeRef.current });
         await transcribeAudio(audioBlob);
       };
 
