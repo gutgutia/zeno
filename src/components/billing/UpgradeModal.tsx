@@ -157,9 +157,7 @@ export function UpgradeModal({
 
   const getDescription = () => {
     if (reason === 'credits') {
-      return creditsNeeded && creditsAvailable !== undefined
-        ? `You need ${creditsNeeded} credits but only have ${creditsAvailable}. Purchase a credit pack to continue.`
-        : 'Purchase credits to continue.';
+      return 'You don\'t have enough credits to complete this action. Purchase a credit pack to continue.';
     }
     switch (reason) {
       case 'dashboards':
