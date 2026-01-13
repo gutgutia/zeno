@@ -37,6 +37,8 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
       }
 
       // Check permission state (note: Safari doesn't support microphone permission query)
+      // IMPORTANT: The Permissions API is unreliable and can report 'denied' even when
+      // the user has granted access. We only use it to auto-start if 'granted'.
       if (navigator.permissions && navigator.permissions.query) {
         try {
           const status = await navigator.permissions.query({ name: 'microphone' as PermissionName });
@@ -46,28 +48,19 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
             // Permission already granted - start recording immediately
             setPermissionState('granted');
             startRecording();
-          } else if (status.state === 'denied') {
-            setPermissionState('denied');
-            setError('Microphone access is blocked. Please click the lock icon in your browser\'s address bar, find "Microphone", set it to "Allow", and refresh the page.');
-          } else {
-            // 'prompt' - need user gesture
-            setPermissionState('prompt');
+            return;
           }
-
-          // Listen for permission changes
-          status.addEventListener('change', () => {
-            console.log('[VoiceRecorder] Permission changed to:', status.state);
-          });
+          // For 'denied' or 'prompt', we still show the button and let user try
+          // The actual getUserMedia call is the source of truth
         } catch (permErr) {
-          // Permission query not supported (Safari), assume we need to prompt
           console.log('[VoiceRecorder] Permission query not supported:', permErr);
-          setPermissionState('prompt');
         }
       } else {
-        // Permissions API not supported, assume we need to prompt
         console.log('[VoiceRecorder] Permissions API not available');
-        setPermissionState('prompt');
       }
+
+      // Default: show the prompt button and let the user try
+      setPermissionState('prompt');
     };
 
     checkPermissionAndStart();
