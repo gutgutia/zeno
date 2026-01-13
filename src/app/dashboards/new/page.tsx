@@ -109,12 +109,71 @@ function NewDashboardPageContent() {
   const tokenCount = useMemo(() => estimateTokens(rawContent), [rawContent]);
   const isTooLarge = useMemo(() => isContentTooLarge(rawContent), [rawContent]);
 
+  // localStorage key for persisting state
+  const STORAGE_KEY = 'dashboard_creation_state';
+
+  // Load state from localStorage on mount (handles refresh and Stripe redirect)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const state = JSON.parse(saved);
+        // Restore state
+        if (state.step) setStep(state.step);
+        if (state.title) setTitle(state.title);
+        if (state.rawContent) setRawContent(state.rawContent);
+        if (state.parsedData) setParsedData(state.parsedData);
+        if (state.schema) setSchema(state.schema);
+        if (state.dataSource) setDataSource(state.dataSource);
+        if (state.contentType) setContentType(state.contentType);
+        if (state.instructions) setInstructions(state.instructions);
+        if (state.activeTab) setActiveTab(state.activeTab);
+        console.log('[Dashboard Create] Restored state from localStorage, step:', state.step);
+      }
+    } catch (err) {
+      console.error('Failed to restore state from localStorage:', err);
+    }
+  }, []);
+
+  // Save state to localStorage when key fields change
+  useEffect(() => {
+    // Only save if we have meaningful state (not initial empty state)
+    if (step === 'input' && !rawContent && !parsedData) return;
+
+    try {
+      const state = {
+        step,
+        title,
+        rawContent,
+        parsedData,
+        schema,
+        dataSource,
+        contentType,
+        instructions,
+        activeTab,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (err) {
+      console.error('Failed to save state to localStorage:', err);
+    }
+  }, [step, title, rawContent, parsedData, schema, dataSource, contentType, instructions, activeTab]);
+
+  // Clear localStorage when dashboard is successfully created
+  const clearSavedState = useCallback(() => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (err) {
+      console.error('Failed to clear localStorage:', err);
+    }
+  }, []);
+
   // Load workspace and check Google connection on mount
   useEffect(() => {
     loadWorkspace();
   }, []);
 
-  // Handle Google connection callback
+  // Handle URL callbacks (Google connection, Stripe credit purchase)
   useEffect(() => {
     if (googleConnected === 'true') {
       setHasGoogleConnection(true);
@@ -126,7 +185,16 @@ function NewDashboardPageContent() {
       setError(googleError);
       window.history.replaceState({}, '', '/dashboards/new');
     }
-  }, [googleConnected, googleError]);
+
+    // Handle return from Stripe credit purchase
+    const creditsPurchased = searchParams.get('credits_purchased');
+    if (creditsPurchased === 'true') {
+      // Clear URL params but keep state restored from localStorage
+      window.history.replaceState({}, '', '/dashboards/new');
+      // Trigger a refresh of credits in navbar
+      window.dispatchEvent(new CustomEvent('credits-updated'));
+    }
+  }, [googleConnected, googleError, searchParams]);
 
   const loadWorkspace = async () => {
     try {
@@ -546,6 +614,8 @@ function NewDashboardPageContent() {
         throw new Error(data.error || 'Failed to create dashboard');
       }
 
+      // Clear saved state before navigating away
+      clearSavedState();
       router.push(`/dashboards/${data.dashboard.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create dashboard');
