@@ -165,6 +165,20 @@ Optional:
 
 ## Deployment
 
-- **Platform:** Railway (using Dockerfile)
+- **Platform:** Vercel
 - **Build:** Webpack (not Turbopack - ESM issues)
 - **Agent SDK:** Requires global Claude Code CLI installation
+
+## Local Development
+
+### Stripe Webhooks
+To test Stripe payments locally, run the Stripe CLI:
+```bash
+stripe listen --forward-to localhost:3000/api/billing/webhook
+```
+Use the webhook signing secret it provides in your `.env` as `STRIPE_WEBHOOK_SECRET`.
+
+### Credits System Notes
+- Credits are tied to organizations, not individual users
+- When a user is in an organization, their credit balance comes from `organization_credits`
+- Credit pack purchases automatically detect the user's organization and add credits there
