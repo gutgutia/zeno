@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withAxiom } from "next-axiom";
 
 // Security headers to protect against common web attacks
 const securityHeaders = [
@@ -30,7 +31,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://accounts.google.com https://*.posthog.com https://us.i.posthog.com https://us-assets.i.posthog.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://accounts.google.com https://*.posthog.com https://us.i.posthog.com https://us-assets.i.posthog.com https://*.axiom.co",
       "frame-src 'self' https://js.stripe.com https://accounts.google.com",
       "frame-ancestors 'none'",
     ].join('; '),
@@ -81,4 +82,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withAxiom(nextConfig);
