@@ -15,7 +15,6 @@ import { SheetSelector } from '@/components/sheets/SheetSelector';
 import { GoogleSheetPicker } from '@/components/sheets/GoogleSheetPicker';
 import { UpgradePrompt } from '@/components/billing/UpgradePrompt';
 import { UpgradeModal } from '@/components/billing/UpgradeModal';
-import { VoiceRecorder } from '@/components/voice/VoiceRecorder';
 import { usePlan } from '@/lib/hooks';
 import { useOrganization } from '@/lib/contexts/organization-context';
 import type { ParsedData, DataSchema, ContentType } from '@/types/dashboard';
@@ -80,9 +79,19 @@ function NewDashboardPageContent() {
   // Instructions state
   const [instructions, setInstructions] = useState('');
   const [enableSync, setEnableSync] = useState(true);
-  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const instructionsRef = useRef<HTMLTextAreaElement>(null);
   const cursorPositionRef = useRef<number>(0);
+
+  // Voice recording state (inline, no modal)
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const recordingTimerRef = useRef<number | null>(null);
+  const recordingStartTimeRef = useRef<number>(0);
 
   // UI state
   const [error, setError] = useState<string | null>(null);
@@ -559,8 +568,8 @@ function NewDashboardPageContent() {
     }
   };
 
-  // Handle voice transcript - insert at cursor position
-  const handleVoiceTranscript = useCallback((transcript: string) => {
+  // Insert transcript at cursor position
+  const insertTranscript = useCallback((transcript: string) => {
     const cursorPos = cursorPositionRef.current;
     const before = instructions.slice(0, cursorPos);
     const after = instructions.slice(cursorPos);
@@ -591,16 +600,135 @@ function NewDashboardPageContent() {
     }, 0);
   }, [instructions]);
 
-  // Open voice recorder and save cursor position
-  const handleStartVoiceRecording = useCallback(() => {
-    // Save current cursor position before opening recorder
+  // Transcribe audio blob
+  const transcribeAudio = useCallback(async (audioBlob: Blob) => {
+    setIsTranscribing(true);
+    setRecordingError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
+
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Transcription failed');
+      }
+
+      const data = await response.json();
+
+      if (data.text && data.text.trim()) {
+        insertTranscript(data.text.trim());
+      } else {
+        setRecordingError('No speech detected. Please try again.');
+      }
+    } catch (err) {
+      console.error('Transcription error:', err);
+      setRecordingError(err instanceof Error ? err.message : 'Transcription failed. Please try again.');
+    } finally {
+      setIsTranscribing(false);
+    }
+  }, [insertTranscript]);
+
+  // Stop recording
+  const stopRecording = useCallback(() => {
+    if (recordingTimerRef.current) {
+      cancelAnimationFrame(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  }, [isRecording]);
+
+  // Start recording - browser will prompt for permission if needed
+  const startRecording = useCallback(async () => {
+    // Save cursor position
     if (instructionsRef.current) {
       cursorPositionRef.current = instructionsRef.current.selectionStart;
     } else {
       cursorPositionRef.current = instructions.length;
     }
-    setShowVoiceRecorder(true);
-  }, [instructions.length]);
+
+    setRecordingError(null);
+    audioChunksRef.current = [];
+
+    try {
+      // Request microphone - browser shows permission prompt if needed
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true }
+      });
+      streamRef.current = stream;
+
+      // Set up media recorder
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : 'audio/webm'
+      });
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+
+        // Create audio blob and transcribe
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await transcribeAudio(audioBlob);
+      };
+
+      mediaRecorder.start(100);
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingStartTimeRef.current = Date.now();
+
+      // Smooth timer using requestAnimationFrame
+      const updateTimer = () => {
+        const elapsed = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000);
+        setRecordingDuration(elapsed);
+        recordingTimerRef.current = requestAnimationFrame(updateTimer);
+      };
+      recordingTimerRef.current = requestAnimationFrame(updateTimer);
+
+    } catch (err) {
+      console.error('Error starting recording:', err);
+      if (err instanceof Error) {
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setRecordingError('Microphone access denied. Please allow access and try again.');
+        } else if (err.name === 'NotFoundError') {
+          setRecordingError('No microphone found. Please connect a microphone.');
+        } else {
+          setRecordingError(`Failed to start recording: ${err.message}`);
+        }
+      } else {
+        setRecordingError('Failed to start recording. Please try again.');
+      }
+    }
+  }, [instructions.length, transcribeAudio]);
+
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        cancelAnimationFrame(recordingTimerRef.current);
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
 
   const getContentTypeLabel = (type: ContentType) => {
     switch (type) {
@@ -889,44 +1017,89 @@ function NewDashboardPageContent() {
               Tell us what you&apos;d like to see. Leave blank and we&apos;ll create something great automatically.
             </p>
 
-            <div className="relative">
-              <Textarea
-                ref={instructionsRef}
-                placeholder="Examples:
+            {/* Recording/Transcribing UI replaces textarea */}
+            {isRecording || isTranscribing ? (
+              <div className="min-h-[120px] border border-[var(--color-gray-200)] rounded-md bg-[var(--color-gray-50)] flex flex-col items-center justify-center py-8">
+                {isTranscribing ? (
+                  <>
+                    {/* Transcribing state */}
+                    <div className="w-10 h-10 border-3 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin mb-3" />
+                    <p className="text-[var(--color-gray-600)] text-sm">Transcribing...</p>
+                  </>
+                ) : (
+                  <>
+                    {/* Recording state - pulsing mic */}
+                    <div className="relative mb-4">
+                      <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+                        <div className="absolute w-16 h-16 rounded-full bg-red-100 animate-ping opacity-75" />
+                        <svg className="w-8 h-8 text-red-500 relative z-10" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <p className="text-[var(--color-gray-700)] font-medium mb-1">Listening...</p>
+                    <p className="text-[var(--color-gray-500)] text-2xl font-mono tabular-nums mb-4">
+                      {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={stopRecording}
+                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <rect x="6" y="6" width="12" height="12" rx="2" />
+                      </svg>
+                      Stop Recording
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="relative">
+                <Textarea
+                  ref={instructionsRef}
+                  placeholder="Examples:
 • Show me customer status breakdown by owner
 • Create a professional summary with key metrics
 • Highlight the most important trends
 • Make it look like an executive report"
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                onSelect={(e) => {
-                  cursorPositionRef.current = (e.target as HTMLTextAreaElement).selectionStart;
-                }}
-                className="min-h-[120px] pr-12"
-                autoFocus
-              />
-              {/* Voice input button */}
-              <button
-                type="button"
-                onClick={handleStartVoiceRecording}
-                className="absolute right-3 top-3 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Click to speak your instructions"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  onSelect={(e) => {
+                    cursorPositionRef.current = (e.target as HTMLTextAreaElement).selectionStart;
+                  }}
+                  className="min-h-[120px] pr-12"
+                  autoFocus
+                />
+                {/* Voice input button */}
+                <button
+                  type="button"
+                  onClick={startRecording}
+                  className="absolute right-3 top-3 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Click to speak your instructions"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-                  />
-                </svg>
-              </button>
-            </div>
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            {/* Recording error message */}
+            {recordingError && (
+              <p className="text-red-500 text-sm mt-2">{recordingError}</p>
+            )}
           </div>
 
           {/* Content Summary - Collapsible */}
@@ -1161,14 +1334,6 @@ function NewDashboardPageContent() {
         creditsNeeded={creditsInfo?.needed}
         creditsAvailable={creditsInfo?.available}
       />
-
-      {/* Voice Recorder Modal */}
-      {showVoiceRecorder && (
-        <VoiceRecorder
-          onTranscript={handleVoiceTranscript}
-          onClose={() => setShowVoiceRecorder(false)}
-        />
-      )}
     </div>
   );
 }
