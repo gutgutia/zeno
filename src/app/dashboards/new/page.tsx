@@ -75,6 +75,7 @@ function NewDashboardPageContent() {
   const [selectedGoogleSpreadsheet, setSelectedGoogleSpreadsheet] = useState<GoogleSpreadsheet | null>(null);
   const [googleSheets, setGoogleSheets] = useState<GoogleSheetInfo[]>([]);
   const [selectedGoogleSheets, setSelectedGoogleSheets] = useState<string[]>([]);
+  const [isFetchingGoogleSheet, setIsFetchingGoogleSheet] = useState(false);
 
   // Instructions state
   const [instructions, setInstructions] = useState('');
@@ -109,55 +110,39 @@ function NewDashboardPageContent() {
   const tokenCount = useMemo(() => estimateTokens(rawContent), [rawContent]);
   const isTooLarge = useMemo(() => isContentTooLarge(rawContent), [rawContent]);
 
-  // localStorage key for persisting state
+  // localStorage key for persisting state (only for Stripe redirect)
   const STORAGE_KEY = 'dashboard_creation_state';
 
-  // Load state from localStorage on mount (handles refresh and Stripe redirect)
+  // Load state from localStorage ONLY when returning from Stripe credit purchase
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const state = JSON.parse(saved);
-        // Restore state
-        if (state.step) setStep(state.step);
-        if (state.title) setTitle(state.title);
-        if (state.rawContent) setRawContent(state.rawContent);
-        if (state.parsedData) setParsedData(state.parsedData);
-        if (state.schema) setSchema(state.schema);
-        if (state.dataSource) setDataSource(state.dataSource);
-        if (state.contentType) setContentType(state.contentType);
-        if (state.instructions) setInstructions(state.instructions);
-        if (state.activeTab) setActiveTab(state.activeTab);
-        console.log('[Dashboard Create] Restored state from localStorage, step:', state.step);
+    const creditsPurchased = searchParams.get('credits_purchased');
+
+    // Only restore state if coming back from Stripe
+    if (creditsPurchased === 'true') {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const state = JSON.parse(saved);
+          // Restore state
+          if (state.step) setStep(state.step);
+          if (state.title) setTitle(state.title);
+          if (state.rawContent) setRawContent(state.rawContent);
+          if (state.parsedData) setParsedData(state.parsedData);
+          if (state.schema) setSchema(state.schema);
+          if (state.dataSource) setDataSource(state.dataSource);
+          if (state.contentType) setContentType(state.contentType);
+          if (state.instructions) setInstructions(state.instructions);
+          if (state.activeTab) setActiveTab(state.activeTab);
+          console.log('[Dashboard Create] Restored state from localStorage after Stripe redirect');
+        }
+      } catch (err) {
+        console.error('Failed to restore state from localStorage:', err);
       }
-    } catch (err) {
-      console.error('Failed to restore state from localStorage:', err);
     }
-  }, []);
 
-  // Save state to localStorage when key fields change
-  useEffect(() => {
-    // Only save if we have meaningful state (not initial empty state)
-    if (step === 'input' && !rawContent && !parsedData) return;
-
-    try {
-      const state = {
-        step,
-        title,
-        rawContent,
-        parsedData,
-        schema,
-        dataSource,
-        contentType,
-        instructions,
-        activeTab,
-        savedAt: Date.now(),
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (err) {
-      console.error('Failed to save state to localStorage:', err);
-    }
-  }, [step, title, rawContent, parsedData, schema, dataSource, contentType, instructions, activeTab]);
+    // Always clear localStorage on mount (fresh start unless Stripe redirect)
+    localStorage.removeItem(STORAGE_KEY);
+  }, [searchParams]);
 
   // Clear localStorage when dashboard is successfully created
   const clearSavedState = useCallback(() => {
@@ -498,7 +483,7 @@ function NewDashboardPageContent() {
 
   const handleGoogleSpreadsheetSelect = async (spreadsheet: GoogleSpreadsheet) => {
     setSelectedGoogleSpreadsheet(spreadsheet);
-    setIsLoading(true);
+    setIsFetchingGoogleSheet(true);
     setError(null);
 
     try {
@@ -517,6 +502,7 @@ function NewDashboardPageContent() {
       if (data.sheets.length > 1) {
         // Multiple sheets - show selector
         setSelectedGoogleSheets(data.sheets.map((s: GoogleSheetInfo) => s.name));
+        setIsFetchingGoogleSheet(false);
         setStep('select-google-sheets');
       } else {
         // Single sheet - fetch data directly
@@ -524,8 +510,7 @@ function NewDashboardPageContent() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load spreadsheet');
-    } finally {
-      setIsLoading(false);
+      setIsFetchingGoogleSheet(false);
     }
   };
 
@@ -535,7 +520,7 @@ function NewDashboardPageContent() {
   };
 
   const fetchGoogleSheetData = async (spreadsheet: GoogleSpreadsheet, sheets: string[]) => {
-    setIsLoading(true);
+    setIsFetchingGoogleSheet(true);
     setError(null);
 
     try {
@@ -585,7 +570,7 @@ function NewDashboardPageContent() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch spreadsheet data');
     } finally {
-      setIsLoading(false);
+      setIsFetchingGoogleSheet(false);
     }
   };
 
@@ -962,8 +947,17 @@ function NewDashboardPageContent() {
 • Customer proposals
 • Meeting notes
 • Any content you want to present beautifully`}
-                      value={rawContent}
-                      onChange={(e) => setRawContent(e.target.value)}
+                      value={dataSource?.type === 'google_sheets' ? '' : rawContent}
+                      onChange={(e) => {
+                        setRawContent(e.target.value);
+                        // Clear Google Sheets data source if user starts typing
+                        if (dataSource?.type === 'google_sheets') {
+                          setDataSource(null);
+                          setParsedData(null);
+                          setSchema(null);
+                          setSelectedGoogleSpreadsheet(null);
+                        }
+                      }}
                     />
                   </div>
 
@@ -1080,6 +1074,17 @@ function NewDashboardPageContent() {
                       description="Import data directly from Google Sheets and keep your dashboards automatically synced. Upgrade to Pro to unlock this feature."
                       requiredPlan="pro"
                     />
+                  </div>
+                ) : isFetchingGoogleSheet ? (
+                  // Loading state while fetching spreadsheet data
+                  <div className="text-center py-8">
+                    <div className="w-12 h-12 border-3 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-[var(--color-gray-900)] mb-2">
+                      Loading Spreadsheet
+                    </h3>
+                    <p className="text-[var(--color-gray-600)]">
+                      Fetching data from {selectedGoogleSpreadsheet?.name || 'Google Sheets'}...
+                    </p>
                   </div>
                 ) : (
                   <GoogleSheetPicker

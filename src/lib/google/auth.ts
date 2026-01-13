@@ -2,11 +2,14 @@ import { google } from 'googleapis';
 import { createClient } from '@/lib/supabase/server';
 
 // OAuth configuration
+// Using drive.file (non-sensitive) instead of drive.metadata.readonly (restricted)
+// to avoid CASA security assessment requirements. With drive.file, users select
+// files via Google Picker, granting per-file access.
 const SCOPES = [
-  'https://www.googleapis.com/auth/spreadsheets.readonly',
-  'https://www.googleapis.com/auth/drive.metadata.readonly',
-  'https://www.googleapis.com/auth/userinfo.email',
-  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/spreadsheets.readonly', // Sensitive - read spreadsheet data
+  'https://www.googleapis.com/auth/drive.file',            // Non-sensitive - access user-selected files
+  'https://www.googleapis.com/auth/userinfo.email',        // Non-sensitive - get user email
+  'https://www.googleapis.com/auth/userinfo.profile',      // Non-sensitive - get user profile
 ];
 
 // Create OAuth2 client
