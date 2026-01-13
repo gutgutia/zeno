@@ -91,6 +91,7 @@ export async function POST(request: Request) {
       pack_size,         // For credit packs: 'small', 'medium', 'large'
       organization_id,   // Optional: org to apply credits/subscription to
       seats = 1,         // Number of seats for subscription
+      return_url,        // Optional: custom return URL after purchase
     } = body;
 
     // For subscriptions, ensure organization exists
@@ -319,6 +320,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Invalid pack size' }, { status: 400 });
       }
 
+      // Determine success URL - use custom return_url if provided
+      const successUrl = return_url
+        ? `${baseUrl}${return_url}?credits_purchased=true&credits=${creditAmount}&session_id={CHECKOUT_SESSION_ID}`
+        : `${baseUrl}/settings/billing?success=true&credits=${creditAmount}&session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = return_url
+        ? `${baseUrl}${return_url}?canceled=true`
+        : `${baseUrl}/settings/billing?canceled=true`;
+
       const session = await getStripe().checkout.sessions.create({
         customer: customerId,
         mode: 'payment',
@@ -336,8 +345,8 @@ export async function POST(request: Request) {
           credits: creditAmount.toString(),
           pack_size,
         },
-        success_url: `${baseUrl}/settings/billing?success=true&credits=${creditAmount}&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${baseUrl}/settings/billing?canceled=true`,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
       });
 
       return NextResponse.json({ url: session.url });

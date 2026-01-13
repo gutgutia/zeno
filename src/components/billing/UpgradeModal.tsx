@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,7 +19,14 @@ interface UpgradeModalProps {
   featureName?: string;
   creditsNeeded?: number;
   creditsAvailable?: number;
+  onCreditsAdded?: () => void; // Called when credits are successfully added
 }
+
+const creditPacks = [
+  { size: 'small', credits: 100, price: 10, perCredit: 0.10 },
+  { size: 'medium', credits: 500, price: 45, perCredit: 0.09, savings: '10%', popular: true },
+  { size: 'large', credits: 2000, price: 160, perCredit: 0.08, savings: '20%' },
+];
 
 const plans = [
   {
@@ -54,12 +62,59 @@ export function UpgradeModal({
   featureName,
   creditsNeeded,
   creditsAvailable,
+  onCreditsAdded,
 }: UpgradeModalProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
+  const [showPlans, setShowPlans] = useState(false);
+  const searchParams = useSearchParams();
+
+  // Check for successful credit purchase on mount/when searchParams change
+  useEffect(() => {
+    const creditsPurchased = searchParams.get('credits_purchased');
+    if (creditsPurchased === 'true' && isOpen) {
+      toast.success('Credits added successfully!');
+      // Clear URL params
+      const url = new URL(window.location.href);
+      url.searchParams.delete('credits_purchased');
+      window.history.replaceState({}, '', url.toString());
+      // Notify parent that credits were added
+      if (onCreditsAdded) {
+        onCreditsAdded();
+      }
+      onClose();
+    }
+  }, [searchParams, isOpen, onClose, onCreditsAdded]);
+
+  const handleBuyCreditPack = async (size: string) => {
+    setIsLoading(size);
+    try {
+      const response = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'credit_pack',
+          pack_size: size,
+          return_url: window.location.pathname, // Return to current page
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to start checkout');
+      setIsLoading(null);
+    }
+  };
 
   const handleUpgrade = async (plan: string) => {
-    setIsLoading(true);
+    setIsLoading(plan);
     try {
       const response = await fetch('/api/billing/checkout', {
         method: 'POST',
@@ -82,14 +137,15 @@ export function UpgradeModal({
       window.location.href = data.url;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to start checkout');
-      setIsLoading(false);
+      setIsLoading(null);
     }
   };
 
   const getTitle = () => {
+    if (reason === 'credits') {
+      return 'Need More Credits';
+    }
     switch (reason) {
-      case 'credits':
-        return 'Need More Credits?';
       case 'dashboards':
         return 'Dashboard Limit Reached';
       case 'feature':
@@ -100,11 +156,12 @@ export function UpgradeModal({
   };
 
   const getDescription = () => {
+    if (reason === 'credits') {
+      return creditsNeeded && creditsAvailable !== undefined
+        ? `You need ${creditsNeeded} credits but only have ${creditsAvailable}. Purchase a credit pack to continue.`
+        : 'Purchase credits to continue.';
+    }
     switch (reason) {
-      case 'credits':
-        return creditsNeeded && creditsAvailable !== undefined
-          ? `You need ${creditsNeeded} credits but only have ${creditsAvailable}. Upgrade for more credits and unlock premium features.`
-          : 'Upgrade to get more credits each month and unlock premium features.';
       case 'dashboards':
         return 'You\'ve reached the free plan limit of 3 dashboards. Upgrade to create unlimited dashboards.';
       case 'feature':
@@ -114,13 +171,101 @@ export function UpgradeModal({
     }
   };
 
+  // For credits reason, show credit packs by default
+  if (reason === 'credits' && !showPlans) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl">{getTitle()}</DialogTitle>
+            <DialogDescription>{getDescription()}</DialogDescription>
+          </DialogHeader>
+
+          {/* Credit Packs */}
+          <div className="space-y-3 mt-2">
+            {creditPacks.map((pack) => (
+              <div
+                key={pack.size}
+                className={`relative flex items-center justify-between p-4 border rounded-xl transition-colors ${
+                  pack.popular
+                    ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
+                    : 'border-[var(--color-gray-200)] hover:border-[var(--color-gray-300)]'
+                }`}
+              >
+                {pack.savings && (
+                  <span className="absolute -top-2 left-3 bg-green-500 text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                    Save {pack.savings}
+                  </span>
+                )}
+                <div className="flex items-center gap-4">
+                  <div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xl font-bold text-[var(--color-gray-900)]">
+                        {pack.credits.toLocaleString()}
+                      </span>
+                      <span className="text-sm text-[var(--color-gray-500)]">credits</span>
+                    </div>
+                    <div className="text-sm text-[var(--color-gray-400)]">
+                      ${pack.perCredit.toFixed(2)}/credit
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => handleBuyCreditPack(pack.size)}
+                  disabled={isLoading === pack.size}
+                  variant={pack.popular ? 'default' : 'outline'}
+                  className="min-w-[100px]"
+                >
+                  {isLoading === pack.size ? 'Loading...' : `$${pack.price}`}
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          {/* Subscribe Option */}
+          <div className="mt-4 pt-4 border-t border-[var(--color-gray-200)]">
+            <p className="text-sm text-[var(--color-gray-600)] text-center">
+              Need credits regularly?{' '}
+              <button
+                onClick={() => setShowPlans(true)}
+                className="text-[var(--color-primary)] font-medium hover:underline"
+              >
+                Subscribe for monthly credits
+              </button>
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Show subscription plans (for non-credits reasons or when user clicks "Subscribe")
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-xl">{getTitle()}</DialogTitle>
-          <DialogDescription>{getDescription()}</DialogDescription>
+          <DialogTitle className="text-xl">
+            {reason === 'credits' ? 'Subscribe for Monthly Credits' : getTitle()}
+          </DialogTitle>
+          <DialogDescription>
+            {reason === 'credits'
+              ? 'Get credits every month and unlock premium features.'
+              : getDescription()}
+          </DialogDescription>
         </DialogHeader>
+
+        {/* Back to Credit Packs (if coming from credits view) */}
+        {reason === 'credits' && showPlans && (
+          <button
+            onClick={() => setShowPlans(false)}
+            className="flex items-center gap-1 text-sm text-[var(--color-gray-500)] hover:text-[var(--color-gray-700)] mb-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to credit packs
+          </button>
+        )}
 
         {/* Billing Toggle */}
         <div className="flex justify-center mb-6">
@@ -199,34 +344,16 @@ export function UpgradeModal({
 
                 <Button
                   onClick={() => handleUpgrade(plan.plan)}
-                  disabled={isLoading}
+                  disabled={isLoading === plan.plan}
                   variant={plan.popular ? 'default' : 'outline'}
                   className="w-full"
                 >
-                  {isLoading ? 'Loading...' : `Upgrade to ${plan.name}`}
+                  {isLoading === plan.plan ? 'Loading...' : `Upgrade to ${plan.name}`}
                 </Button>
               </div>
             );
           })}
         </div>
-
-        {/* Credit Packs Option */}
-        {reason === 'credits' && (
-          <div className="mt-4 pt-4 border-t border-[var(--color-gray-200)]">
-            <p className="text-sm text-[var(--color-gray-600)] text-center">
-              Just need a quick top-up?{' '}
-              <button
-                onClick={() => {
-                  onClose();
-                  window.location.href = '/settings/billing?tab=credits';
-                }}
-                className="text-[var(--color-primary)] font-medium hover:underline"
-              >
-                Buy a credit pack
-              </button>
-            </p>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );
