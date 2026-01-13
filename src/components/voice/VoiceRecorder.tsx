@@ -67,12 +67,30 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
       setError(null);
       audioChunksRef.current = [];
 
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('Your browser does not support audio recording. Please try Chrome, Firefox, or Safari.');
+        return;
+      }
+
+      // Check permission state first (if supported)
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+          if (permissionStatus.state === 'denied') {
+            setError('Microphone access is blocked. Please click the lock icon in your browser\'s address bar, find "Microphone", and set it to "Allow", then try again.');
+            return;
+          }
+        } catch {
+          // Permission query not supported, continue anyway
+        }
+      }
+
       // Request microphone access
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: 16000,
         }
       });
       streamRef.current = stream;
@@ -129,8 +147,16 @@ export function VoiceRecorder({ onTranscript, onClose }: VoiceRecorderProps) {
 
     } catch (err) {
       console.error('Error starting recording:', err);
-      if (err instanceof Error && err.name === 'NotAllowedError') {
-        setError('Microphone access denied. Please allow microphone access and try again.');
+      if (err instanceof Error) {
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setError('Microphone access is blocked. Please click the lock icon in your browser\'s address bar, find "Microphone", set it to "Allow", and refresh the page.');
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          setError('No microphone found. Please connect a microphone and try again.');
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          setError('Your microphone is in use by another application. Please close other apps using the microphone and try again.');
+        } else {
+          setError(`Failed to start recording: ${err.message}`);
+        }
       } else {
         setError('Failed to start recording. Please try again.');
       }
