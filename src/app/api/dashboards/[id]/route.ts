@@ -18,10 +18,10 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get the dashboard with organization branding and domain info
+    // Get the dashboard with organization branding and domain info (left join to handle null organization_id)
     const { data, error } = await supabase
       .from('dashboards')
-      .select('*, organizations!inner(id, name, created_by, branding, subdomain, custom_domain)')
+      .select('*, organizations(id, name, created_by, branding, subdomain, custom_domain)')
       .eq('id', id)
       .single();
 
@@ -37,38 +37,44 @@ export async function GET(request: Request, { params }: RouteParams) {
         branding: BrandingConfig | null;
         subdomain: string | null;
         custom_domain: string | null;
-      };
+      } | null;
     };
 
-    // Check ownership - user must be organization owner or member
-    const isOwner = dashboardData.organizations.created_by === user.id;
+    // Check ownership - user must be dashboard owner, organization owner, or member
+    const isOwner = dashboardData.owner_id === user.id ||
+      (dashboardData.organizations?.created_by === user.id);
 
     if (!isOwner) {
-      // Check if user is a member of the organization
-      const { data: membership } = await supabase
-        .from('organization_members')
-        .select('role')
-        .eq('organization_id', dashboardData.organizations.id)
-        .eq('user_id', user.id)
-        .single();
+      // Check if user is a member of the organization (only if organization exists)
+      if (dashboardData.organizations) {
+        const { data: membership } = await supabase
+          .from('organization_members')
+          .select('role')
+          .eq('organization_id', dashboardData.organizations.id)
+          .eq('user_id', user.id)
+          .single();
 
-      if (!membership) {
+        if (!membership) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+      } else {
+        // No organization and not the owner
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
     }
 
     // Merge organization branding with dashboard override
     const effectiveBranding = getMergedBranding(
-      dashboardData.organizations.branding,
+      dashboardData.organizations?.branding || null,
       dashboardData.branding_override
     );
 
-    // Extract organization info for share URLs
-    const organization = {
+    // Extract organization info for share URLs (may be null)
+    const organization = dashboardData.organizations ? {
       name: dashboardData.organizations.name,
       subdomain: dashboardData.organizations.subdomain,
       custom_domain: dashboardData.organizations.custom_domain,
-    };
+    } : null;
 
     // Remove nested organization from response, add merged branding and org info
     const { organizations: _, ...dashboard } = dashboardData;
