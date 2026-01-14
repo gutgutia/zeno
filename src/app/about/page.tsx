@@ -1,5 +1,6 @@
 import { Navbar, Footer } from '@/components/marketing';
 import { Container } from '@/components/ui';
+import { Breadcrumbs } from '@/components/seo';
 
 export const metadata = {
   title: 'About - Zeno',
@@ -12,6 +13,7 @@ export default function AboutPage() {
       <Navbar />
       <main className="pt-24 pb-16">
         <Container size="md">
+          <Breadcrumbs items={[{ name: 'About', href: '/about' }]} />
           <div className="prose prose-gray max-w-none">
             <h1 className="text-3xl font-bold text-gray-900 mb-4">About Zeno</h1>
 
