@@ -1,5 +1,6 @@
 import { Navbar, Footer } from '@/components/marketing';
 import { Container } from '@/components/ui';
+import { Breadcrumbs } from '@/components/seo';
 
 export const metadata = {
   title: 'Privacy Policy - Zeno',
@@ -12,6 +13,7 @@ export default function PrivacyPage() {
       <Navbar />
       <main className="pt-24 pb-16">
         <Container size="md">
+          <Breadcrumbs items={[{ name: 'Privacy Policy', href: '/privacy' }]} />
           <div className="prose prose-gray max-w-none">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
             <p className="text-gray-500 mb-8">Last updated: January 13, 2026</p>

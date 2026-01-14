@@ -6,5 +6,6 @@ export { Features } from './Features';
 export { HowItWorks } from './HowItWorks';
 export { Pricing } from './Pricing';
 export { Testimonials } from './Testimonials';
+export { FAQ } from './FAQ';
 export { CTA } from './CTA';
 export { Footer } from './Footer';

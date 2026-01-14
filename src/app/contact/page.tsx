@@ -1,5 +1,6 @@
 import { Navbar, Footer } from '@/components/marketing';
 import { Container } from '@/components/ui';
+import { Breadcrumbs } from '@/components/seo';
 
 export const metadata = {
   title: 'Contact - Zeno',
@@ -12,6 +13,7 @@ export default function ContactPage() {
       <Navbar />
       <main className="pt-24 pb-16">
         <Container size="sm">
+          <Breadcrumbs items={[{ name: 'Contact', href: '/contact' }]} />
           <div className="text-center mb-12">
             <h1 className="text-3xl font-bold text-gray-900 mb-4">Contact Us</h1>
             <p className="text-lg text-gray-600">
