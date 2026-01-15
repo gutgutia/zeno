@@ -22,6 +22,9 @@ import type { DataSource } from '@/types/database';
 
 type Step = 'input' | 'select-sheets' | 'select-google-sheets' | 'instructions' | 'generating' | 'error';
 
+// Feature flag - set to true to enable Google Sheets integration
+const GOOGLE_SHEETS_ENABLED = false;
+
 interface GoogleSpreadsheet {
   id: string;
   name: string;
@@ -1031,7 +1034,28 @@ function NewDashboardPageContent() {
               </TabsContent>
 
               <TabsContent value="google" className="p-6">
-                {isCheckingGoogle ? (
+                {!GOOGLE_SHEETS_ENABLED ? (
+                  // Coming Soon message
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-[#4285F4]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-[#4285F4]" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 7h2v2H7zm0 4h2v2H7zm0 4h2v2H7zm4-8h6v2h-6zm0 4h6v2h-6zm0 4h6v2h-6z"/>
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-[var(--color-gray-900)] mb-2">
+                      Google Sheets Integration
+                    </h3>
+                    <p className="text-[var(--color-gray-600)] mb-4 max-w-md mx-auto">
+                      Import data directly from Google Sheets and keep your dashboards automatically synced.
+                    </p>
+                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-gray-100)] text-[var(--color-gray-600)] rounded-full text-sm font-medium">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Coming Soon
+                    </span>
+                  </div>
+                ) : isCheckingGoogle ? (
                   <div className="text-center py-8">
                     <div className="w-8 h-8 border-2 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-[var(--color-gray-600)]">Checking Google connection...</p>
