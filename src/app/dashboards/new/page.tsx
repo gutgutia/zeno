@@ -109,6 +109,9 @@ function NewDashboardPageContent() {
   // Content summary collapsed state
   const [contentSummaryOpen, setContentSummaryOpen] = useState(false);
 
+  // Hidden unlock for Google Sheets (for verification purposes)
+  const [googleSheetsUnlocked, setGoogleSheetsUnlocked] = useState(false);
+
   // Token estimation
   const tokenCount = useMemo(() => estimateTokens(rawContent), [rawContent]);
   const isTooLarge = useMemo(() => isContentTooLarge(rawContent), [rawContent]);
@@ -1034,8 +1037,8 @@ function NewDashboardPageContent() {
               </TabsContent>
 
               <TabsContent value="google" className="p-6">
-                {!GOOGLE_SHEETS_ENABLED ? (
-                  // Coming Soon message
+                {!GOOGLE_SHEETS_ENABLED && !googleSheetsUnlocked ? (
+                  // Coming Soon message - clicking reveals the feature
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-[#4285F4]/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <svg className="w-8 h-8 text-[#4285F4]" viewBox="0 0 24 24" fill="currentColor">
@@ -1048,12 +1051,15 @@ function NewDashboardPageContent() {
                     <p className="text-[var(--color-gray-600)] mb-4 max-w-md mx-auto">
                       Import data directly from Google Sheets and keep your dashboards automatically synced.
                     </p>
-                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-gray-100)] text-[var(--color-gray-600)] rounded-full text-sm font-medium">
+                    <button
+                      onClick={() => setGoogleSheetsUnlocked(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-gray-100)] text-[var(--color-gray-600)] rounded-full text-sm font-medium hover:bg-[var(--color-gray-200)] transition-colors cursor-default"
+                    >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       Coming Soon
-                    </span>
+                    </button>
                   </div>
                 ) : isCheckingGoogle ? (
                   <div className="text-center py-8">
