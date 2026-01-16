@@ -45,22 +45,6 @@ export default function SettingsLayout({
                 </li>
                 <li>
                   <Link
-                    href="/settings/branding"
-                    className="block px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
-                  >
-                    Branding
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/settings/connections"
-                    className="block px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
-                  >
-                    Connections
-                  </Link>
-                </li>
-                <li>
-                  <Link
                     href="/settings/team"
                     className="block px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
                   >
@@ -69,10 +53,26 @@ export default function SettingsLayout({
                 </li>
                 <li>
                   <Link
+                    href="/settings/branding"
+                    className="block px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
+                  >
+                    Branding
+                  </Link>
+                </li>
+                <li>
+                  <Link
                     href="/settings/domain"
                     className="block px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
                   >
                     Custom Domain
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/settings/connections"
+                    className="block px-3 py-2 text-sm text-[var(--color-gray-600)] hover:text-[var(--color-gray-900)] hover:bg-[var(--color-gray-100)] rounded-lg transition-colors"
+                  >
+                    Connections
                   </Link>
                 </li>
                 <li>
