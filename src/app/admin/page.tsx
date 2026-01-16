@@ -54,9 +54,9 @@ export default function AdminOverviewPage() {
 
       const totalCreditsUsed = creditData?.reduce((sum, t) => sum + Math.abs(t.amount), 0) || 0;
 
-      // Get plan distribution
+      // Get plan distribution from organizations (not profiles)
       const { data: planData } = await supabase
-        .from('profiles')
+        .from('organizations')
         .select('plan_type') as { data: { plan_type: string | null }[] | null };
 
       const planDistribution = {
@@ -66,8 +66,8 @@ export default function AdminOverviewPage() {
         enterprise: 0,
       };
 
-      planData?.forEach((p) => {
-        const plan = p.plan_type as keyof typeof planDistribution;
+      planData?.forEach((o) => {
+        const plan = o.plan_type as keyof typeof planDistribution;
         if (plan in planDistribution) {
           planDistribution[plan]++;
         } else {
@@ -255,7 +255,7 @@ function PlanCard({
       <p className="text-xl font-bold text-[var(--color-gray-900)] mt-2">
         {count.toLocaleString()}
       </p>
-      <p className="text-xs text-[var(--color-gray-500)]">users</p>
+      <p className="text-xs text-[var(--color-gray-500)]">orgs</p>
     </div>
   );
 }

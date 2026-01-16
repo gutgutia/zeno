@@ -83,7 +83,6 @@ export default function AdminUserDetailPage({
   // Modal states
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [showOverrideModal, setShowOverrideModal] = useState(false);
-  const [showPlanModal, setShowPlanModal] = useState(false);
 
   // Form states
   const [creditAmount, setCreditAmount] = useState('');
@@ -96,7 +95,6 @@ export default function AdminUserDetailPage({
     expires_at: '',
     notes: '',
   });
-  const [newPlanType, setNewPlanType] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -202,37 +200,6 @@ export default function AdminUserDetailPage({
     }
   }
 
-  async function handleUpdatePlan() {
-    if (!newPlanType) {
-      toast.error('Please select a plan');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'update_plan',
-          plan_type: newPlanType,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to update plan');
-
-      toast.success('Plan updated successfully');
-      setShowPlanModal(false);
-      setNewPlanType('');
-      fetchUser();
-    } catch (error) {
-      console.error('Error updating plan:', error);
-      toast.error('Failed to update plan');
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -296,9 +263,6 @@ export default function AdminUserDetailPage({
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowPlanModal(true)}>
-              Change Plan
-            </Button>
             <Button variant="outline" onClick={() => setShowOverrideModal(true)}>
               Set Override
             </Button>
@@ -622,41 +586,6 @@ export default function AdminUserDetailPage({
         </DialogContent>
       </Dialog>
 
-      {/* Change Plan Modal */}
-      <Dialog open={showPlanModal} onOpenChange={setShowPlanModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change Plan</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label>New Plan</Label>
-              <select
-                value={newPlanType}
-                onChange={(e) => setNewPlanType(e.target.value)}
-                className="mt-1 w-full rounded-md border border-[var(--color-gray-200)] px-3 py-2"
-              >
-                <option value="">Select a plan</option>
-                <option value="free">Free</option>
-                <option value="starter">Starter</option>
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
-              <p className="text-xs text-[var(--color-gray-500)] mt-1">
-                Current plan: {user.profile.plan_type || 'free'}
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPlanModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdatePlan} disabled={saving}>
-              {saving ? 'Updating...' : 'Update Plan'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

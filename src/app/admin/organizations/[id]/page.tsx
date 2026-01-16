@@ -702,7 +702,9 @@ export default function AdminOrgDetailPage({
                 className="mt-1 w-full rounded-md border border-[var(--color-gray-200)] px-3 py-2"
               >
                 <option value="">No override</option>
-                <option value="team">Team</option>
+                <option value="free">Free</option>
+                <option value="starter">Starter</option>
+                <option value="pro">Pro</option>
                 <option value="enterprise">Enterprise</option>
               </select>
             </div>
@@ -780,7 +782,9 @@ export default function AdminOrgDetailPage({
                 onChange={(e) => setPlanForm({ ...planForm, plan_type: e.target.value })}
                 className="mt-1 w-full rounded-md border border-[var(--color-gray-200)] px-3 py-2"
               >
-                <option value="team">Team</option>
+                <option value="free">Free</option>
+                <option value="starter">Starter</option>
+                <option value="pro">Pro</option>
                 <option value="enterprise">Enterprise</option>
               </select>
             </div>

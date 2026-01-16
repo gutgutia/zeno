@@ -69,6 +69,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     setCurrentOrgState(org);
     localStorage.setItem(CURRENT_ORG_KEY, org.id);
     setOrgCookie(org.id);
+    // Dispatch event so components can refetch org-specific data (like credits)
+    window.dispatchEvent(new CustomEvent('organization-changed', { detail: { organizationId: org.id } }));
   }, []);
 
   return (

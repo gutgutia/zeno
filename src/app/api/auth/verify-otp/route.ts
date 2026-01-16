@@ -47,11 +47,11 @@ async function ensureUserSetup(supabase: ReturnType<typeof createAdminClient>, u
     .single();
 
   if (!orgMembership) {
-    // Create personal organization using the database function
+    // Create default organization using the database function
     // This bypasses RLS via SECURITY DEFINER
     await supabase.rpc('create_user_organization', {
       p_user_id: userId,
-      p_name: 'Personal',
+      p_name: 'Default',
     });
   }
 }

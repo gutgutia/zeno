@@ -27,16 +27,18 @@ export function CreditDisplay({ variant = 'compact', className = '' }: CreditDis
   useEffect(() => {
     fetchCredits();
 
-    // Listen for credit updates (dispatched when plan changes)
+    // Listen for credit updates (dispatched when plan changes or org switches)
     const handleCreditsUpdated = () => {
       fetchCredits();
     };
 
     window.addEventListener('credits-updated', handleCreditsUpdated);
+    window.addEventListener('organization-changed', handleCreditsUpdated);
     window.addEventListener('focus', handleCreditsUpdated);
 
     return () => {
       window.removeEventListener('credits-updated', handleCreditsUpdated);
+      window.removeEventListener('organization-changed', handleCreditsUpdated);
       window.removeEventListener('focus', handleCreditsUpdated);
     };
   }, []);

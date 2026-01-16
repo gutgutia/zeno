@@ -55,12 +55,48 @@ export async function GET(
     }
   }
 
-  // Get user credits
-  const { data: credits } = await supabase
-    .from('user_credits')
-    .select('*')
+  // Get organizations first (needed for credits and plan)
+  const { data: memberships } = await supabase
+    .from('organization_members')
+    .select(`
+      role,
+      organization:organizations(id, name, plan_type)
+    `)
     .eq('user_id', userId)
-    .single();
+    .not('accepted_at', 'is', null);
+
+  // Get the user's primary org (best plan)
+  let primaryOrgId: string | null = null;
+  let effectivePlan = 'free';
+  const planRank: Record<string, number> = { enterprise: 4, pro: 3, starter: 2, free: 1 };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  memberships?.forEach((m: any) => {
+    const org = m.organization;
+    if (org) {
+      const orgPlan = org.plan_type;
+      if ((planRank[orgPlan] || 0) > (planRank[effectivePlan] || 0)) {
+        effectivePlan = orgPlan;
+        primaryOrgId = org.id;
+      } else if (!primaryOrgId) {
+        primaryOrgId = org.id;
+      }
+    }
+  });
+
+  // Get credits from organization (not user_credits)
+  let credits = { balance: 0, lifetime_credits: 0, lifetime_used: 0 };
+  if (primaryOrgId) {
+    const { data: orgCredits } = await supabase
+      .from('organization_credits')
+      .select('balance, lifetime_credits, lifetime_used')
+      .eq('organization_id', primaryOrgId)
+      .single();
+
+    if (orgCredits) {
+      credits = orgCredits;
+    }
+  }
 
   // Get dashboard count
   const { count: dashboardCount } = await supabase
@@ -86,33 +122,29 @@ export async function GET(
     .eq('is_active', true)
     .single();
 
-  // Get recent transactions
-  const { data: transactions } = await supabase
-    .from('credit_transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(20);
-
-  // Get organizations
-  const { data: memberships } = await supabase
-    .from('organization_members')
-    .select(`
-      role,
-      organization:organizations(id, name, plan_type)
-    `)
-    .eq('user_id', userId);
+  // Get recent transactions (from org if available)
+  let transactions: unknown[] = [];
+  if (primaryOrgId) {
+    const { data: txData } = await supabase
+      .from('credit_transactions')
+      .select('*')
+      .eq('organization_id', primaryOrgId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    transactions = txData || [];
+  }
 
   return NextResponse.json({
     profile: {
       ...profile,
       email,
+      plan_type: effectivePlan, // Override with effective plan from org
     },
-    credits: credits || { balance: 0, lifetime_credits: 0, lifetime_used: 0 },
+    credits,
     dashboardCount: dashboardCount || 0,
     dashboards: dashboards || [],
     override: override || null,
-    transactions: transactions || [],
+    transactions,
     organizations: memberships || [],
   });
 }
@@ -152,32 +184,50 @@ export async function PATCH(
         return NextResponse.json({ error: 'Amount and reason required' }, { status: 400 });
       }
 
-      // Get current credits
-      const { data: currentCredits } = await supabase
-        .from('user_credits')
-        .select('balance')
+      // Get user's primary organization
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('organization_id')
         .eq('user_id', userId)
+        .not('accepted_at', 'is', null)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (!membership) {
+        return NextResponse.json({ error: 'User has no organization' }, { status: 400 });
+      }
+
+      const orgId = membership.organization_id;
+
+      // Get current org credits
+      const { data: currentCredits } = await supabase
+        .from('organization_credits')
+        .select('balance, lifetime_credits')
+        .eq('organization_id', orgId)
         .single();
 
       const currentBalance = currentCredits?.balance || 0;
+      const currentLifetime = currentCredits?.lifetime_credits || 0;
       const newBalance = currentBalance + amount;
+      const newLifetime = currentLifetime + (amount > 0 ? amount : 0);
 
-      // Update credits
+      // Update org credits
       const { error: updateError } = await supabase
-        .from('user_credits')
+        .from('organization_credits')
         .upsert({
-          user_id: userId,
+          organization_id: orgId,
           balance: newBalance,
-          lifetime_credits: (currentCredits?.balance || 0) + (amount > 0 ? amount : 0),
-        }, { onConflict: 'user_id' });
+          lifetime_credits: newLifetime,
+        }, { onConflict: 'organization_id' });
 
       if (updateError) {
         return NextResponse.json({ error: updateError.message }, { status: 500 });
       }
 
-      // Create transaction record
+      // Create transaction record (at org level)
       await supabase.from('credit_transactions').insert({
-        user_id: userId,
+        organization_id: orgId,
         amount,
         balance_after: newBalance,
         transaction_type: 'manual_adjustment',
@@ -191,7 +241,7 @@ export async function PATCH(
         action: 'add_credits',
         target_type: 'user',
         target_id: userId,
-        new_value: { amount, reason, new_balance: newBalance },
+        new_value: { amount, reason, new_balance: newBalance, organization_id: orgId },
       });
 
       return NextResponse.json({ success: true, new_balance: newBalance });
@@ -246,42 +296,6 @@ export async function PATCH(
         action: 'remove_override',
         target_type: 'user',
         target_id: userId,
-      });
-
-      return NextResponse.json({ success: true });
-    }
-
-    case 'update_plan': {
-      const { plan_type } = data;
-      if (!plan_type) {
-        return NextResponse.json({ error: 'Plan type required' }, { status: 400 });
-      }
-
-      // Get old plan
-      const { data: oldProfile } = await supabase
-        .from('profiles')
-        .select('plan_type')
-        .eq('id', userId)
-        .single();
-
-      // Update profile
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ plan_type })
-        .eq('id', userId);
-
-      if (updateError) {
-        return NextResponse.json({ error: updateError.message }, { status: 500 });
-      }
-
-      // Log admin action
-      await supabase.from('admin_audit_log').insert({
-        admin_user_id: user.id,
-        action: 'update_plan',
-        target_type: 'user',
-        target_id: userId,
-        old_value: { plan_type: oldProfile?.plan_type },
-        new_value: { plan_type },
       });
 
       return NextResponse.json({ success: true });

@@ -120,8 +120,14 @@ export default function AdminOrganizationsPage() {
             <DropdownMenuItem onClick={() => { setPlanFilter(''); setPage(1); }}>
               All Plans
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { setPlanFilter('team'); setPage(1); }}>
-              Team
+            <DropdownMenuItem onClick={() => { setPlanFilter('free'); setPage(1); }}>
+              Free
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setPlanFilter('starter'); setPage(1); }}>
+              Starter
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setPlanFilter('pro'); setPage(1); }}>
+              Pro
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => { setPlanFilter('enterprise'); setPage(1); }}>
               Enterprise

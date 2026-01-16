@@ -111,7 +111,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Check credit balance before generation (pass service client for internal calls)
     const hasCredits = await hasEnoughCredits(userId, ESTIMATED_GENERATION_CREDITS, supabase);
     if (!hasCredits) {
-      const balance = await getCreditBalance(userId, supabase);
+      const balance = await getCreditBalance(userId, null, supabase);
       return NextResponse.json({
         error: 'Insufficient credits',
         credits_required: ESTIMATED_GENERATION_CREDITS,

@@ -4,7 +4,7 @@ export interface Profile {
   id: string;
   name: string | null;
   avatar_url: string | null;
-  plan_type: 'free' | 'team' | 'enterprise';
+  // Note: plan_type is derived from organization membership, not stored on profile
   stripe_customer_id: string | null;
   created_at: string;
   updated_at: string;
@@ -13,7 +13,7 @@ export interface Profile {
 // Plan limits (configurable via admin)
 export interface PlanLimits {
   id: string;
-  plan_type: 'free' | 'team' | 'enterprise';
+  plan_type: 'free' | 'starter' | 'pro' | 'enterprise';
   max_dashboards: number | null; // null = unlimited
   max_folders: number | null;
   max_data_rows: number | null;
@@ -65,7 +65,7 @@ export interface Organization {
   // Billing
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
-  plan_type: 'team' | 'enterprise';
+  plan_type: 'free' | 'starter' | 'pro' | 'enterprise';
   billing_cycle: 'monthly' | 'annual';
   seats_purchased: number;
   billing_email: string | null;

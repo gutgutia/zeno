@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   // Parse query params
   const searchParams = request.nextUrl.searchParams;
   const search = searchParams.get('search') || '';
-  const planType = searchParams.get('plan_type') || '';
+  const planFilter = searchParams.get('plan_type') || '';
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '50');
   const offset = (page - 1) * limit;
@@ -43,11 +43,6 @@ export async function GET(request: NextRequest) {
     query = query.ilike('name', `%${search}%`);
   }
 
-  // Apply plan filter
-  if (planType) {
-    query = query.eq('plan_type', planType);
-  }
-
   // Apply pagination and ordering
   query = query
     .range(offset, offset + limit - 1)
@@ -59,13 +54,45 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Get user credits for each profile
   const userIds = profiles?.map(p => p.id) || [];
 
-  const { data: credits } = await supabase
-    .from('user_credits')
-    .select('user_id, balance, lifetime_credits, lifetime_used')
-    .in('user_id', userIds);
+  // Get organization memberships with org details (plan comes from org, not profile)
+  const { data: memberships } = await supabase
+    .from('organization_members')
+    .select('user_id, organization_id, organizations(id, plan_type)')
+    .in('user_id', userIds)
+    .not('accepted_at', 'is', null);
+
+  // Map user to their best org plan
+  const userPlanMap: Record<string, string> = {};
+  const userOrgIdMap: Record<string, string> = {};
+  const planRank: Record<string, number> = { enterprise: 4, pro: 3, starter: 2, free: 1 };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  memberships?.forEach((m: any) => {
+    const org = m.organizations;
+    if (org) {
+      const currentPlan = userPlanMap[m.user_id];
+      const newPlan = org.plan_type;
+      // Pick best plan: enterprise > pro > starter > free
+      if (!currentPlan || (planRank[newPlan] || 0) > (planRank[currentPlan] || 0)) {
+        userPlanMap[m.user_id] = newPlan;
+        userOrgIdMap[m.user_id] = m.organization_id;
+      }
+    }
+  });
+
+  // Get org credits for users' organizations
+  const orgIds = [...new Set(Object.values(userOrgIdMap))];
+  const { data: orgCredits } = await supabase
+    .from('organization_credits')
+    .select('organization_id, balance, lifetime_credits, lifetime_used')
+    .in('organization_id', orgIds);
+
+  const orgCreditMap: Record<string, { balance: number; lifetime_credits: number; lifetime_used: number }> = {};
+  orgCredits?.forEach(c => {
+    orgCreditMap[c.organization_id] = c;
+  });
 
   // Get dashboard counts
   const { data: dashboardCounts } = await supabase
@@ -91,12 +118,6 @@ export async function GET(request: NextRequest) {
 
   const overrideSet = new Set(overrides?.map(o => o.user_id));
 
-  // Create credit map
-  const creditMap: Record<string, { balance: number; lifetime_credits: number; lifetime_used: number }> = {};
-  credits?.forEach(c => {
-    creditMap[c.user_id] = c;
-  });
-
   // Try to get emails from auth.users using admin client
   let emailMap: Record<string, string> = {};
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -119,21 +140,30 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Combine data
-  const users = (profiles || []).map(profile => ({
-    id: profile.id,
-    email: emailMap[profile.id] || null,
-    name: profile.name,
-    avatar_url: profile.avatar_url,
-    plan_type: profile.plan_type,
-    credit_balance: creditMap[profile.id]?.balance || 0,
-    lifetime_credits: creditMap[profile.id]?.lifetime_credits || 0,
-    lifetime_used: creditMap[profile.id]?.lifetime_used || 0,
-    dashboard_count: dashboardCountMap[profile.id] || 0,
-    has_override: overrideSet.has(profile.id),
-    created_at: profile.created_at,
-    updated_at: profile.updated_at,
-  }));
+  // Combine data - plan comes from org membership, credits from org
+  let users = (profiles || []).map(profile => {
+    const orgId = userOrgIdMap[profile.id];
+    const orgCredit = orgId ? orgCreditMap[orgId] : null;
+    return {
+      id: profile.id,
+      email: emailMap[profile.id] || null,
+      name: profile.name,
+      avatar_url: profile.avatar_url,
+      plan_type: userPlanMap[profile.id] || 'free', // Derived from org, not profile
+      credit_balance: orgCredit?.balance || 0,
+      lifetime_credits: orgCredit?.lifetime_credits || 0,
+      lifetime_used: orgCredit?.lifetime_used || 0,
+      dashboard_count: dashboardCountMap[profile.id] || 0,
+      has_override: overrideSet.has(profile.id),
+      created_at: profile.created_at,
+      updated_at: profile.updated_at,
+    };
+  });
+
+  // Apply plan filter if specified (filter after mapping since plan comes from org)
+  if (planFilter) {
+    users = users.filter(u => u.plan_type === planFilter);
+  }
 
   return NextResponse.json({
     users,

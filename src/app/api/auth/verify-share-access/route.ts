@@ -57,7 +57,7 @@ async function ensureUserSetup(supabase: ReturnType<typeof createAdminClient>, u
   if (!orgMembership) {
     await supabase.rpc('create_user_organization', {
       p_user_id: userId,
-      p_name: 'Personal',
+      p_name: 'Default',
     });
   }
 }

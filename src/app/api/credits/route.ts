@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getCreditBalance, getTransactionHistory, getUserPlan, canCreateDashboard } from '@/lib/credits';
+import { cookies } from 'next/headers';
 
 // GET /api/credits - Get user's credit balance and usage info
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
 
@@ -16,8 +17,12 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get credit balance
-    const balance = await getCreditBalance(user.id);
+    // Get current organization from cookie (set by organization context)
+    const cookieStore = await cookies();
+    const currentOrgId = cookieStore.get('zeno_current_org')?.value || null;
+
+    // Get credit balance for the current organization
+    const balance = await getCreditBalance(user.id, currentOrgId);
 
     if (!balance) {
       return NextResponse.json({ error: 'Credit balance not found' }, { status: 404 });

@@ -210,14 +210,13 @@ export async function getAdminUserList(
   const limit = params.limit || 50;
   const offset = (page - 1) * limit;
 
-  // Build query for profiles with credits
+  // Build query for profiles (plan_type comes from org membership, not profile)
   let query = supabase
     .from('profiles')
     .select(`
       id,
       name,
       avatar_url,
-      plan_type,
       created_at,
       updated_at
     `, { count: 'exact' });
@@ -227,10 +226,7 @@ export async function getAdminUserList(
     query = query.or(`name.ilike.%${params.search}%`);
   }
 
-  // Apply plan filter
-  if (params.planType) {
-    query = query.eq('plan_type', params.planType);
-  }
+  // Note: Plan filter not supported here - plan comes from org membership
 
   // Apply pagination
   query = query.range(offset, offset + limit - 1).order('created_at', { ascending: false });
@@ -241,11 +237,12 @@ export async function getAdminUserList(
 
   // Get user emails from auth (requires admin client)
   // For now, return profiles without email - email will be fetched separately
+  // Note: plan_type is derived from org membership elsewhere
   const users: AdminUserView[] = (profiles || []).map(profile => ({
     id: profile.id,
     name: profile.name,
     avatar_url: profile.avatar_url,
-    plan_type: profile.plan_type,
+    plan_type: null, // Plan comes from org membership, not profile
     created_at: profile.created_at,
     updated_at: profile.updated_at,
   }));

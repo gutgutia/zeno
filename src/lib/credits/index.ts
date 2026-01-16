@@ -85,31 +85,68 @@ export function calculateCredits(inputTokens: number, outputTokens: number): num
 // ============================================
 
 /**
- * Get user's credit balance (from org if member, else personal)
+ * Get user's credit balance (from specified org, or user's primary org, or personal credits)
  * @param userId - The user ID to check credits for
+ * @param organizationId - Optional organization ID to get credits for (if user is a member)
  * @param client - Optional supabase client (uses server client if not provided)
  */
-export async function getCreditBalance(userId: string, client?: OptionalClient): Promise<CreditBalance | null> {
+export async function getCreditBalance(
+  userId: string,
+  organizationId?: string | null,
+  client?: OptionalClient
+): Promise<CreditBalance | null> {
   const supabase = client || await createClient();
 
-  // First check if user is in any organization
+  // If a specific organization is requested, verify membership and get those credits
+  if (organizationId) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: membership } = await (supabase as any)
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', userId)
+      .eq('organization_id', organizationId)
+      .not('accepted_at', 'is', null)
+      .single();
+
+    if (membership) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: orgCredits } = await (supabase as any)
+        .from('organization_credits')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .single();
+
+      if (orgCredits) {
+        return {
+          balance: orgCredits.balance,
+          lifetime_credits: orgCredits.lifetime_credits,
+          lifetime_used: orgCredits.lifetime_used,
+          source: 'organization',
+          organization_id: organizationId,
+        };
+      }
+    }
+  }
+
+  // Otherwise, get the user's primary organization (first one they own, or first membership)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: membership } = await (supabase as any)
+  const { data: memberships } = await (supabase as any)
     .from('organization_members')
-    .select('organization_id, organizations(plan_type)')
+    .select('organization_id, role')
     .eq('user_id', userId)
     .not('accepted_at', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+    .order('created_at', { ascending: true }); // Get oldest first (typically personal org)
 
-  if (membership?.organization_id) {
-    // Get org credits
+  // Prefer owned orgs, then fall back to first membership
+  const ownedOrg = memberships?.find((m: { role: string }) => m.role === 'owner');
+  const primaryMembership = ownedOrg || memberships?.[0];
+
+  if (primaryMembership?.organization_id) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: orgCredits } = await (supabase as any)
       .from('organization_credits')
       .select('*')
-      .eq('organization_id', membership.organization_id)
+      .eq('organization_id', primaryMembership.organization_id)
       .single();
 
     if (orgCredits) {
@@ -118,12 +155,12 @@ export async function getCreditBalance(userId: string, client?: OptionalClient):
         lifetime_credits: orgCredits.lifetime_credits,
         lifetime_used: orgCredits.lifetime_used,
         source: 'organization',
-        organization_id: membership.organization_id,
+        organization_id: primaryMembership.organization_id,
       };
     }
   }
 
-  // Fall back to user credits
+  // Fall back to user credits (legacy)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: userCredits } = await (supabase as any)
     .from('user_credits')
@@ -154,7 +191,7 @@ export async function hasEnoughCredits(
   requiredCredits: number,
   client?: OptionalClient
 ): Promise<boolean> {
-  const balance = await getCreditBalance(userId, client);
+  const balance = await getCreditBalance(userId, null, client);
   return balance !== null && balance.balance >= requiredCredits;
 }
 
@@ -174,7 +211,7 @@ export async function deductCredits(
   const creditsToDeduct = calculateCredits(inputTokens, outputTokens);
 
   // Get current balance info
-  const balance = await getCreditBalance(userId, supabase);
+  const balance = await getCreditBalance(userId, null, supabase);
 
   if (!balance) {
     return {
