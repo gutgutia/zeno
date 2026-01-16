@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { UpgradeModal } from '@/components/billing/UpgradeModal';
-import { useVoiceRecording } from '@/hooks/useVoiceRecording';
 
 interface UpdateDataModalProps {
   dashboardId: string;
@@ -62,61 +61,6 @@ export function UpdateDataModal({
 
   // Track if component is mounted to avoid state updates after unmount
   const isMounted = useRef(true);
-
-  // Voice recording for paste data
-  const pasteTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const cursorPositionRef = useRef<number>(0);
-
-  // Insert transcript at cursor position
-  const insertTranscript = useCallback((transcript: string) => {
-    const cursorPos = cursorPositionRef.current;
-    const before = pastedData.slice(0, cursorPos);
-    const after = pastedData.slice(cursorPos);
-
-    // Add space before transcript if there's text before and it doesn't end with space
-    const needsSpaceBefore = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
-    // Add space after transcript if there's text after and it doesn't start with space
-    const needsSpaceAfter = after.length > 0 && !after.startsWith(' ') && !after.startsWith('\n');
-
-    const newText = before +
-      (needsSpaceBefore ? ' ' : '') +
-      transcript +
-      (needsSpaceAfter ? ' ' : '') +
-      after;
-
-    setPastedData(newText);
-
-    // Update cursor position to end of inserted text
-    const newCursorPos = cursorPos + (needsSpaceBefore ? 1 : 0) + transcript.length + (needsSpaceAfter ? 1 : 0);
-    cursorPositionRef.current = newCursorPos;
-
-    // Focus textarea and set cursor position after state update
-    setTimeout(() => {
-      if (pasteTextareaRef.current) {
-        pasteTextareaRef.current.focus();
-        pasteTextareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
-      }
-    }, 0);
-  }, [pastedData]);
-
-  const {
-    isRecording,
-    isTranscribing,
-    recordingDuration,
-    recordingError,
-    startRecording: startVoiceRecording,
-    stopRecording,
-  } = useVoiceRecording({ onTranscript: insertTranscript });
-
-  // Save cursor position before starting recording
-  const startRecording = useCallback(async () => {
-    if (pasteTextareaRef.current) {
-      cursorPositionRef.current = pasteTextareaRef.current.selectionStart;
-    } else {
-      cursorPositionRef.current = pastedData.length;
-    }
-    await startVoiceRecording();
-  }, [pastedData.length, startVoiceRecording]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -404,86 +348,14 @@ export function UpdateDataModal({
               {inputMethod === 'paste' && (
                 <div className="space-y-2">
                   <Label htmlFor="paste-data">Paste your data</Label>
-                  {/* Recording/Transcribing UI replaces textarea */}
-                  {isRecording || isTranscribing ? (
-                    <div className="min-h-[200px] border border-[var(--color-gray-200)] rounded-md bg-[var(--color-gray-50)] flex flex-col items-center justify-center py-8">
-                      {isTranscribing ? (
-                        <>
-                          {/* Transcribing state */}
-                          <div className="w-10 h-10 border-3 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin mb-3" />
-                          <p className="text-[var(--color-gray-600)] text-sm">Transcribing...</p>
-                        </>
-                      ) : (
-                        <>
-                          {/* Recording state - pulsing mic */}
-                          <div className="relative mb-4">
-                            <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
-                              <div className="absolute w-16 h-16 rounded-full bg-red-100 animate-ping opacity-75" />
-                              <svg className="w-8 h-8 text-red-500 relative z-10" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-                              </svg>
-                            </div>
-                          </div>
-                          <p className="text-[var(--color-gray-700)] font-medium mb-1">Listening...</p>
-                          <p className="text-[var(--color-gray-500)] text-2xl font-mono tabular-nums mb-4">
-                            {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={stopRecording}
-                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                          >
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                              <rect x="6" y="6" width="12" height="12" rx="2" />
-                            </svg>
-                            Stop Recording
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <Textarea
-                        ref={pasteTextareaRef}
-                        id="paste-data"
-                        value={pastedData}
-                        onChange={(e) => setPastedData(e.target.value)}
-                        onSelect={(e) => {
-                          cursorPositionRef.current = (e.target as HTMLTextAreaElement).selectionStart;
-                        }}
-                        placeholder="Paste your CSV, TSV, or JSON data here..."
-                        rows={8}
-                        className="font-mono text-sm pb-10"
-                      />
-                      {/* Voice input button - bottom right */}
-                      <button
-                        type="button"
-                        onClick={startRecording}
-                        className="absolute right-2 bottom-2 p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Click to speak your data"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Recording error message */}
-                  {recordingError && (
-                    <p className="text-red-500 text-sm mt-2">{recordingError}</p>
-                  )}
+                  <Textarea
+                    id="paste-data"
+                    value={pastedData}
+                    onChange={(e) => setPastedData(e.target.value)}
+                    placeholder="Paste your CSV, TSV, or JSON data here..."
+                    rows={8}
+                    className="font-mono text-sm"
+                  />
                 </div>
               )}
 
