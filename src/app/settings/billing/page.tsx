@@ -538,8 +538,8 @@ function BillingContent() {
         )}
       </div>
 
-      {/* Team Seats Section - Only show for paid plans */}
-      {seatInfo && seatInfo.has_subscription && currentPlan !== 'free' && (
+      {/* Team Seats Section - Show for paid plans */}
+      {seatInfo && currentPlan !== 'free' && (
         <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-8">
           <div className="flex items-start justify-between mb-4">
             <div>
@@ -548,7 +548,7 @@ function BillingContent() {
                 {seatInfo.credits_per_seat} credits per seat per month
               </p>
             </div>
-            {!creditInfo?.subscription_ends_at && (
+            {seatInfo.has_subscription && !creditInfo?.subscription_ends_at && (
               <div className="flex items-center gap-2">
                 {seatInfo.seats_available > 0 && (
                   <Button
@@ -604,9 +604,15 @@ function BillingContent() {
           </div>
 
           <div className="mt-4 pt-4 border-t border-[var(--color-gray-100)] flex items-center justify-between text-sm">
-            <span className="text-[var(--color-gray-600)]">
-              Cost per seat: ${seatInfo.price_per_seat}/{seatInfo.billing_cycle === 'annual' ? 'mo (billed annually)' : 'mo'}
-            </span>
+            {seatInfo.has_subscription ? (
+              <span className="text-[var(--color-gray-600)]">
+                Cost per seat: ${seatInfo.price_per_seat}/{seatInfo.billing_cycle === 'annual' ? 'mo (billed annually)' : 'mo'}
+              </span>
+            ) : (
+              <span className="text-[var(--color-gray-500)]">
+                Plan managed by admin
+              </span>
+            )}
             <Link href="/settings/team" className="text-[var(--color-primary)] hover:underline">
               Manage Team Members →
             </Link>

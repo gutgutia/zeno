@@ -426,7 +426,7 @@ export default function TeamPage() {
       )}
 
       {/* Seat Info Section */}
-      {seatInfo && seatInfo.has_subscription && canAddTeamMembers && (
+      {seatInfo && canAddTeamMembers && (
         <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-6">
           {/* Cancellation Warning */}
           {seatInfo.subscription_ends_at && (
@@ -450,7 +450,7 @@ export default function TeamPage() {
                 {seatInfo.credits_per_seat} credits per seat per month
               </p>
             </div>
-            {canManageMembers && !seatInfo.subscription_ends_at && (
+            {canManageMembers && seatInfo.has_subscription && !seatInfo.subscription_ends_at && (
               <div className="flex items-center gap-2">
                 {seatInfo.seats_available > 0 && (
                   <Button
