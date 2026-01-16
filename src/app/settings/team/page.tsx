@@ -515,11 +515,11 @@ export default function TeamPage() {
                   </div>
                   <div>
                     <div className="font-medium text-[var(--color-gray-900)]">
-                      {member.name || member.email || 'Unknown'}
+                      {member.name || 'No name set'}
                     </div>
-                    {member.email && member.name && (
-                      <div className="text-sm text-[var(--color-gray-500)]">{member.email}</div>
-                    )}
+                    <div className="text-sm text-[var(--color-gray-500)]">
+                      {member.email || 'No email'}
+                    </div>
                   </div>
                 </div>
 
