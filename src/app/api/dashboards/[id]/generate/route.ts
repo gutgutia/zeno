@@ -51,7 +51,7 @@ const getAgent = async (): Promise<{
 };
 
 // Allow long-running requests for agent loops
-export const maxDuration = 300; // 5 minutes
+export const maxDuration = 480; // 8 minutes
 
 // Estimated credits for dashboard generation (based on typical token usage)
 // Simple: ~9 credits, Medium: ~25 credits, Complex: ~50 credits

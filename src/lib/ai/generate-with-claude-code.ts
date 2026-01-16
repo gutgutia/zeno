@@ -17,11 +17,11 @@ import type { BrandingConfig } from '@/types/database';
 
 // Configuration
 const CLAUDE_CODE_CONFIG = {
-  // Sandbox timeout (5 minutes)
-  sandboxTimeoutMs: 300000,
+  // Sandbox timeout (8 minutes)
+  sandboxTimeoutMs: 480000,
 
-  // Command timeout (4 minutes, leaving buffer for cleanup)
-  commandTimeoutMs: 240000,
+  // Command timeout (7 minutes - extended for complex dashboards with extended thinking)
+  commandTimeoutMs: 420000,
 
   // Model to use (claude will use its default, but we track for billing)
   model: 'claude-opus-4-5',
