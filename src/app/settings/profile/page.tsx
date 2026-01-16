@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { toast } from 'sonner';
+import smartcrop from 'smartcrop';
 
 interface Profile {
   id: string;
@@ -82,6 +83,55 @@ export default function ProfileSettingsPage() {
     fileInputRef.current?.click();
   };
 
+  // Smart crop image to square, centered on face
+  const smartCropImage = async (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          // Determine the crop size (square, max 512px for avatars)
+          const size = Math.min(img.width, img.height, 512);
+
+          // Use smartcrop to find the best crop region
+          const result = await smartcrop.crop(img, { width: size, height: size });
+          const crop = result.topCrop;
+
+          // Create canvas and draw cropped image
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+
+          if (!ctx) {
+            resolve(file); // Fallback to original
+            return;
+          }
+
+          // Draw the cropped region
+          ctx.drawImage(
+            img,
+            crop.x, crop.y, crop.width, crop.height,
+            0, 0, size, size
+          );
+
+          // Convert canvas to blob
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const croppedFile = new File([blob], file.name, { type: 'image/jpeg' });
+              resolve(croppedFile);
+            } else {
+              resolve(file); // Fallback to original
+            }
+          }, 'image/jpeg', 0.9);
+        } catch {
+          resolve(file); // Fallback to original on error
+        }
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -102,8 +152,11 @@ export default function ProfileSettingsPage() {
     setIsUploadingAvatar(true);
 
     try {
+      // Smart crop the image (centers on face)
+      const croppedFile = await smartCropImage(file);
+
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', croppedFile);
 
       const response = await fetch('/api/profile/avatar', {
         method: 'POST',
