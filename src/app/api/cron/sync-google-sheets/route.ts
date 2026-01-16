@@ -239,7 +239,7 @@ export async function GET(request: NextRequest) {
               await sendDashboardUpdatedEmail({
                 to: userEmail,
                 dashboardTitle: dashboard.title,
-                dashboardId: dashboard.id,
+                dashboardSlug: dashboard.slug,
                 summary: refreshResult.summary,
               });
               console.log(`[Sync] Email notification sent to ${userEmail} for dashboard ${dashboard.id}`);

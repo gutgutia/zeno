@@ -496,7 +496,7 @@ export async function POST(
           await sendDashboardUpdatedEmail({
             to: user.email,
             dashboardTitle: dashboard.title,
-            dashboardId: id,
+            dashboardSlug: dashboard.slug,
             versionLabel: versionInfo?.label,
             summary: refreshResult.summary,
             changesCount: refreshResult.changes?.length,

@@ -69,17 +69,18 @@ export async function sendWelcomeEmail({
 export interface SendDashboardReadyEmailParams {
   to: string;
   dashboardTitle: string;
-  dashboardId: string;
+  dashboardSlug: string;
   appUrl?: string;
 }
 
 export async function sendDashboardReadyEmail({
   to,
   dashboardTitle,
-  dashboardId,
+  dashboardSlug,
   appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://zeno.fyi',
 }: SendDashboardReadyEmailParams) {
-  const dashboardUrl = `${appUrl}/dashboards/${dashboardId}`;
+  // Use /d/slug for better UX - handles unauthenticated users gracefully
+  const dashboardUrl = `${appUrl}/d/${dashboardSlug}`;
 
   const { data, error } = await resend.emails.send({
     from: FROM_EMAIL,
@@ -99,7 +100,7 @@ export async function sendDashboardReadyEmail({
 export interface SendDashboardUpdatedEmailParams {
   to: string;
   dashboardTitle: string;
-  dashboardId: string;
+  dashboardSlug: string;
   versionLabel?: string;
   summary?: string;
   changesCount?: number;
@@ -109,13 +110,14 @@ export interface SendDashboardUpdatedEmailParams {
 export async function sendDashboardUpdatedEmail({
   to,
   dashboardTitle,
-  dashboardId,
+  dashboardSlug,
   versionLabel,
   summary,
   changesCount,
   appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://zeno.fyi',
 }: SendDashboardUpdatedEmailParams) {
-  const dashboardUrl = `${appUrl}/dashboards/${dashboardId}`;
+  // Use /d/slug for better UX - handles unauthenticated users gracefully
+  const dashboardUrl = `${appUrl}/d/${dashboardSlug}`;
 
   const subject = versionLabel
     ? `Your dashboard "${dashboardTitle}" updated to v${versionLabel}`

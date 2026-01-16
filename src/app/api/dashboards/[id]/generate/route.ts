@@ -329,7 +329,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       // Send email notification if requested
       if (dashboard.notify_email && userEmail) {
         try {
-          await sendDashboardReadyEmail(userEmail, dashboard.title, id);
+          await sendDashboardReadyEmail(userEmail, dashboard.title, dashboard.slug);
         } catch (emailError) {
           console.error('Failed to send email notification:', emailError);
           // Don't fail the generation if email fails
@@ -372,10 +372,12 @@ export async function POST(request: Request, { params }: RouteParams) {
 
 /**
  * Send email notification when dashboard is ready
+ * Uses /d/slug URL for better UX when user is not logged in
  */
-async function sendDashboardReadyEmail(email: string, title: string, dashboardId: string) {
+async function sendDashboardReadyEmail(email: string, title: string, dashboardSlug: string) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  const dashboardUrl = `${baseUrl}/dashboards/${dashboardId}`;
+  // Use /d/slug for better UX - handles unauthenticated users gracefully
+  const dashboardUrl = `${baseUrl}/d/${dashboardSlug}`;
 
   // Use our email API endpoint
   await fetch(`${baseUrl}/api/email/dashboard-ready`, {

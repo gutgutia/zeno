@@ -13,13 +13,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Extract dashboard ID from URL
-    const dashboardId = dashboardUrl.split('/').pop() || '';
+    // Extract dashboard slug from URL (expects /d/slug format)
+    const dashboardSlug = dashboardUrl.split('/').pop() || '';
 
     await sendDashboardReadyEmail({
       to: email,
       dashboardTitle: title,
-      dashboardId,
+      dashboardSlug,
     });
 
     return NextResponse.json({ success: true });
