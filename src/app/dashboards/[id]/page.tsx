@@ -676,8 +676,15 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
                 Generation Failed
               </h2>
               <p className="text-[var(--color-gray-600)] max-w-md mb-4">
-                {dashboard.generation_error || 'Something went wrong while generating your dashboard.'}
+                {dashboard.generation_error?.includes('deadline_exceeded') || dashboard.generation_error?.includes('timed out')
+                  ? 'Dashboard generation took too long and timed out. This can happen with complex data or detailed instructions. Please try again - it often works on the second attempt.'
+                  : dashboard.generation_error || 'Something went wrong while generating your dashboard.'}
               </p>
+              {dashboard.generation_error?.includes('deadline_exceeded') && (
+                <p className="text-sm text-[var(--color-gray-500)] max-w-md mb-4">
+                  Tip: Try simplifying your instructions or using less data.
+                </p>
+              )}
               <Button onClick={handleRetryGeneration}>
                 Try Again
               </Button>
