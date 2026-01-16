@@ -3,15 +3,6 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import Link from 'next/link';
 
@@ -77,25 +68,6 @@ const plans = [
   },
 ];
 
-interface SeatInfo {
-  seats_purchased: number;
-  seats_used: number;
-  seats_pending: number;
-  seats_available: number;
-  plan_type: string;
-  billing_cycle: 'monthly' | 'annual';
-  has_subscription: boolean;
-  subscription_ends_at: string | null;
-  current_period_end: string | null;
-  current_period_start: string | null;
-  days_remaining: number | null;
-  total_days_in_period: number | null;
-  credits_per_seat: number;
-  price_per_seat: number;
-  price_per_seat_monthly: number;
-  price_per_seat_annual: number;
-}
-
 interface Invoice {
   id: string;
   number: string | null;
@@ -114,14 +86,10 @@ interface Invoice {
 
 function BillingContent() {
   const [creditInfo, setCreditInfo] = useState<CreditInfo | null>(null);
-  const [seatInfo, setSeatInfo] = useState<SeatInfo | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
-  const [isSeatDialogOpen, setIsSeatDialogOpen] = useState(false);
-  const [newSeatCount, setNewSeatCount] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const searchParams = useSearchParams();
 
   const fetchCredits = useCallback(async () => {
@@ -130,9 +98,8 @@ function BillingContent() {
       if (response.ok) {
         const data = await response.json();
         setCreditInfo(data);
-        // Fetch seat info and invoices if we have an org
+        // Fetch invoices if we have an org
         if (data.organization_id) {
-          fetchSeatInfo(data.organization_id);
           fetchInvoices(data.organization_id);
         }
       }
@@ -143,18 +110,6 @@ function BillingContent() {
       setIsLoading(false);
     }
   }, []);
-
-  const fetchSeatInfo = async (orgId: string) => {
-    try {
-      const response = await fetch(`/api/billing/seats?organization_id=${orgId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSeatInfo(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch seat info:', error);
-    }
-  };
 
   const fetchInvoices = async (orgId: string) => {
     try {
@@ -298,41 +253,6 @@ function BillingContent() {
     }
   };
 
-  const handleUpdateSeats = async () => {
-    if (!creditInfo?.organization_id || !seatInfo) return;
-    if (newSeatCount === seatInfo.seats_purchased) return; // No change
-
-    setIsSubmitting(true);
-    try {
-      const response = await fetch('/api/billing/seats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organization_id: creditInfo.organization_id,
-          seats: newSeatCount,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update seats');
-      }
-
-      setIsSeatDialogOpen(false);
-      fetchSeatInfo(creditInfo.organization_id);
-      if (newSeatCount > seatInfo.seats_purchased) {
-        fetchCredits();
-        window.dispatchEvent(new CustomEvent('credits-updated'));
-      }
-      toast.success(data.message || `Updated to ${newSeatCount} seat(s)`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update seats');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -384,31 +304,71 @@ function BillingContent() {
         <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">Billing & Credits</h1>
       </div>
 
-      {/* Credit Balance Card */}
-      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-8">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-1">Credit Balance</h2>
-            <p className="text-sm text-[var(--color-gray-500)]">
-              {creditInfo?.source === 'organization' ? 'Shared with your organization' : 'Personal credits'}
-            </p>
-          </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold text-[var(--color-gray-900)]">
-              {creditInfo?.balance || 0}
+      {/* Credits Section - Balance + Buy Packs */}
+      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] overflow-hidden mb-8">
+        {/* Credit Balance */}
+        <div className="p-6 border-b border-[var(--color-gray-100)]">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-1">Credits</h2>
+              <p className="text-sm text-[var(--color-gray-500)]">
+                {creditInfo?.source === 'organization' ? 'Shared with your organization' : 'Personal credits'}
+              </p>
             </div>
-            <div className="text-sm text-[var(--color-gray-500)]">credits</div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-[var(--color-gray-900)]">
+                {creditInfo?.balance || 0}
+              </div>
+              <div className="text-sm text-[var(--color-gray-500)]">credits</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-[var(--color-gray-100)]">
+            <div>
+              <div className="text-sm text-[var(--color-gray-500)]">Lifetime Received</div>
+              <div className="text-lg font-medium">{creditInfo?.lifetime_credits || 0}</div>
+            </div>
+            <div>
+              <div className="text-sm text-[var(--color-gray-500)]">Lifetime Used</div>
+              <div className="text-lg font-medium">{creditInfo?.lifetime_used || 0}</div>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-[var(--color-gray-100)]">
-          <div>
-            <div className="text-sm text-[var(--color-gray-500)]">Lifetime Received</div>
-            <div className="text-lg font-medium">{creditInfo?.lifetime_credits || 0}</div>
-          </div>
-          <div>
-            <div className="text-sm text-[var(--color-gray-500)]">Lifetime Used</div>
-            <div className="text-lg font-medium">{creditInfo?.lifetime_used || 0}</div>
+        {/* Buy Credit Packs */}
+        <div className="p-6 bg-[var(--color-gray-50)]">
+          <h3 className="text-sm font-medium text-[var(--color-gray-700)] mb-4">Buy Credit Packs</h3>
+          <div className="grid md:grid-cols-3 gap-3">
+            {creditPacks.map((pack) => (
+              <div
+                key={pack.size}
+                className="relative bg-white border border-[var(--color-gray-200)] rounded-lg p-3 hover:border-[var(--color-primary)] transition-colors"
+              >
+                {pack.savings && (
+                  <span className="absolute -top-2 right-2 bg-green-500 text-white text-xs font-medium px-1.5 py-0.5 rounded-full">
+                    Save {pack.savings}
+                  </span>
+                )}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-lg font-bold text-[var(--color-gray-900)]">
+                      {pack.credits.toLocaleString()}
+                    </div>
+                    <div className="text-xs text-[var(--color-gray-500)]">
+                      ${pack.perCredit.toFixed(2)}/credit
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleBuyCreditPack(pack.size)}
+                    disabled={isCheckoutLoading === pack.size}
+                  >
+                    {isCheckoutLoading === pack.size ? '...' : `$${pack.price}`}
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -537,229 +497,115 @@ function BillingContent() {
             </div>
           </div>
         )}
-      </div>
 
-      {/* Team Seats Section - Show for paid plans */}
-      {seatInfo && currentPlan !== 'free' && (
-        <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-8">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-semibold text-[var(--color-gray-900)]">Team Seats</h2>
-              <p className="text-sm text-[var(--color-gray-500)]">
-                {seatInfo.credits_per_seat} credits per seat per month
-              </p>
-            </div>
-            {seatInfo.has_subscription && !creditInfo?.subscription_ends_at && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setNewSeatCount(seatInfo.seats_purchased);
-                  setIsSeatDialogOpen(true);
-                }}
-              >
-                Manage Seats
-              </Button>
-            )}
-          </div>
+        {/* Upgrade Options (show if can upgrade to a higher plan) */}
+        {(() => {
+          const planOrder = ['free', 'starter', 'pro'];
+          const currentIndex = planOrder.indexOf(currentPlan);
+          const availablePlans = plans.filter(p => {
+            const planIndex = planOrder.indexOf(p.plan);
+            return planIndex > currentIndex;
+          });
 
-          <div className="grid grid-cols-4 gap-4">
-            <div className="bg-[var(--color-gray-50)] rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-[var(--color-gray-900)]">
-                {seatInfo.seats_purchased}
-              </div>
-              <div className="text-sm text-[var(--color-gray-500)]">Total Seats</div>
-            </div>
-            <div className="bg-[var(--color-gray-50)] rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-[var(--color-gray-900)]">
-                {seatInfo.seats_used}
-              </div>
-              <div className="text-sm text-[var(--color-gray-500)]">In Use</div>
-            </div>
-            <div className="bg-[var(--color-gray-50)] rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-amber-600">
-                {seatInfo.seats_pending}
-              </div>
-              <div className="text-sm text-[var(--color-gray-500)]">Pending</div>
-            </div>
-            <div className="bg-[var(--color-gray-50)] rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {seatInfo.seats_available}
-              </div>
-              <div className="text-sm text-[var(--color-gray-500)]">Available</div>
-            </div>
-          </div>
+          if (availablePlans.length === 0) return null;
 
-          <div className="mt-4 pt-4 border-t border-[var(--color-gray-100)] flex items-center justify-between text-sm">
-            {seatInfo.has_subscription ? (
-              <span className="text-[var(--color-gray-600)]">
-                Cost per seat: ${seatInfo.price_per_seat}/{seatInfo.billing_cycle === 'annual' ? 'mo (billed annually)' : 'mo'}
-              </span>
-            ) : (
-              <span className="text-[var(--color-gray-500)]">
-                Plan managed by admin
-              </span>
-            )}
-            <Link href="/settings/team" className="text-[var(--color-primary)] hover:underline">
-              Manage Team Members →
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Credit Packs */}
-      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-8">
-        <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-4">Buy Credit Packs</h2>
-        <p className="text-sm text-[var(--color-gray-500)] mb-6">
-          Need more credits? Purchase a pack anytime.
-        </p>
-
-        <div className="grid md:grid-cols-3 gap-4">
-          {creditPacks.map((pack) => (
-            <div
-              key={pack.size}
-              className="relative border border-[var(--color-gray-200)] rounded-xl p-4 hover:border-[var(--color-primary)] transition-colors"
-            >
-              {pack.savings && (
-                <span className="absolute -top-2 right-3 bg-green-500 text-white text-xs font-medium px-2 py-0.5 rounded-full">
-                  Save {pack.savings}
-                </span>
-              )}
-              <div className="text-2xl font-bold text-[var(--color-gray-900)] mb-1">
-                {pack.credits.toLocaleString()}
-              </div>
-              <div className="text-sm text-[var(--color-gray-500)] mb-3">credits</div>
-              <div className="text-lg font-semibold text-[var(--color-primary)] mb-1">
-                ${pack.price}
-              </div>
-              <div className="text-xs text-[var(--color-gray-400)] mb-4">
-                ${pack.perCredit.toFixed(2)}/credit
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => handleBuyCreditPack(pack.size)}
-                disabled={isCheckoutLoading === pack.size}
-              >
-                {isCheckoutLoading === pack.size ? 'Loading...' : 'Buy Now'}
-              </Button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Upgrade Plans (show if can upgrade to a higher plan) */}
-      {(() => {
-        const planOrder = ['free', 'starter', 'pro'];
-        const currentIndex = planOrder.indexOf(currentPlan);
-        const availablePlans = plans.filter(p => {
-          const planIndex = planOrder.indexOf(p.plan);
-          return planIndex > currentIndex;
-        });
-
-        if (availablePlans.length === 0) return null;
-
-        return (
-          <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-8">
-            <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-4">
-              {currentPlan === 'free' ? 'Upgrade Your Plan' : 'Upgrade to Pro'}
-            </h2>
-            <p className="text-sm text-[var(--color-gray-500)] mb-4">
-              {currentPlan === 'free'
-                ? 'Get more credits monthly, unlock premium features, and remove limits.'
-                : 'Get 250 credits/seat/month, remove Zeno branding, and unlock premium features.'}
-            </p>
-
-            {/* Billing Toggle */}
-            <div className="flex justify-center mb-6">
-              <div className="inline-flex items-center gap-2 bg-[var(--color-gray-100)] rounded-full p-1">
-                <button
-                  onClick={() => setBillingCycle('monthly')}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    billingCycle === 'monthly'
-                      ? 'bg-white text-[var(--color-gray-900)] shadow-sm'
-                      : 'text-[var(--color-gray-600)]'
-                  }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  onClick={() => setBillingCycle('annual')}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    billingCycle === 'annual'
-                      ? 'bg-white text-[var(--color-gray-900)] shadow-sm'
-                      : 'text-[var(--color-gray-600)]'
-                  }`}
-                >
-                  Annual
-                  <span className="ml-1 text-xs text-green-600">Save 20%</span>
-                </button>
-              </div>
-            </div>
-
-            <div className={`grid gap-4 ${availablePlans.length > 1 ? 'md:grid-cols-2' : 'max-w-md mx-auto'}`}>
-              {availablePlans.map((plan) => {
-                const price = billingCycle === 'annual' ? plan.annualPrice : plan.monthlyPrice;
-                return (
-                  <div
-                    key={plan.name}
-                    className={`relative rounded-xl p-5 border ${
-                      plan.popular
-                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
-                        : 'border-[var(--color-gray-200)]'
+          return (
+            <div className="p-6 border-t border-[var(--color-gray-100)]">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-[var(--color-gray-700)]">
+                  {currentPlan === 'free' ? 'Upgrade Your Plan' : 'Upgrade to Pro'}
+                </h3>
+                {/* Billing Toggle */}
+                <div className="inline-flex items-center gap-1 bg-[var(--color-gray-100)] rounded-full p-0.5">
+                  <button
+                    onClick={() => setBillingCycle('monthly')}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                      billingCycle === 'monthly'
+                        ? 'bg-white text-[var(--color-gray-900)] shadow-sm'
+                        : 'text-[var(--color-gray-600)]'
                     }`}
                   >
-                    {plan.popular && (
-                      <span className="absolute -top-2.5 left-4 bg-[var(--color-primary)] text-white text-xs font-medium px-2 py-0.5 rounded-full">
-                        {currentPlan === 'starter' ? 'Recommended' : 'Most Popular'}
-                      </span>
-                    )}
+                    Monthly
+                  </button>
+                  <button
+                    onClick={() => setBillingCycle('annual')}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                      billingCycle === 'annual'
+                        ? 'bg-white text-[var(--color-gray-900)] shadow-sm'
+                        : 'text-[var(--color-gray-600)]'
+                    }`}
+                  >
+                    Annual
+                    <span className="ml-1 text-green-600">-20%</span>
+                  </button>
+                </div>
+              </div>
 
-                    <h3 className="font-semibold text-lg mb-1">{plan.name}</h3>
-                    <div className="flex items-baseline gap-1 mb-2">
-                      <span className="text-2xl font-bold">${price}</span>
-                      <span className="text-[var(--color-gray-500)]">/seat/mo</span>
-                    </div>
-                    {billingCycle === 'annual' && (
-                      <p className="text-xs text-[var(--color-gray-400)] mb-2">
-                        Billed annually (${price * 12}/seat/year)
-                      </p>
-                    )}
-
-                    <div className="flex items-center gap-2 mb-4 text-sm text-[var(--color-primary)]">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      {plan.credits}
-                    </div>
-
-                    <ul className="space-y-2 mb-4">
-                      {plan.features.map((feature) => (
-                        <li key={feature} className="flex items-start gap-2 text-sm">
-                          <svg className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-
-                    <Button
-                      onClick={() => handleUpgrade(plan.plan)}
-                      disabled={isCheckoutLoading === plan.plan}
-                      variant={plan.popular ? 'default' : 'outline'}
-                      className="w-full"
+              <div className={`grid gap-3 ${availablePlans.length > 1 ? 'md:grid-cols-2' : ''}`}>
+                {availablePlans.map((plan) => {
+                  const price = billingCycle === 'annual' ? plan.annualPrice : plan.monthlyPrice;
+                  return (
+                    <div
+                      key={plan.name}
+                      className={`relative rounded-lg p-4 border ${
+                        plan.popular
+                          ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
+                          : 'border-[var(--color-gray-200)]'
+                      }`}
                     >
-                      {isCheckoutLoading === plan.plan ? 'Loading...' : `Upgrade to ${plan.name}`}
-                    </Button>
-                  </div>
-                );
-              })}
+                      {plan.popular && (
+                        <span className="absolute -top-2 left-3 bg-[var(--color-primary)] text-white text-xs font-medium px-2 py-0.5 rounded-full">
+                          {currentPlan === 'starter' ? 'Recommended' : 'Most Popular'}
+                        </span>
+                      )}
+
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="font-semibold text-[var(--color-gray-900)]">{plan.name}</h4>
+                          <div className="flex items-baseline gap-1 mt-1">
+                            <span className="text-xl font-bold">${price}</span>
+                            <span className="text-sm text-[var(--color-gray-500)]">/seat/mo</span>
+                          </div>
+                          <div className="flex items-center gap-1 mt-1 text-xs text-[var(--color-primary)]">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            {plan.credits}
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => handleUpgrade(plan.plan)}
+                          disabled={isCheckoutLoading === plan.plan}
+                          variant={plan.popular ? 'default' : 'outline'}
+                          size="sm"
+                        >
+                          {isCheckoutLoading === plan.plan ? '...' : 'Upgrade'}
+                        </Button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 pt-3 border-t border-[var(--color-gray-100)]">
+                        {plan.features.slice(0, 3).map((feature) => (
+                          <span key={feature} className="flex items-center gap-1 text-xs text-[var(--color-gray-600)]">
+                            <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                            {feature}
+                          </span>
+                        ))}
+                        {plan.features.length > 3 && (
+                          <span className="text-xs text-[var(--color-gray-400)]">
+                            +{plan.features.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
+      </div>
 
       {/* Invoices - Show for paid plans */}
       {invoices.length > 0 && (
@@ -852,139 +698,6 @@ function BillingContent() {
           <p className="text-sm text-[var(--color-gray-500)]">No transactions yet</p>
         )}
       </div>
-
-      {/* Manage Seats Dialog */}
-      <Dialog open={isSeatDialogOpen} onOpenChange={setIsSeatDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Manage Team Seats</DialogTitle>
-            <DialogDescription>
-              Adjust your seat count. You have {seatInfo?.seats_used || 0} seat{(seatInfo?.seats_used || 0) !== 1 ? 's' : ''} in use.
-            </DialogDescription>
-          </DialogHeader>
-
-          {seatInfo && (
-            <div className="space-y-4 py-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-gray-700)] mb-3">
-                  Total seats
-                </label>
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => setNewSeatCount(Math.max(seatInfo.seats_used + seatInfo.seats_pending, newSeatCount - 1))}
-                    disabled={newSeatCount <= seatInfo.seats_used + seatInfo.seats_pending}
-                    className="w-12 h-12 rounded-lg border border-[var(--color-gray-200)] flex items-center justify-center hover:bg-[var(--color-gray-50)] disabled:opacity-50 disabled:cursor-not-allowed text-lg"
-                  >
-                    −
-                  </button>
-                  <div className="flex-1 text-center">
-                    <div className="text-4xl font-bold text-[var(--color-gray-900)]">
-                      {newSeatCount}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setNewSeatCount(newSeatCount + 1)}
-                    className="w-12 h-12 rounded-lg border border-[var(--color-gray-200)] flex items-center justify-center hover:bg-[var(--color-gray-50)] text-lg"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              {/* Show summary only when there's a change */}
-              {newSeatCount !== seatInfo.seats_purchased && (
-                <>
-                  {newSeatCount > seatInfo.seats_purchased ? (
-                    // Adding seats
-                    <div className="bg-[var(--color-primary)]/5 rounded-lg p-4 border border-[var(--color-primary)]/20">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[var(--color-gray-600)]">Adding</span>
-                        <span className="font-medium text-[var(--color-gray-900)]">
-                          {newSeatCount - seatInfo.seats_purchased} seat{newSeatCount - seatInfo.seats_purchased > 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[var(--color-gray-600)]">
-                          Additional {seatInfo.billing_cycle === 'annual' ? 'annual' : 'monthly'} cost
-                        </span>
-                        <span className="font-medium text-[var(--color-gray-900)]">
-                          {seatInfo.billing_cycle === 'annual'
-                            ? `+$${(newSeatCount - seatInfo.seats_purchased) * seatInfo.price_per_seat_annual}/year`
-                            : `+$${(newSeatCount - seatInfo.seats_purchased) * seatInfo.price_per_seat}/mo`}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[var(--color-gray-600)]">Additional credits/mo</span>
-                        <span className="font-medium text-green-600">
-                          +{(newSeatCount - seatInfo.seats_purchased) * seatInfo.credits_per_seat}
-                        </span>
-                      </div>
-                      {/* Prorated amount charged today */}
-                      {seatInfo.days_remaining !== null && seatInfo.total_days_in_period !== null && seatInfo.total_days_in_period > 0 && (
-                        <div className="flex items-center justify-between pt-2 mt-2 border-t border-[var(--color-primary)]/10">
-                          <span className="text-[var(--color-gray-600)]">Charged today (prorated)</span>
-                          <span className="font-semibold text-[var(--color-gray-900)]">
-                            ${(
-                              ((newSeatCount - seatInfo.seats_purchased) *
-                                (seatInfo.billing_cycle === 'annual' ? seatInfo.price_per_seat_annual : seatInfo.price_per_seat) *
-                                seatInfo.days_remaining) /
-                              seatInfo.total_days_in_period
-                            ).toFixed(2)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    // Removing seats
-                    <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[var(--color-gray-600)]">Removing</span>
-                        <span className="font-medium text-[var(--color-gray-900)]">
-                          {seatInfo.seats_purchased - newSeatCount} seat{seatInfo.seats_purchased - newSeatCount > 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[var(--color-gray-600)]">
-                          {seatInfo.billing_cycle === 'annual' ? 'Annual' : 'Monthly'} savings
-                        </span>
-                        <span className="font-medium text-green-600">
-                          {seatInfo.billing_cycle === 'annual'
-                            ? `$${(seatInfo.seats_purchased - newSeatCount) * seatInfo.price_per_seat_annual}/year`
-                            : `$${(seatInfo.seats_purchased - newSeatCount) * seatInfo.price_per_seat}/mo`}
-                        </span>
-                      </div>
-                      {seatInfo.current_period_end && (
-                        <div className="flex items-center justify-between pt-2 mt-2 border-t border-amber-200">
-                          <span className="text-[var(--color-gray-600)]">Takes effect on</span>
-                          <span className="font-semibold text-[var(--color-gray-900)]">
-                            {new Date(seatInfo.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </span>
-                        </div>
-                      )}
-                      <p className="text-xs text-amber-700 mt-3">
-                        No refund will be issued. You&apos;ll keep all {seatInfo.seats_purchased} seats until then.
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSeatDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleUpdateSeats}
-              disabled={isSubmitting || !seatInfo || newSeatCount === seatInfo.seats_purchased}
-              variant={newSeatCount < (seatInfo?.seats_purchased || 0) ? 'destructive' : 'default'}
-            >
-              {isSubmitting ? 'Updating...' : newSeatCount === seatInfo?.seats_purchased ? 'No Change' : 'Confirm'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
