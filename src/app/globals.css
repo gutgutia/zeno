@@ -101,26 +101,15 @@ p {
   color: var(--color-gray-600);
 }
 
-a {
+/* Only style standalone links, not links inside interactive elements */
+a:not([class]) {
   color: var(--color-primary);
   text-decoration: none;
   transition: color var(--duration-fast) var(--ease-out);
 }
 
-a:hover {
+a:not([class]):hover {
   color: var(--color-primary-hover);
-}
-
-/* Links inside buttons and nav items should inherit text color */
-button a,
-[data-slot="button"] a,
-nav a {
-  color: inherit;
-}
-
-button a:hover,
-[data-slot="button"] a:hover {
-  color: inherit;
 }
 
 /* ==========================================================================
