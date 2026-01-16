@@ -226,12 +226,14 @@ export default async function PublicDashboardPage({ params }: PageProps) {
 
   // If published, allow access to anyone
   if (!dashboardData.is_published) {
-    // Not published - check for share-based access
+    // Not published - check for ownership or share-based access
 
     // Check if user is the owner
     const isOwner = user && dashboardData.workspaces.owner_id === user.id;
 
     if (!isOwner) {
+      // Not the owner (or not logged in) - check shares and auth
+
       // Get shares for this dashboard
       const { data: shares } = await adminSupabase
         .from('dashboard_shares')
@@ -240,30 +242,27 @@ export default async function PublicDashboardPage({ params }: PageProps) {
 
       const dashboardShares = (shares || []) as DashboardShare[];
 
-      // If no shares exist, this is a private dashboard
-      if (dashboardShares.length === 0) {
-        notFound();
-      }
-
       // Check for Supabase authenticated user
       let hasAccess = false;
       let viewerEmail = '';
 
       if (user) {
-        // Supabase authenticated user (internal users)
+        // Supabase authenticated user - check if they have share access
         hasAccess = checkShareAccess(dashboardShares, user.email || '');
         viewerEmail = user.email || '';
       } else {
         // Check for external viewer session (cookie-based)
         const externalSession = await checkExternalViewerSession(adminSupabase, dashboardData.id);
         if (externalSession.valid && externalSession.email) {
-          // Verify the session email still has access
-          hasAccess = checkShareAccess(dashboardShares, externalSession.email);
+          // Verify the session email still has access (or is the owner)
+          const isExternalOwner = false; // External sessions can't be owners (they'd use Supabase auth)
+          hasAccess = isExternalOwner || checkShareAccess(dashboardShares, externalSession.email);
           viewerEmail = externalSession.email;
         }
       }
 
-      // If not authenticated at all, show auth gate
+      // If not authenticated at all, show auth gate so they can log in
+      // (They might be the owner who just isn't logged in yet)
       if (!user && !viewerEmail) {
         return (
           <SharedDashboardAuthGate
@@ -274,7 +273,8 @@ export default async function PublicDashboardPage({ params }: PageProps) {
         );
       }
 
-      // User/viewer is authenticated but doesn't have access (access may have been revoked)
+      // User/viewer is authenticated but doesn't have access
+      // (They're not the owner and not in the share list)
       if (!hasAccess) {
         return <AccessDenied userEmail={viewerEmail} dashboardTitle={dashboardData.title} />;
       }

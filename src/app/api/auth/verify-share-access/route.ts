@@ -160,35 +160,43 @@ export async function POST(request: Request) {
 
     const dashboardData = dashboard as unknown as { id: string; workspaces: { owner_id: string } };
 
-    // Get the owner's email for domain comparison
+    // Get the owner's email for domain comparison and ownership check
     const { data: ownerUser } = await supabase.auth.admin.getUserById(dashboardData.workspaces.owner_id);
-    const ownerEmail = ownerUser?.user?.email || '';
+    const ownerEmail = ownerUser?.user?.email?.toLowerCase() || '';
 
-    // Find the share that matches this user's email
-    const { data: shares } = await supabase
-      .from('dashboard_shares')
-      .select('*')
-      .eq('dashboard_id', dashboardData.id);
+    // Check if this user is the owner
+    const isOwner = normalizedEmail === ownerEmail;
 
-    const userDomain = normalizedEmail.split('@')[1];
-    const matchingShare = (shares as DashboardShare[] | null)?.find((share) => {
-      if (share.share_type === 'email') {
-        return share.share_value === normalizedEmail;
-      } else if (share.share_type === 'domain') {
-        return share.share_value === userDomain;
+    // Find the share that matches this user's email (only needed if not owner)
+    let matchingShare: DashboardShare | undefined;
+
+    if (!isOwner) {
+      const { data: shares } = await supabase
+        .from('dashboard_shares')
+        .select('*')
+        .eq('dashboard_id', dashboardData.id);
+
+      const userDomain = normalizedEmail.split('@')[1];
+      matchingShare = (shares as DashboardShare[] | null)?.find((share) => {
+        if (share.share_type === 'email') {
+          return share.share_value === normalizedEmail;
+        } else if (share.share_type === 'domain') {
+          return share.share_value === userDomain;
+        }
+        return false;
+      });
+
+      if (!matchingShare) {
+        return NextResponse.json(
+          { error: 'You do not have access to this dashboard' },
+          { status: 403 }
+        );
       }
-      return false;
-    });
-
-    if (!matchingShare) {
-      return NextResponse.json(
-        { error: 'You do not have access to this dashboard' },
-        { status: 403 }
-      );
     }
 
     // Determine effective viewer type
-    const effectiveViewerType = getEffectiveViewerType(matchingShare, normalizedEmail, ownerEmail);
+    // Owners are always internal users
+    const effectiveViewerType = isOwner ? 'internal' : getEffectiveViewerType(matchingShare!, normalizedEmail, ownerEmail);
 
     if (effectiveViewerType === 'internal') {
       // Internal user: Create/get Supabase account, return magic link token
