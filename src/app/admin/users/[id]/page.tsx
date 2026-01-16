@@ -385,12 +385,17 @@ export default function AdminUserDetailPage({
               <div className="space-y-2">
                 {user.organizations.map((membership, index) => (
                   <div key={index} className="flex items-center justify-between p-2 bg-[var(--color-gray-50)] rounded">
-                    <button
-                      onClick={() => router.push(`/admin/organizations/${membership.organization?.id}`)}
-                      className="text-[var(--color-primary)] hover:underline font-medium"
-                    >
-                      {membership.organization?.name || 'Unknown Org'}
-                    </button>
+                    <div>
+                      <button
+                        onClick={() => router.push(`/admin/organizations/${membership.organization?.id}`)}
+                        className="text-[var(--color-primary)] hover:underline font-medium"
+                      >
+                        {membership.organization?.name || 'Unknown Org'}
+                      </button>
+                      <p className="text-xs text-[var(--color-gray-400)] font-mono">
+                        {membership.organization?.id}
+                      </p>
+                    </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-[var(--color-gray-500)]">
                         {membership.organization?.plan_type}
