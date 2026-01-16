@@ -21,7 +21,7 @@ async function captureOGImage() {
   const browser = await chromium.launch();
   const context = await browser.newContext({
     viewport: { width: OG_WIDTH, height: OG_HEIGHT },
-    deviceScaleFactor: 2, // 2x for high-res output
+    deviceScaleFactor: 3, // 3x for high-res output (3600x1890)
   });
   
   const page = await context.newPage();
@@ -42,7 +42,7 @@ async function captureOGImage() {
   });
   
   console.log(`✓ Saved: ${outputPath}`);
-  console.log(`  Dimensions: ${OG_WIDTH * 2}x${OG_HEIGHT * 2} (2x scale)`);
+  console.log(`  Dimensions: ${OG_WIDTH * 3}x${OG_HEIGHT * 3} (3x scale)`);
   
   await browser.close();
 }
