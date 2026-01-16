@@ -79,12 +79,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get the public URL
+    // Get the public URL with cache-busting timestamp
     const { data: urlData } = supabase.storage
       .from('avatars')
       .getPublicUrl(filePath);
 
-    const avatarUrl = urlData.publicUrl;
+    // Add timestamp to bust browser/CDN cache
+    const avatarUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
     // Update the profile with the new avatar URL
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
