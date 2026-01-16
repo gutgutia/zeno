@@ -227,6 +227,74 @@ export async function GET(request: Request) {
 
     const pricePerSeat = isAnnual ? pricePerSeatAnnual : pricePerSeatMonthly;
 
+    // Get billing period info from Stripe if available
+    let currentPeriodEnd: string | null = null;
+    let currentPeriodStart: string | null = null;
+    let daysRemaining: number | null = null;
+    let totalDaysInPeriod: number | null = null;
+
+    if (org?.stripe_subscription_id) {
+      try {
+        const stripe = getStripe();
+        const subscription = await stripe.subscriptions.retrieve(org.stripe_subscription_id);
+
+        // Cast to access all properties (Stripe types may not include all fields)
+        const sub = subscription as unknown as Record<string, unknown>;
+
+        // Try to get period info - check multiple possible locations
+        let periodEndTimestamp = sub.current_period_end as number | undefined;
+        let periodStartTimestamp = sub.current_period_start as number | undefined;
+
+        // If not on subscription directly, calculate from billing_cycle_anchor
+        if (!periodEndTimestamp && sub.billing_cycle_anchor) {
+          const anchor = sub.billing_cycle_anchor as number;
+          const billingCycle = org?.billing_cycle || 'monthly';
+          const now = new Date();
+
+          // Calculate current period based on anchor
+          const anchorDate = new Date(anchor * 1000);
+          let periodStart = new Date(anchorDate);
+          let periodEnd = new Date(anchorDate);
+
+          // Move to current period
+          if (billingCycle === 'annual') {
+            while (periodEnd <= now) {
+              periodStart = new Date(periodEnd);
+              periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+            }
+          } else {
+            while (periodEnd <= now) {
+              periodStart = new Date(periodEnd);
+              periodEnd.setMonth(periodEnd.getMonth() + 1);
+            }
+          }
+
+          periodStartTimestamp = Math.floor(periodStart.getTime() / 1000);
+          periodEndTimestamp = Math.floor(periodEnd.getTime() / 1000);
+        }
+
+        // Get period info from subscription
+        if (periodEndTimestamp) {
+          const periodEnd = new Date(periodEndTimestamp * 1000);
+          currentPeriodEnd = periodEnd.toISOString();
+
+          if (periodStartTimestamp) {
+            const periodStart = new Date(periodStartTimestamp * 1000);
+            currentPeriodStart = periodStart.toISOString();
+
+            // Calculate days remaining and total days in period
+            const now = new Date();
+            const msPerDay = 24 * 60 * 60 * 1000;
+            totalDaysInPeriod = Math.round((periodEnd.getTime() - periodStart.getTime()) / msPerDay);
+            daysRemaining = Math.max(0, Math.round((periodEnd.getTime() - now.getTime()) / msPerDay));
+          }
+        }
+      } catch (e) {
+        // Subscription may not exist or be invalid
+        console.error('Failed to get subscription details:', e);
+      }
+    }
+
     return NextResponse.json({
       seats_purchased: org?.seats_purchased || 1,
       seats_used: currentMembers || 1,
@@ -236,6 +304,10 @@ export async function GET(request: Request) {
       billing_cycle: org?.billing_cycle || 'monthly',
       has_subscription: !!org?.stripe_subscription_id,
       subscription_ends_at: org?.subscription_ends_at || null,
+      current_period_end: currentPeriodEnd,
+      current_period_start: currentPeriodStart,
+      days_remaining: daysRemaining,
+      total_days_in_period: totalDaysInPeriod,
       credits_per_seat: creditsPerSeat,
       price_per_seat: pricePerSeat,
       price_per_seat_monthly: pricePerSeatMonthly,
