@@ -111,6 +111,18 @@ a:hover {
   color: var(--color-primary-hover);
 }
 
+/* Links inside buttons and nav items should inherit text color */
+button a,
+[data-slot="button"] a,
+nav a {
+  color: inherit;
+}
+
+button a:hover,
+[data-slot="button"] a:hover {
+  color: inherit;
+}
+
 /* ==========================================================================
    Focus States
    ========================================================================== */
