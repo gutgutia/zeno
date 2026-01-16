@@ -76,12 +76,12 @@ export default function AdminUsersPage() {
   }, [fetchUsers]);
 
   const getPlanBadgeColor = (plan: string | null, hasOverride: boolean) => {
-    if (hasOverride) return 'bg-yellow-100 text-yellow-800';
+    if (hasOverride) return 'bg-[var(--color-warning-light)] text-[var(--color-warning)]';
     switch (plan) {
-      case 'enterprise': return 'bg-orange-100 text-orange-800';
-      case 'pro': return 'bg-purple-100 text-purple-800';
-      case 'starter': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'enterprise': return 'bg-[var(--color-warning-light)] text-[var(--color-warning)]';
+      case 'pro': return 'bg-[var(--color-secondary-light)] text-[var(--color-secondary)]';
+      case 'starter': return 'bg-[var(--color-primary-light)] text-[var(--color-primary)]';
+      default: return 'bg-[var(--color-gray-100)] text-[var(--color-gray-700)]';
     }
   };
 
@@ -133,7 +133,7 @@ export default function AdminUsersPage() {
       </div>
 
       {/* User Table */}
-      <div className="bg-white rounded-lg border border-[var(--color-gray-200)] overflow-hidden">
+      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] overflow-hidden">
         <table className="w-full">
           <thead className="bg-[var(--color-gray-50)] border-b border-[var(--color-gray-200)]">
             <tr>
@@ -163,18 +163,18 @@ export default function AdminUsersPage() {
                 <tr key={i} className="animate-pulse">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
+                      <div className="w-8 h-8 bg-[var(--color-gray-200)] rounded-full"></div>
                       <div className="space-y-1">
-                        <div className="h-4 bg-gray-200 rounded w-32"></div>
-                        <div className="h-3 bg-gray-200 rounded w-48"></div>
+                        <div className="h-4 bg-[var(--color-gray-200)] rounded w-32"></div>
+                        <div className="h-3 bg-[var(--color-gray-200)] rounded w-48"></div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3"><div className="h-5 bg-gray-200 rounded w-16"></div></td>
-                  <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded w-12"></div></td>
-                  <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded w-8"></div></td>
-                  <td className="px-4 py-3"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
-                  <td className="px-4 py-3"><div className="h-8 bg-gray-200 rounded w-16 ml-auto"></div></td>
+                  <td className="px-4 py-3"><div className="h-5 bg-[var(--color-gray-200)] rounded w-16"></div></td>
+                  <td className="px-4 py-3"><div className="h-4 bg-[var(--color-gray-200)] rounded w-12"></div></td>
+                  <td className="px-4 py-3"><div className="h-4 bg-[var(--color-gray-200)] rounded w-8"></div></td>
+                  <td className="px-4 py-3"><div className="h-4 bg-[var(--color-gray-200)] rounded w-24"></div></td>
+                  <td className="px-4 py-3"><div className="h-8 bg-[var(--color-gray-200)] rounded w-16 ml-auto"></div></td>
                 </tr>
               ))
             ) : users.length === 0 ? (

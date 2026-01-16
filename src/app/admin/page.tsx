@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+import { Users, LayoutDashboard, Coins, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface AdminStats {
   totalUsers: number;
@@ -89,12 +91,12 @@ export default function AdminOverviewPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">Admin Dashboard</h1>
+        <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">Overview</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg border border-[var(--color-gray-200)] p-6 animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-              <div className="h-8 bg-gray-200 rounded w-3/4"></div>
+            <div key={i} className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 animate-pulse">
+              <div className="h-4 bg-[var(--color-gray-200)] rounded w-1/2 mb-3"></div>
+              <div className="h-8 bg-[var(--color-gray-200)] rounded w-3/4"></div>
             </div>
           ))}
         </div>
@@ -104,7 +106,7 @@ export default function AdminOverviewPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">Admin Dashboard</h1>
+      <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">Overview</h1>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -112,49 +114,65 @@ export default function AdminOverviewPage() {
           title="Total Users"
           value={stats?.totalUsers || 0}
           href="/admin/users"
+          icon={Users}
+          iconColor="text-[var(--color-primary)]"
+          iconBg="bg-[var(--color-primary-light)]"
         />
         <StatCard
           title="Active Users (30d)"
           value={stats?.activeUsers || 0}
           subtitle={`${((stats?.activeUsers || 0) / (stats?.totalUsers || 1) * 100).toFixed(0)}% of total`}
+          icon={TrendingUp}
+          iconColor="text-[var(--color-teal)]"
+          iconBg="bg-[var(--color-teal-light)]"
         />
         <StatCard
           title="Total Dashboards"
           value={stats?.totalDashboards || 0}
+          icon={LayoutDashboard}
+          iconColor="text-[var(--color-secondary)]"
+          iconBg="bg-[var(--color-secondary-light)]"
         />
         <StatCard
           title="Credits Used"
           value={stats?.totalCreditsUsed || 0}
+          icon={Coins}
+          iconColor="text-[var(--color-warning)]"
+          iconBg="bg-[var(--color-warning-light)]"
         />
       </div>
 
       {/* Plan Distribution */}
-      <div className="bg-white rounded-lg border border-[var(--color-gray-200)] p-6">
+      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6">
         <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-4">Plan Distribution</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <PlanCard label="Free" count={stats?.planDistribution.free || 0} color="gray" />
-          <PlanCard label="Starter" count={stats?.planDistribution.starter || 0} color="blue" />
-          <PlanCard label="Pro" count={stats?.planDistribution.pro || 0} color="purple" />
-          <PlanCard label="Enterprise" count={stats?.planDistribution.enterprise || 0} color="orange" />
+          <PlanCard label="Free" count={stats?.planDistribution.free || 0} variant="gray" />
+          <PlanCard label="Starter" count={stats?.planDistribution.starter || 0} variant="primary" />
+          <PlanCard label="Pro" count={stats?.planDistribution.pro || 0} variant="secondary" />
+          <PlanCard label="Enterprise" count={stats?.planDistribution.enterprise || 0} variant="warning" />
         </div>
       </div>
 
       {/* Quick Links */}
-      <div className="bg-white rounded-lg border border-[var(--color-gray-200)] p-6">
+      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6">
         <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-4">Quick Actions</h2>
         <div className="flex flex-wrap gap-3">
-          <Link
-            href="/admin/users"
-            className="inline-flex items-center px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
-          >
-            Manage Users
-          </Link>
-          <Link
-            href="/admin/settings"
-            className="inline-flex items-center px-4 py-2 bg-[var(--color-gray-100)] text-[var(--color-gray-700)] rounded-lg hover:bg-[var(--color-gray-200)] transition-colors"
-          >
-            Global Settings
-          </Link>
+          <Button asChild>
+            <Link href="/admin/users">
+              <Users className="w-4 h-4 mr-2" />
+              Manage Users
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/admin/organizations">
+              Manage Organizations
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/admin/settings">
+              Global Settings
+            </Link>
+          </Button>
         </div>
       </div>
     </div>
@@ -166,29 +184,40 @@ function StatCard({
   value,
   subtitle,
   href,
+  icon: Icon,
+  iconColor,
+  iconBg,
 }: {
   title: string;
   value: number;
   subtitle?: string;
   href?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  iconColor: string;
+  iconBg: string;
 }) {
   const content = (
-    <>
-      <p className="text-sm text-[var(--color-gray-500)]">{title}</p>
-      <p className="text-2xl font-bold text-[var(--color-gray-900)]">
-        {value.toLocaleString()}
-      </p>
-      {subtitle && (
-        <p className="text-xs text-[var(--color-gray-400)] mt-1">{subtitle}</p>
-      )}
-    </>
+    <div className="flex items-start justify-between">
+      <div>
+        <p className="text-sm text-[var(--color-gray-500)]">{title}</p>
+        <p className="text-2xl font-bold text-[var(--color-gray-900)] mt-1">
+          {value.toLocaleString()}
+        </p>
+        {subtitle && (
+          <p className="text-xs text-[var(--color-gray-400)] mt-1">{subtitle}</p>
+        )}
+      </div>
+      <div className={`p-2 rounded-lg ${iconBg}`}>
+        <Icon className={`w-5 h-5 ${iconColor}`} />
+      </div>
+    </div>
   );
 
   if (href) {
     return (
       <Link
         href={href}
-        className="bg-white rounded-lg border border-[var(--color-gray-200)] p-6 hover:border-[var(--color-primary)] transition-colors"
+        className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 hover:border-[var(--color-primary)] hover:shadow-sm transition-all"
       >
         {content}
       </Link>
@@ -196,7 +225,7 @@ function StatCard({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-[var(--color-gray-200)] p-6">
+    <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6">
       {content}
     </div>
   );
@@ -205,22 +234,22 @@ function StatCard({
 function PlanCard({
   label,
   count,
-  color,
+  variant,
 }: {
   label: string;
   count: number;
-  color: 'gray' | 'blue' | 'purple' | 'orange';
+  variant: 'gray' | 'primary' | 'secondary' | 'warning';
 }) {
-  const colorClasses = {
-    gray: 'bg-gray-100 text-gray-700',
-    blue: 'bg-blue-100 text-blue-700',
-    purple: 'bg-purple-100 text-purple-700',
-    orange: 'bg-orange-100 text-orange-700',
+  const variantClasses = {
+    gray: 'bg-[var(--color-gray-100)] text-[var(--color-gray-700)]',
+    primary: 'bg-[var(--color-primary-light)] text-[var(--color-primary)]',
+    secondary: 'bg-[var(--color-secondary-light)] text-[var(--color-secondary)]',
+    warning: 'bg-[var(--color-warning-light)] text-[var(--color-warning)]',
   };
 
   return (
     <div className="text-center p-4 rounded-lg bg-[var(--color-gray-50)]">
-      <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${colorClasses[color]}`}>
+      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${variantClasses[variant]}`}>
         {label}
       </span>
       <p className="text-xl font-bold text-[var(--color-gray-900)] mt-2">

@@ -17,6 +17,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { ArrowLeft } from 'lucide-react';
 
 interface UserDetail {
   profile: {
@@ -235,9 +236,9 @@ export default function AdminUserDetailPage({
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-8 bg-gray-200 rounded w-48 animate-pulse"></div>
-        <div className="bg-white rounded-lg border p-6 animate-pulse">
-          <div className="h-16 bg-gray-200 rounded"></div>
+        <div className="h-8 bg-[var(--color-gray-200)] rounded w-48 animate-pulse"></div>
+        <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 animate-pulse">
+          <div className="h-16 bg-[var(--color-gray-200)] rounded"></div>
         </div>
       </div>
     );
@@ -260,17 +261,15 @@ export default function AdminUserDetailPage({
       <div className="flex items-center gap-4">
         <Link
           href="/admin/users"
-          className="text-[var(--color-gray-500)] hover:text-[var(--color-gray-700)]"
+          className="text-[var(--color-gray-500)] hover:text-[var(--color-gray-700)] transition-colors"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+          <ArrowLeft className="w-5 h-5" />
         </Link>
         <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">User Details</h1>
       </div>
 
       {/* User Header Card */}
-      <div className="bg-white rounded-lg border border-[var(--color-gray-200)] p-6">
+      <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16">
@@ -285,7 +284,7 @@ export default function AdminUserDetailPage({
               <p className="text-[var(--color-gray-500)]">{user.profile.email || user.profile.id}</p>
               <div className="flex items-center gap-2 mt-2">
                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                  user.override ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                  user.override ? 'bg-[var(--color-warning-light)] text-[var(--color-warning)]' : 'bg-[var(--color-gray-100)] text-[var(--color-gray-700)]'
                 }`}>
                   {user.profile.plan_type || 'free'}
                   {user.override && ' (override)'}
@@ -312,25 +311,25 @@ export default function AdminUserDetailPage({
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg border border-[var(--color-gray-200)] p-4">
+        <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-4">
           <p className="text-sm text-[var(--color-gray-500)]">Credit Balance</p>
           <p className="text-2xl font-bold text-[var(--color-gray-900)]">
             {user.credits.balance.toLocaleString()}
           </p>
         </div>
-        <div className="bg-white rounded-lg border border-[var(--color-gray-200)] p-4">
+        <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-4">
           <p className="text-sm text-[var(--color-gray-500)]">Lifetime Credits</p>
           <p className="text-2xl font-bold text-[var(--color-gray-900)]">
             {user.credits.lifetime_credits.toLocaleString()}
           </p>
         </div>
-        <div className="bg-white rounded-lg border border-[var(--color-gray-200)] p-4">
+        <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-4">
           <p className="text-sm text-[var(--color-gray-500)]">Credits Used</p>
           <p className="text-2xl font-bold text-[var(--color-gray-900)]">
             {user.credits.lifetime_used.toLocaleString()}
           </p>
         </div>
-        <div className="bg-white rounded-lg border border-[var(--color-gray-200)] p-4">
+        <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-4">
           <p className="text-sm text-[var(--color-gray-500)]">Dashboards</p>
           <p className="text-2xl font-bold text-[var(--color-gray-900)]">
             {user.dashboardCount}
@@ -349,11 +348,11 @@ export default function AdminUserDetailPage({
         <TabsContent value="overview" className="space-y-4">
           {/* Override Info */}
           {user.override && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="bg-[var(--color-warning-light)] border border-[var(--color-warning)]/30 rounded-xl p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-yellow-800">Active Override</h3>
-                  <div className="mt-2 text-sm text-yellow-700 space-y-1">
+                  <h3 className="font-medium text-[var(--color-warning)]">Active Override</h3>
+                  <div className="mt-2 text-sm text-[var(--color-gray-700)] space-y-1">
                     {user.override.plan_type && <p>Plan: {user.override.plan_type}</p>}
                     {user.override.max_dashboards && <p>Max Dashboards: {user.override.max_dashboards}</p>}
                     {user.override.monthly_credits && <p>Monthly Credits: {user.override.monthly_credits}</p>}
@@ -380,11 +379,11 @@ export default function AdminUserDetailPage({
 
           {/* Organizations */}
           {user.organizations.length > 0 && (
-            <div className="bg-white rounded-lg border border-[var(--color-gray-200)] p-4">
+            <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-4">
               <h3 className="font-medium text-[var(--color-gray-900)] mb-3">Organizations</h3>
               <div className="space-y-2">
                 {user.organizations.map((membership, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-[var(--color-gray-50)] rounded">
+                  <div key={index} className="flex items-center justify-between p-2 bg-[var(--color-gray-50)] rounded-lg">
                     <div>
                       <button
                         onClick={() => router.push(`/admin/organizations/${membership.organization?.id}`)}
@@ -400,7 +399,7 @@ export default function AdminUserDetailPage({
                       <span className="text-xs text-[var(--color-gray-500)]">
                         {membership.organization?.plan_type}
                       </span>
-                      <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">
+                      <span className="text-xs bg-[var(--color-gray-200)] text-[var(--color-gray-700)] px-2 py-0.5 rounded">
                         {membership.role}
                       </span>
                     </div>
@@ -412,9 +411,9 @@ export default function AdminUserDetailPage({
         </TabsContent>
 
         <TabsContent value="transactions">
-          <div className="bg-white rounded-lg border border-[var(--color-gray-200)] overflow-hidden">
+          <div className="bg-white rounded-xl border border-[var(--color-gray-200)] overflow-hidden">
             <table className="w-full">
-              <thead className="bg-[var(--color-gray-50)] border-b">
+              <thead className="bg-[var(--color-gray-50)] border-b border-[var(--color-gray-200)]">
                 <tr>
                   <th className="text-left px-4 py-3 text-xs font-medium text-[var(--color-gray-500)] uppercase">Date</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-[var(--color-gray-500)] uppercase">Type</th>
@@ -440,7 +439,7 @@ export default function AdminUserDetailPage({
                         <span className="capitalize">{tx.transaction_type.replace(/_/g, ' ')}</span>
                       </td>
                       <td className={`px-4 py-3 text-sm text-right font-medium ${
-                        tx.amount > 0 ? 'text-green-600' : 'text-red-600'
+                        tx.amount > 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'
                       }`}>
                         {tx.amount > 0 ? '+' : ''}{tx.amount}
                       </td>
@@ -459,9 +458,9 @@ export default function AdminUserDetailPage({
         </TabsContent>
 
         <TabsContent value="dashboards">
-          <div className="bg-white rounded-lg border border-[var(--color-gray-200)] overflow-hidden">
+          <div className="bg-white rounded-xl border border-[var(--color-gray-200)] overflow-hidden">
             <table className="w-full">
-              <thead className="bg-[var(--color-gray-50)] border-b">
+              <thead className="bg-[var(--color-gray-50)] border-b border-[var(--color-gray-200)]">
                 <tr>
                   <th className="text-left px-4 py-3 text-xs font-medium text-[var(--color-gray-500)] uppercase">Title</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-[var(--color-gray-500)] uppercase">Status</th>
@@ -484,7 +483,7 @@ export default function AdminUserDetailPage({
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          dashboard.is_published ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          dashboard.is_published ? 'bg-[var(--color-success-light)] text-[var(--color-success)]' : 'bg-[var(--color-gray-100)] text-[var(--color-gray-700)]'
                         }`}>
                           {dashboard.is_published ? 'Published' : 'Draft'}
                         </span>
