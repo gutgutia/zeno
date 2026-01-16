@@ -1,6 +1,19 @@
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { sendTeamInvitationEmail } from '@/lib/email/send';
+
+// Admin client for fetching user emails
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error('Missing Supabase env vars');
+  }
+  return createSupabaseClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -55,7 +68,8 @@ export async function GET(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Failed to fetch members' }, { status: 500 });
     }
 
-    // Fetch profile info separately for each member
+    // Fetch profile info separately for each member using admin client
+    const adminClient = getSupabaseAdmin();
     const membersWithProfile = await Promise.all(
       (members || []).map(async (m: { id: string; user_id: string; role: string; invited_at: string; accepted_at: string }) => {
         // Get profile
@@ -66,9 +80,8 @@ export async function GET(request: Request, { params }: RouteParams) {
           .eq('id', m.user_id)
           .single();
 
-        // Get email from auth (only works with service role client in production)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: authUser } = await (supabase as any).auth.admin?.getUserById(m.user_id) || {};
+        // Get email from auth using admin client
+        const { data: authUser } = await adminClient.auth.admin.getUserById(m.user_id);
 
         return {
           id: m.id,
