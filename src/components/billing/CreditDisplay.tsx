@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useOrganization } from '@/lib/contexts/organization-context';
 
 interface CreditInfo {
   balance: number;
@@ -21,6 +22,7 @@ interface CreditDisplayProps {
 }
 
 export function CreditDisplay({ variant = 'compact', className = '' }: CreditDisplayProps) {
+  const { currentOrg } = useOrganization();
   const [creditInfo, setCreditInfo] = useState<CreditInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -73,11 +75,20 @@ export function CreditDisplay({ variant = 'compact', className = '' }: CreditDis
   const planLabel = creditInfo.plan.charAt(0).toUpperCase() + creditInfo.plan.slice(1);
 
   if (variant === 'compact') {
+    // Truncate org name if too long
+    const orgName = currentOrg?.name || 'Default';
+    const truncatedName = orgName.length > 12 ? orgName.slice(0, 11) + '...' : orgName;
+
     return (
       <Link
         href="/settings/billing"
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-[var(--color-gray-100)] transition-colors ${className}`}
+        title={`${orgName} - ${creditInfo.balance} credits`}
       >
+        <span className="text-sm text-[var(--color-gray-500)] max-w-[100px] truncate">
+          {truncatedName}
+        </span>
+        <span className="text-[var(--color-gray-300)]">·</span>
         <svg
           className={`w-4 h-4 ${isLowCredits ? 'text-amber-500' : 'text-[var(--color-primary)]'}`}
           fill="none"
