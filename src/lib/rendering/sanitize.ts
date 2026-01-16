@@ -100,7 +100,9 @@ const DANGEROUS_CSS_PATTERNS = [
  * Sanitize HTML content for safe rendering
  * This is a server-side compatible sanitization function
  */
-export function sanitizeHTML(html: string): string {
+export function sanitizeHTML(html: string | null | undefined): string {
+  if (!html) return '';
+
   let sanitized = html;
 
   // Remove dangerous patterns first

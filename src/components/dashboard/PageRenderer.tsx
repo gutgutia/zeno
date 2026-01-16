@@ -16,7 +16,9 @@ interface PageRendererProps {
 /**
  * Check if HTML needs iframe rendering (has scripts, Chart.js, or style blocks in head)
  */
-function needsIframeRendering(html: string): boolean {
+function needsIframeRendering(html: string | null | undefined): boolean {
+  if (!html) return false;
+
   // Check for script tags, Chart.js, or style blocks in the head
   // The legacy path strips <head> which removes all CSS, so any complete HTML document
   // with styles should use iframe rendering
@@ -104,7 +106,7 @@ export function PageRenderer({ html, charts, data, className = '' }: PageRendere
 
   // Extract body styles and content from the HTML (legacy mode)
   const { bodyStyles, bodyContent } = useMemo(() => {
-    if (useIframe) {
+    if (useIframe || !html) {
       return { bodyStyles: '', bodyContent: '' };
     }
 
@@ -192,12 +194,24 @@ export function PageRenderer({ html, charts, data, className = '' }: PageRendere
     };
   }, [useIframe, bodyContent, charts, data, cleanupChartRoots]);
 
+  // Handle missing HTML gracefully
+  if (!html) {
+    return (
+      <div className={`page-renderer ${className} flex items-center justify-center min-h-[400px]`}>
+        <div className="text-center text-[var(--color-gray-500)]">
+          <p>Dashboard content is not available.</p>
+          <p className="text-sm mt-1">The dashboard may still be generating.</p>
+        </div>
+      </div>
+    );
+  }
+
   // Use iframe for HTML with JavaScript/Chart.js
   if (useIframe) {
     return <IframeRenderer html={html} className={`page-renderer ${className}`} />;
   }
 
-  // Legacy mode: sanitized HTML with React chart hydration
+  // Legacy mode: sanitized HTML with React chart hydration (content is sanitized above)
   return (
     <div
       ref={containerRef}
