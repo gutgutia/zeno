@@ -61,7 +61,9 @@ export default function TeamPage() {
   const [isCreatingOrg, setIsCreatingOrg] = useState(false);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [isAddSeatDialogOpen, setIsAddSeatDialogOpen] = useState(false);
+  const [isRemoveSeatDialogOpen, setIsRemoveSeatDialogOpen] = useState(false);
   const [seatsToAdd, setSeatsToAdd] = useState(1);
+  const [seatsToRemove, setSeatsToRemove] = useState(1);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -190,6 +192,38 @@ export default function TeamPage() {
       toast.success(data.message || `Added ${seatsToAdd} seat(s)`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to add seats');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRemoveSeats = async () => {
+    if (!organization || !seatInfo) return;
+
+    setIsSubmitting(true);
+    try {
+      const newTotal = seatInfo.seats_purchased - seatsToRemove;
+      const response = await fetch('/api/billing/seats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organization_id: organization.id,
+          seats: newTotal,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to remove seats');
+      }
+
+      setIsRemoveSeatDialogOpen(false);
+      setSeatsToRemove(1);
+      fetchSeatInfo(organization.id);
+      toast.success(data.message || `Reduced to ${newTotal} seat(s). Change takes effect next billing cycle.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to remove seats');
     } finally {
       setIsSubmitting(false);
     }
@@ -367,7 +401,16 @@ export default function TeamPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-[var(--color-gray-900)]">Team</h1>
           {canManageMembers && canAddTeamMembers && (
-            <Button onClick={() => setIsInviteDialogOpen(true)}>Invite Team Member</Button>
+            seatInfo && seatInfo.seats_available <= 0 ? (
+              <Button
+                variant="outline"
+                onClick={() => setIsAddSeatDialogOpen(true)}
+              >
+                Add Seats to Invite
+              </Button>
+            ) : (
+              <Button onClick={() => setIsInviteDialogOpen(true)}>Invite Team Member</Button>
+            )
           )}
         </div>
       </div>
@@ -408,9 +451,23 @@ export default function TeamPage() {
               </p>
             </div>
             {canManageMembers && !seatInfo.subscription_ends_at && (
-              <Button variant="outline" size="sm" onClick={() => setIsAddSeatDialogOpen(true)}>
-                Add Seats
-              </Button>
+              <div className="flex items-center gap-2">
+                {seatInfo.seats_available > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSeatsToRemove(1);
+                      setIsRemoveSeatDialogOpen(true);
+                    }}
+                  >
+                    Remove Seats
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => setIsAddSeatDialogOpen(true)}>
+                  Add Seats
+                </Button>
+              </div>
             )}
           </div>
 
@@ -702,6 +759,106 @@ export default function TeamPage() {
             </Button>
             <Button onClick={handleAddSeats} disabled={isSubmitting}>
               {isSubmitting ? 'Adding...' : `Add ${seatsToAdd} Seat${seatsToAdd > 1 ? 's' : ''}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Seats Dialog */}
+      <Dialog open={isRemoveSeatDialogOpen} onOpenChange={setIsRemoveSeatDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Team Seats</DialogTitle>
+            <DialogDescription>
+              Reduce your seat count. The change takes effect at the end of your current billing period.
+            </DialogDescription>
+          </DialogHeader>
+
+          {seatInfo && (
+            <div className="space-y-4 py-4">
+              <div className="bg-[var(--color-gray-50)] rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-[var(--color-gray-600)]">Current seats</span>
+                  <span className="font-medium">{seatInfo.seats_purchased}</span>
+                </div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-[var(--color-gray-600)]">Seats in use</span>
+                  <span className="font-medium">{seatInfo.seats_used + seatInfo.seats_pending}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[var(--color-gray-600)]">Available to remove</span>
+                  <span className="font-medium text-green-600">{seatInfo.seats_available}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-gray-700)] mb-1">
+                  Seats to remove
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSeatsToRemove(Math.max(1, seatsToRemove - 1))}
+                    className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)] flex items-center justify-center hover:bg-[var(--color-gray-50)]"
+                  >
+                    -
+                  </button>
+                  <Input
+                    type="number"
+                    value={seatsToRemove}
+                    onChange={(e) => setSeatsToRemove(Math.max(1, Math.min(seatInfo.seats_available, parseInt(e.target.value) || 1)))}
+                    className="w-20 text-center"
+                    min={1}
+                    max={seatInfo.seats_available}
+                  />
+                  <button
+                    onClick={() => setSeatsToRemove(Math.min(seatInfo.seats_available, seatsToRemove + 1))}
+                    className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)] flex items-center justify-center hover:bg-[var(--color-gray-50)]"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium text-[var(--color-gray-900)]">New total</span>
+                  <span className="font-bold text-[var(--color-gray-900)]">
+                    {seatInfo.seats_purchased - seatsToRemove} seats
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--color-gray-600)]">
+                    {seatInfo.billing_cycle === 'annual' ? 'Annual' : 'Monthly'} savings
+                  </span>
+                  <span className="text-green-600">
+                    {seatInfo.billing_cycle === 'annual'
+                      ? `-$${seatsToRemove * seatInfo.price_per_seat_annual}/year`
+                      : `-$${seatsToRemove * seatInfo.price_per_seat}/mo`}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2 text-xs text-[var(--color-gray-500)]">
+                <svg className="w-4 h-4 text-[var(--color-gray-400)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p>
+                  No refund will be issued. You&apos;ll keep access to {seatInfo.seats_purchased} seats until the end of your billing period, then the change will take effect.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRemoveSeatDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRemoveSeats}
+              disabled={isSubmitting || !seatInfo || seatsToRemove > seatInfo.seats_available}
+              variant="destructive"
+            >
+              {isSubmitting ? 'Removing...' : `Remove ${seatsToRemove} Seat${seatsToRemove > 1 ? 's' : ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>

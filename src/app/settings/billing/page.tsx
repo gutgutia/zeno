@@ -3,6 +3,15 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import Link from 'next/link';
 
@@ -68,11 +77,32 @@ const plans = [
   },
 ];
 
+interface SeatInfo {
+  seats_purchased: number;
+  seats_used: number;
+  seats_pending: number;
+  seats_available: number;
+  plan_type: string;
+  billing_cycle: 'monthly' | 'annual';
+  has_subscription: boolean;
+  subscription_ends_at: string | null;
+  credits_per_seat: number;
+  price_per_seat: number;
+  price_per_seat_monthly: number;
+  price_per_seat_annual: number;
+}
+
 function BillingContent() {
   const [creditInfo, setCreditInfo] = useState<CreditInfo | null>(null);
+  const [seatInfo, setSeatInfo] = useState<SeatInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('annual');
+  const [isAddSeatDialogOpen, setIsAddSeatDialogOpen] = useState(false);
+  const [isRemoveSeatDialogOpen, setIsRemoveSeatDialogOpen] = useState(false);
+  const [seatsToAdd, setSeatsToAdd] = useState(1);
+  const [seatsToRemove, setSeatsToRemove] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const searchParams = useSearchParams();
 
   const fetchCredits = useCallback(async () => {
@@ -81,6 +111,10 @@ function BillingContent() {
       if (response.ok) {
         const data = await response.json();
         setCreditInfo(data);
+        // Fetch seat info if we have an org
+        if (data.organization_id) {
+          fetchSeatInfo(data.organization_id);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch credits:', error);
@@ -89,6 +123,18 @@ function BillingContent() {
       setIsLoading(false);
     }
   }, []);
+
+  const fetchSeatInfo = async (orgId: string) => {
+    try {
+      const response = await fetch(`/api/billing/seats?organization_id=${orgId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSeatInfo(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch seat info:', error);
+    }
+  };
 
   useEffect(() => {
     fetchCredits();
@@ -217,6 +263,72 @@ function BillingContent() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to open billing portal');
       setIsCheckoutLoading(null);
+    }
+  };
+
+  const handleAddSeats = async () => {
+    if (!creditInfo?.organization_id || !seatInfo) return;
+
+    setIsSubmitting(true);
+    try {
+      const newTotal = seatInfo.seats_purchased + seatsToAdd;
+      const response = await fetch('/api/billing/seats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organization_id: creditInfo.organization_id,
+          seats: newTotal,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to add seats');
+      }
+
+      setIsAddSeatDialogOpen(false);
+      setSeatsToAdd(1);
+      fetchSeatInfo(creditInfo.organization_id);
+      fetchCredits();
+      window.dispatchEvent(new CustomEvent('credits-updated'));
+      toast.success(data.message || `Added ${seatsToAdd} seat(s)`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add seats');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRemoveSeats = async () => {
+    if (!creditInfo?.organization_id || !seatInfo) return;
+
+    setIsSubmitting(true);
+    try {
+      const newTotal = seatInfo.seats_purchased - seatsToRemove;
+      const response = await fetch('/api/billing/seats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organization_id: creditInfo.organization_id,
+          seats: newTotal,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to remove seats');
+      }
+
+      setIsRemoveSeatDialogOpen(false);
+      setSeatsToRemove(1);
+      fetchSeatInfo(creditInfo.organization_id);
+      toast.success(data.message || `Reduced to ${newTotal} seat(s)`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to remove seats');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -426,6 +538,82 @@ function BillingContent() {
         )}
       </div>
 
+      {/* Team Seats Section - Only show for paid plans */}
+      {seatInfo && seatInfo.has_subscription && currentPlan !== 'free' && (
+        <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-8">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--color-gray-900)]">Team Seats</h2>
+              <p className="text-sm text-[var(--color-gray-500)]">
+                {seatInfo.credits_per_seat} credits per seat per month
+              </p>
+            </div>
+            {!creditInfo?.subscription_ends_at && (
+              <div className="flex items-center gap-2">
+                {seatInfo.seats_available > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSeatsToRemove(1);
+                      setIsRemoveSeatDialogOpen(true);
+                    }}
+                  >
+                    Remove Seats
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSeatsToAdd(1);
+                    setIsAddSeatDialogOpen(true);
+                  }}
+                >
+                  Add Seats
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-4 gap-4">
+            <div className="bg-[var(--color-gray-50)] rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-[var(--color-gray-900)]">
+                {seatInfo.seats_purchased}
+              </div>
+              <div className="text-sm text-[var(--color-gray-500)]">Total Seats</div>
+            </div>
+            <div className="bg-[var(--color-gray-50)] rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-[var(--color-gray-900)]">
+                {seatInfo.seats_used}
+              </div>
+              <div className="text-sm text-[var(--color-gray-500)]">In Use</div>
+            </div>
+            <div className="bg-[var(--color-gray-50)] rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-amber-600">
+                {seatInfo.seats_pending}
+              </div>
+              <div className="text-sm text-[var(--color-gray-500)]">Pending</div>
+            </div>
+            <div className="bg-[var(--color-gray-50)] rounded-lg p-4 text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {seatInfo.seats_available}
+              </div>
+              <div className="text-sm text-[var(--color-gray-500)]">Available</div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-[var(--color-gray-100)] flex items-center justify-between text-sm">
+            <span className="text-[var(--color-gray-600)]">
+              Cost per seat: ${seatInfo.price_per_seat}/{seatInfo.billing_cycle === 'annual' ? 'mo (billed annually)' : 'mo'}
+            </span>
+            <Link href="/settings/team" className="text-[var(--color-primary)] hover:underline">
+              Manage Team Members →
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Credit Packs */}
       <div className="bg-white rounded-xl border border-[var(--color-gray-200)] p-6 mb-8">
         <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-4">Buy Credit Packs</h2>
@@ -609,6 +797,206 @@ function BillingContent() {
           <p className="text-sm text-[var(--color-gray-500)]">No transactions yet</p>
         )}
       </div>
+
+      {/* Add Seats Dialog */}
+      <Dialog open={isAddSeatDialogOpen} onOpenChange={setIsAddSeatDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Team Seats</DialogTitle>
+            <DialogDescription>
+              Add more seats to invite additional team members. You&apos;ll be charged immediately for the prorated amount.
+            </DialogDescription>
+          </DialogHeader>
+
+          {seatInfo && (
+            <div className="space-y-4 py-4">
+              <div className="bg-[var(--color-gray-50)] rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-[var(--color-gray-600)]">Current seats</span>
+                  <span className="font-medium">{seatInfo.seats_purchased}</span>
+                </div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-[var(--color-gray-600)]">Billing cycle</span>
+                  <span className="font-medium capitalize">{seatInfo.billing_cycle}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[var(--color-gray-600)]">Price per seat</span>
+                  <span className="font-medium">
+                    {seatInfo.billing_cycle === 'annual'
+                      ? `$${seatInfo.price_per_seat_annual}/year`
+                      : `$${seatInfo.price_per_seat}/mo`}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-gray-700)] mb-1">
+                  Seats to add
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSeatsToAdd(Math.max(1, seatsToAdd - 1))}
+                    className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)] flex items-center justify-center hover:bg-[var(--color-gray-50)]"
+                  >
+                    -
+                  </button>
+                  <Input
+                    type="number"
+                    value={seatsToAdd}
+                    onChange={(e) => setSeatsToAdd(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-20 text-center"
+                    min={1}
+                  />
+                  <button
+                    onClick={() => setSeatsToAdd(seatsToAdd + 1)}
+                    className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)] flex items-center justify-center hover:bg-[var(--color-gray-50)]"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-[var(--color-primary)]/5 rounded-lg p-4 border border-[var(--color-primary)]/20">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium text-[var(--color-gray-900)]">New total</span>
+                  <span className="font-bold text-[var(--color-primary)]">
+                    {seatInfo.seats_purchased + seatsToAdd} seats
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--color-gray-600)]">
+                    Additional {seatInfo.billing_cycle === 'annual' ? 'annual' : 'monthly'} cost
+                  </span>
+                  <span className="text-[var(--color-gray-900)]">
+                    {seatInfo.billing_cycle === 'annual'
+                      ? `+$${seatsToAdd * seatInfo.price_per_seat_annual}/year`
+                      : `+$${seatsToAdd * seatInfo.price_per_seat}/mo`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-1">
+                  <span className="text-[var(--color-gray-600)]">Additional credits/mo</span>
+                  <span className="text-green-600">
+                    +{seatsToAdd * seatInfo.credits_per_seat} credits
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-[var(--color-gray-500)]">
+                You&apos;ll be charged a prorated amount today based on the time remaining in your billing period.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddSeatDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddSeats} disabled={isSubmitting}>
+              {isSubmitting ? 'Adding...' : `Add ${seatsToAdd} Seat${seatsToAdd > 1 ? 's' : ''}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Seats Dialog */}
+      <Dialog open={isRemoveSeatDialogOpen} onOpenChange={setIsRemoveSeatDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Team Seats</DialogTitle>
+            <DialogDescription>
+              Reduce your seat count. The change takes effect at the end of your current billing period.
+            </DialogDescription>
+          </DialogHeader>
+
+          {seatInfo && (
+            <div className="space-y-4 py-4">
+              <div className="bg-[var(--color-gray-50)] rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-[var(--color-gray-600)]">Current seats</span>
+                  <span className="font-medium">{seatInfo.seats_purchased}</span>
+                </div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-[var(--color-gray-600)]">Seats in use</span>
+                  <span className="font-medium">{seatInfo.seats_used + seatInfo.seats_pending}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[var(--color-gray-600)]">Available to remove</span>
+                  <span className="font-medium text-green-600">{seatInfo.seats_available}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-gray-700)] mb-1">
+                  Seats to remove
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSeatsToRemove(Math.max(1, seatsToRemove - 1))}
+                    className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)] flex items-center justify-center hover:bg-[var(--color-gray-50)]"
+                  >
+                    -
+                  </button>
+                  <Input
+                    type="number"
+                    value={seatsToRemove}
+                    onChange={(e) => setSeatsToRemove(Math.max(1, Math.min(seatInfo.seats_available, parseInt(e.target.value) || 1)))}
+                    className="w-20 text-center"
+                    min={1}
+                    max={seatInfo.seats_available}
+                  />
+                  <button
+                    onClick={() => setSeatsToRemove(Math.min(seatInfo.seats_available, seatsToRemove + 1))}
+                    className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)] flex items-center justify-center hover:bg-[var(--color-gray-50)]"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium text-[var(--color-gray-900)]">New total</span>
+                  <span className="font-bold text-[var(--color-gray-900)]">
+                    {seatInfo.seats_purchased - seatsToRemove} seats
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--color-gray-600)]">
+                    {seatInfo.billing_cycle === 'annual' ? 'Annual' : 'Monthly'} savings
+                  </span>
+                  <span className="text-green-600">
+                    {seatInfo.billing_cycle === 'annual'
+                      ? `-$${seatsToRemove * seatInfo.price_per_seat_annual}/year`
+                      : `-$${seatsToRemove * seatInfo.price_per_seat}/mo`}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2 text-xs text-[var(--color-gray-500)]">
+                <svg className="w-4 h-4 text-[var(--color-gray-400)] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p>
+                  No refund will be issued. You&apos;ll keep access to {seatInfo.seats_purchased} seats until the end of your billing period, then the change will take effect.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRemoveSeatDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRemoveSeats}
+              disabled={isSubmitting || !seatInfo || seatsToRemove > seatInfo.seats_available}
+              variant="destructive"
+            >
+              {isSubmitting ? 'Removing...' : `Remove ${seatsToRemove} Seat${seatsToRemove > 1 ? 's' : ''}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
