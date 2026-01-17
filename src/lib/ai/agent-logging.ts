@@ -9,7 +9,7 @@
 export const LOGGING_CONFIG = {
   // Enable verbose logging of agent turns and tool calls
   // Uses --output-format stream-json to get structured events
-  enabled: true,
+  enabled: false,
 
   // Truncate long text in logs to this length
   maxTextLength: 2000,
