@@ -237,13 +237,18 @@ export async function POST(request: Request, { params }: RouteParams) {
 
         // Use full name if available, otherwise use full email address
         const ownerName = profile?.name || user.email || 'Someone';
-        const dashboardUrl = buildDashboardUrl(dashboardData.slug, org);
 
-        // Build white-label options if enabled
-        const whiteLabel = org?.white_label_enabled ? {
-          companyName: org.branding?.companyName,
-          logoUrl: org.branding?.logoUrl,
-          senderName: org.email_sender_name || undefined,
+        // White-label only applies to EXTERNAL viewers
+        // Internal team members always get normal Zeno branding
+        const shouldWhiteLabel = org?.white_label_enabled && finalViewerType === 'external';
+
+        const dashboardUrl = buildDashboardUrl(dashboardData.slug, shouldWhiteLabel ? org : null);
+
+        // Build white-label options only for external viewers
+        const whiteLabel = shouldWhiteLabel ? {
+          companyName: org?.branding?.companyName,
+          logoUrl: org?.branding?.logoUrl,
+          senderName: org?.email_sender_name || undefined,
         } : undefined;
 
         // Determine the "from" name and email address

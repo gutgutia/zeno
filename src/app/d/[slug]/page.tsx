@@ -134,19 +134,20 @@ async function checkExternalViewerSession(
 
 export const dynamic = 'force-dynamic';
 
-// Check if user has access to a shared dashboard
-function checkShareAccess(shares: DashboardShare[], userEmail: string): boolean {
+// Check if user has access to a shared dashboard and return viewer type
+function checkShareAccess(shares: DashboardShare[], userEmail: string): { hasAccess: boolean; viewerType: 'internal' | 'external' | null } {
   const email = userEmail.toLowerCase();
   const domain = email.split('@')[1];
 
-  return shares.some((share) => {
-    if (share.share_type === 'email') {
-      return share.share_value === email;
-    } else if (share.share_type === 'domain') {
-      return share.share_value === domain;
+  for (const share of shares) {
+    if (share.share_type === 'email' && share.share_value === email) {
+      return { hasAccess: true, viewerType: share.viewer_type as 'internal' | 'external' };
+    } else if (share.share_type === 'domain' && share.share_value === domain) {
+      return { hasAccess: true, viewerType: share.viewer_type as 'internal' | 'external' };
     }
-    return false;
-  });
+  }
+
+  return { hasAccess: false, viewerType: null };
 }
 
 // Access Denied component - for users signed in but without access
@@ -263,18 +264,22 @@ export default async function PublicDashboardPage({ params }: PageProps) {
       // Check for Supabase authenticated user
       let hasAccess = false;
       let viewerEmail = '';
+      let viewerType: 'internal' | 'external' | null = null;
 
       if (user) {
         // Supabase authenticated user - check if they have share access
-        hasAccess = checkShareAccess(dashboardShares, user.email || '');
+        const accessResult = checkShareAccess(dashboardShares, user.email || '');
+        hasAccess = accessResult.hasAccess;
+        viewerType = accessResult.viewerType;
         viewerEmail = user.email || '';
       } else {
         // Check for external viewer session (cookie-based)
         const externalSession = await checkExternalViewerSession(adminSupabase, dashboardData.id);
         if (externalSession.valid && externalSession.email) {
           // Verify the session email still has access (or is the owner)
-          const isExternalOwner = false; // External sessions can't be owners (they'd use Supabase auth)
-          hasAccess = isExternalOwner || checkShareAccess(dashboardShares, externalSession.email);
+          const accessResult = checkShareAccess(dashboardShares, externalSession.email);
+          hasAccess = accessResult.hasAccess;
+          viewerType = accessResult.viewerType;
           viewerEmail = externalSession.email;
         }
       }
@@ -282,7 +287,12 @@ export default async function PublicDashboardPage({ params }: PageProps) {
       // If not authenticated at all, show auth gate so they can log in
       // (They might be the owner who just isn't logged in yet)
       if (!user && !viewerEmail) {
-        // Pass white-label info if enabled
+        // For auth gate, we don't know the viewer type yet (they haven't entered email)
+        // We'll show white-label if enabled - the actual experience after login
+        // will be determined by their viewer type
+        // Actually, at this point we can't determine if they're internal or external
+        // So we'll show the white-labeled auth gate if white_label_enabled
+        // The email/dashboard experience after auth will respect viewer type
         const whiteLabelProps = orgWhiteLabel?.white_label_enabled ? {
           companyName: orgWhiteLabel.branding?.companyName,
         } : undefined;
@@ -301,6 +311,16 @@ export default async function PublicDashboardPage({ params }: PageProps) {
       // (They're not the owner and not in the share list)
       if (!hasAccess) {
         return <AccessDenied userEmail={viewerEmail} dashboardTitle={dashboardData.title} />;
+      }
+
+      // Store viewer type for use in rendering
+      // White-label only applies to external viewers
+      const isExternalViewer = viewerType === 'external';
+      const shouldWhiteLabel = orgWhiteLabel?.white_label_enabled && isExternalViewer;
+
+      // Override orgWhiteLabel for the rest of the page based on viewer type
+      if (!shouldWhiteLabel) {
+        orgWhiteLabel = null;
       }
     }
   }
