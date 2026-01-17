@@ -17,15 +17,11 @@ export default function WorkspaceSettingsPage() {
   const [organization, setOrganization] = useState<OrganizationWithRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isCheckingSubdomain, setIsCheckingSubdomain] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
-  const [subdomain, setSubdomain] = useState('');
-  const [subdomainError, setSubdomainError] = useState<string | null>(null);
-  const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
 
   // Fetch organization data
   useEffect(() => {
@@ -44,7 +40,6 @@ export default function WorkspaceSettingsPage() {
         if (selectedOrg) {
           setOrganization(selectedOrg);
           setName(selectedOrg.name);
-          setSubdomain(selectedOrg.subdomain || '');
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -56,84 +51,8 @@ export default function WorkspaceSettingsPage() {
     fetchOrganization();
   }, []);
 
-  // Validate subdomain format
-  const validateSubdomain = (value: string): string | null => {
-    if (!value) return null; // Empty is allowed (removes subdomain)
-
-    if (value.length < 3) {
-      return 'Subdomain must be at least 3 characters';
-    }
-    if (value.length > 63) {
-      return 'Subdomain must be 63 characters or less';
-    }
-    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(value)) {
-      return 'Subdomain can only contain lowercase letters, numbers, and hyphens (no leading/trailing hyphens)';
-    }
-    return null;
-  };
-
-  // Check subdomain availability with debounce
-  useEffect(() => {
-    const formatError = validateSubdomain(subdomain);
-    if (formatError) {
-      setSubdomainError(formatError);
-      setSubdomainAvailable(null);
-      return;
-    }
-
-    // If subdomain is same as current, it's available
-    if (subdomain === (organization?.subdomain || '')) {
-      setSubdomainError(null);
-      setSubdomainAvailable(null);
-      return;
-    }
-
-    if (!subdomain) {
-      setSubdomainError(null);
-      setSubdomainAvailable(null);
-      return;
-    }
-
-    setIsCheckingSubdomain(true);
-    setSubdomainError(null);
-    setSubdomainAvailable(null);
-
-    const timer = setTimeout(async () => {
-      try {
-        // Check subdomain availability against organizations table
-        const response = await fetch(`/api/organizations/check-subdomain?subdomain=${encodeURIComponent(subdomain)}`);
-        const data = await response.json();
-
-        if (data.available) {
-          setSubdomainAvailable(true);
-          setSubdomainError(null);
-        } else {
-          setSubdomainAvailable(false);
-          setSubdomainError(data.reason || 'Subdomain is not available');
-        }
-      } catch (err) {
-        setSubdomainError('Failed to check availability');
-      } finally {
-        setIsCheckingSubdomain(false);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [subdomain, organization?.subdomain]);
-
   const handleSave = async () => {
     if (!organization) return;
-
-    // Validate before saving
-    const formatError = validateSubdomain(subdomain);
-    if (formatError) {
-      setSubdomainError(formatError);
-      return;
-    }
-
-    if (subdomainAvailable === false) {
-      return; // Don't save if subdomain is not available
-    }
 
     setIsSaving(true);
     setError(null);
@@ -143,10 +62,7 @@ export default function WorkspaceSettingsPage() {
       const response = await fetch(`/api/organizations/${organization.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          subdomain: subdomain || null
-        }),
+        body: JSON.stringify({ name }),
       });
 
       if (!response.ok) {
@@ -157,7 +73,6 @@ export default function WorkspaceSettingsPage() {
       const updatedOrg = await response.json();
       setOrganization({ ...organization, ...updatedOrg });
       setSuccess(true);
-      setSubdomainAvailable(null);
 
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
@@ -184,10 +99,6 @@ export default function WorkspaceSettingsPage() {
     );
   }
 
-  const subdomainUrl = subdomain
-    ? `https://${subdomain}.zeno.fyi`
-    : null;
-
   return (
     <div className="space-y-6">
       <div>
@@ -195,7 +106,7 @@ export default function WorkspaceSettingsPage() {
           Organization Settings
         </h1>
         <p className="text-[var(--color-gray-600)] mt-1">
-          Configure your organization name and custom subdomain
+          Configure your organization
         </p>
       </div>
 
@@ -229,85 +140,6 @@ export default function WorkspaceSettingsPage() {
               placeholder="My Organization"
             />
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Subdomain */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Custom Subdomain</CardTitle>
-          <CardDescription>
-            Create a branded URL for your organization&apos;s dashboards
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="subdomain">Subdomain</Label>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center flex-1">
-                <span className="px-3 py-2 bg-[var(--color-gray-100)] border border-r-0 border-[var(--color-gray-200)] rounded-l-lg text-sm text-[var(--color-gray-500)]">
-                  https://
-                </span>
-                <Input
-                  id="subdomain"
-                  value={subdomain}
-                  onChange={(e) => setSubdomain(e.target.value.toLowerCase())}
-                  placeholder="acme"
-                  className="rounded-none border-x-0"
-                />
-                <span className="px-3 py-2 bg-[var(--color-gray-100)] border border-l-0 border-[var(--color-gray-200)] rounded-r-lg text-sm text-[var(--color-gray-500)]">
-                  .zeno.fyi
-                </span>
-              </div>
-              {isCheckingSubdomain && (
-                <div className="w-5 h-5 border-2 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin" />
-              )}
-              {!isCheckingSubdomain && subdomainAvailable === true && (
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-              {!isCheckingSubdomain && subdomainAvailable === false && (
-                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              )}
-            </div>
-            {subdomainError && (
-              <p className="text-sm text-red-600">{subdomainError}</p>
-            )}
-            {subdomainAvailable === true && (
-              <p className="text-sm text-green-600">Subdomain is available!</p>
-            )}
-            <p className="text-xs text-[var(--color-gray-500)]">
-              Choose a unique subdomain for your organization. This will be the URL where your published dashboards are accessible.
-            </p>
-          </div>
-
-          {/* Preview */}
-          {subdomainUrl && !subdomainError && (
-            <div className="p-4 bg-[var(--color-gray-50)] rounded-lg">
-              <p className="text-sm font-medium text-[var(--color-gray-700)] mb-2">
-                Your organization will be accessible at:
-              </p>
-              <div className="space-y-1">
-                <p className="font-mono text-sm text-[var(--color-primary)]">
-                  {subdomainUrl}
-                </p>
-                <p className="text-xs text-[var(--color-gray-500)]">
-                  Homepage showing all published dashboards
-                </p>
-              </div>
-              <div className="mt-2 space-y-1">
-                <p className="font-mono text-sm text-[var(--color-primary)]">
-                  {subdomainUrl}/your-dashboard-slug
-                </p>
-                <p className="text-xs text-[var(--color-gray-500)]">
-                  Individual dashboard pages
-                </p>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -347,7 +179,7 @@ export default function WorkspaceSettingsPage() {
       <div className="flex justify-end gap-3 pt-4">
         <Button
           onClick={handleSave}
-          disabled={isSaving || isCheckingSubdomain || subdomainAvailable === false || !!subdomainError}
+          disabled={isSaving}
         >
           {isSaving ? 'Saving...' : 'Save Changes'}
         </Button>
