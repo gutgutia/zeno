@@ -25,7 +25,8 @@ import {
 const CONFIG = {
   sandboxTimeoutMs: 300000, // 5 minutes
   commandTimeoutMs: 240000, // 4 minutes
-  model: 'claude-opus-4-5',
+  // Model to use: 'sonnet' (default), 'opus' (highest quality), 'haiku' (fastest)
+  model: 'sonnet',
 };
 
 export interface RefreshWithClaudeCodeResult {
@@ -135,11 +136,12 @@ export async function refreshWithClaudeCode(
 
     printLogHeader('Dashboard Refresh');
 
-    // Use streaming JSON format for detailed turn-by-turn logging
+    // Build the command with model flag
     // Note: --output-format stream-json requires --verbose when using -p
+    const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${CONFIG.model}`;
     const command = LOGGING_CONFIG.enabled
-      ? `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --verbose --output-format stream-json`
-      : `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`;
+      ? `${baseCommand} --verbose --output-format stream-json`
+      : baseCommand;
 
     let result: { stdout: string; stderr: string; exitCode: number };
 

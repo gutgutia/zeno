@@ -31,8 +31,9 @@ const CLAUDE_CODE_CONFIG = {
   // Command timeout (7 minutes - extended for complex dashboards with extended thinking)
   commandTimeoutMs: 420000,
 
-  // Model to use (claude will use its default, but we track for billing)
-  model: 'claude-opus-4-5',
+  // Model to use for generation
+  // Options: 'sonnet' (default, balanced), 'opus' (highest quality), 'haiku' (fastest)
+  model: 'sonnet',
 };
 
 export interface GenerateResult {
@@ -154,11 +155,12 @@ export async function generateWithClaudeCode(
     printLogHeader('Dashboard Generation');
 
     try {
-      // Use streaming JSON format for detailed turn-by-turn logging
+      // Build the command with model flag
       // Note: --output-format stream-json requires --verbose when using -p
+      const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${CLAUDE_CODE_CONFIG.model}`;
       const command = LOGGING_CONFIG.enabled
-        ? `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --verbose --output-format stream-json`
-        : `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`;
+        ? `${baseCommand} --verbose --output-format stream-json`
+        : baseCommand;
 
       result = await sandbox.commands.run(command, {
         timeoutMs: CLAUDE_CODE_CONFIG.commandTimeoutMs,
