@@ -1358,17 +1358,6 @@ export default function BrandingSettingsPage() {
                   </div>
                 </div>
 
-                {/* Subdomain Info */}
-                {domainConfig?.subdomain && (
-                  <div className="mt-4 pt-4 border-t border-[var(--color-gray-200)]">
-                    <p className="text-sm text-[var(--color-gray-600)] mb-1">
-                      Your organization also has a subdomain that works automatically:
-                    </p>
-                    <p className="font-mono text-[var(--color-primary)]">
-                      {domainConfig.subdomain}.zeno.fyi
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Info Box */}
