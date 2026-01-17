@@ -36,7 +36,6 @@ export function OTPEmail({
   // Determine branding based on white-label settings
   const isWhiteLabeled = !!whiteLabel?.companyName;
   const companyName = whiteLabel?.companyName || 'Zeno';
-  const logoSrc = whiteLabel?.logoUrl || EMAIL_LOGO_URL;
   const previewText = isWhiteLabeled
     ? `Your login code: ${code}`
     : `Your Zeno login code: ${code}`;
@@ -50,15 +49,19 @@ export function OTPEmail({
       <Preview>{previewText}</Preview>
       <Body style={main}>
         <Container style={container}>
-          {/* Header */}
+          {/* Header - no logo for white-labeled emails */}
           <Section style={header}>
-            <Img
-              src={logoSrc}
-              width={whiteLabel?.logoUrl ? 'auto' : EMAIL_LOGO_SMALL_WIDTH}
-              height={whiteLabel?.logoUrl ? 40 : EMAIL_LOGO_SMALL_HEIGHT}
-              alt={companyName}
-              style={logo}
-            />
+            {!isWhiteLabeled ? (
+              <Img
+                src={EMAIL_LOGO_URL}
+                width={EMAIL_LOGO_SMALL_WIDTH}
+                height={EMAIL_LOGO_SMALL_HEIGHT}
+                alt="Zeno"
+                style={logo}
+              />
+            ) : (
+              <Text style={headerText}>Your login code</Text>
+            )}
           </Section>
 
           {/* Content */}
@@ -129,6 +132,15 @@ const header = {
 const logo = {
   display: 'block',
   margin: '0 auto',
+};
+
+// Header text for white-labeled emails (no logo)
+const headerText = {
+  fontSize: '20px',
+  fontWeight: '600',
+  color: '#ffffff',
+  margin: 0,
+  textAlign: 'center' as const,
 };
 
 const content = {
