@@ -14,6 +14,14 @@
 import { Sandbox } from 'e2b';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig } from '@/types/database';
+import {
+  LOGGING_CONFIG,
+  type AgentEvent,
+  logAgentEvent,
+  printLogHeader,
+  printLogFooter,
+  extractSummaryFromStreamOutput,
+} from './agent-logging';
 
 // Configuration
 const CLAUDE_CODE_CONFIG = {
@@ -137,48 +145,109 @@ export async function generateWithClaudeCode(
     });
     console.log('[Claude Code E2B] Claude CLI check:', versionCheck.stdout || versionCheck.stderr);
 
-    // Run the actual command
-    let result;
-    try {
-      result = await sandbox.commands.run(
-        `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`,
-        {
-          timeoutMs: CLAUDE_CODE_CONFIG.commandTimeoutMs,
-          cwd: '/home/user',
-        }
-      );
-    } catch (cmdError: unknown) {
-      // E2B throws on non-zero exit codes - extract the result from the error
-      console.error('[Claude Code E2B] Command failed with error:', cmdError);
+    // Run the actual command with streaming JSON output for verbose logging
+    let result: { stdout: string; stderr: string; exitCode: number };
+    const turnCounter = { value: 0 };
+    const collectedStdout: string[] = [];
+    const collectedStderr: string[] = [];
 
-      // Try to extract stdout/stderr from the error
+    printLogHeader('Dashboard Generation');
+
+    try {
+      // Use streaming JSON format for detailed turn-by-turn logging
+      // Note: --output-format stream-json requires --verbose when using -p
+      const command = LOGGING_CONFIG.enabled
+        ? `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --verbose --output-format stream-json`
+        : `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`;
+
+      result = await sandbox.commands.run(command, {
+        timeoutMs: CLAUDE_CODE_CONFIG.commandTimeoutMs,
+        cwd: '/home/user',
+        onStdout: (data) => {
+          collectedStdout.push(data);
+
+          if (LOGGING_CONFIG.enabled) {
+            // Parse each line as JSON event
+            const lines = data.split('\n').filter(line => line.trim());
+            for (const line of lines) {
+              try {
+                const event = JSON.parse(line) as AgentEvent;
+
+                // Track turns based on assistant messages
+                if (event.type === 'assistant') {
+                  turnCounter.value++;
+                }
+
+                logAgentEvent(event, turnCounter.value);
+              } catch {
+                // Not JSON, log as raw output if non-empty
+                if (line.trim() && !line.startsWith('{')) {
+                  console.log(`[Raw] ${line}`);
+                }
+              }
+            }
+          }
+        },
+        onStderr: (data) => {
+          collectedStderr.push(data);
+          if (data.trim()) {
+            console.log(`[Stderr] ${data}`);
+          }
+        },
+      });
+    } catch (cmdError: unknown) {
+      // E2B throws on non-zero exit codes, but Claude CLI might still have generated output
+      console.warn('[Claude Code E2B] Command exited with error (checking if output was generated...)');
+
       const err = cmdError as { result?: { stdout?: string; stderr?: string; exitCode?: number }; message?: string };
-      if (err.result) {
-        console.log('[Claude Code E2B] Error stdout:', err.result.stdout?.slice(0, 10000) || '(empty)');
-        console.log('[Claude Code E2B] Error stderr:', err.result.stderr?.slice(0, 10000) || '(empty)');
-        console.log('[Claude Code E2B] Error exit code:', err.result.exitCode);
+      console.log('[Claude Code E2B] Exit code:', err.result?.exitCode);
+      console.log('[Claude Code E2B] Collected stdout chunks:', collectedStdout.length);
+
+      // Check if output.html was actually created - that's the real success indicator
+      let outputExists = false;
+      try {
+        const checkResult = await sandbox.commands.run('test -f /home/user/output.html && echo "exists"', {
+          timeoutMs: 5000,
+        });
+        outputExists = checkResult.stdout.includes('exists');
+        console.log('[Claude Code E2B] output.html exists:', outputExists);
+      } catch {
+        console.log('[Claude Code E2B] Could not check for output.html');
       }
 
-      // Check if ANTHROPIC_API_KEY is available in the sandbox
-      const envCheck = await sandbox.commands.run('echo "ANTHROPIC_API_KEY set: ${ANTHROPIC_API_KEY:+yes}"', {
-        timeoutMs: 5000,
-      }).catch(() => ({ stdout: 'failed to check', stderr: '', exitCode: 1 }));
-      console.log('[Claude Code E2B] API key check in sandbox:', envCheck.stdout);
+      if (outputExists || collectedStdout.length > 0) {
+        // Output was generated - continue processing despite exit code
+        console.log('[Claude Code E2B] Output was generated, continuing despite exit code');
+        result = {
+          stdout: collectedStdout.join(''),
+          stderr: collectedStderr.join(''),
+          exitCode: err.result?.exitCode || 1,
+        };
+      } else {
+        // No output at all - check API key and throw
+        const envCheck = await sandbox.commands.run('echo "ANTHROPIC_API_KEY set: ${ANTHROPIC_API_KEY:+yes}"', {
+          timeoutMs: 5000,
+        }).catch(() => ({ stdout: 'failed to check', stderr: '', exitCode: 1 }));
+        console.log('[Claude Code E2B] API key check in sandbox:', envCheck.stdout);
 
-      throw cmdError;
+        console.error('[Claude Code E2B] No output generated, throwing error');
+        throw cmdError;
+      }
     }
 
     const commandDuration = Date.now() - commandStartTime;
+    printLogFooter(turnCounter.value, commandDuration);
+
     console.log(`[Claude Code E2B] Claude Code completed in ${commandDuration}ms`);
     console.log('[Claude Code E2B] Exit code:', result.exitCode);
+    console.log('[Claude Code E2B] Total turns:', turnCounter.value);
 
-    if (result.stderr) {
-      console.log('[Claude Code E2B] Stderr:', result.stderr.slice(0, 10000));
-    }
+    // Reconstruct stdout/stderr from collected chunks
+    const fullStdout = collectedStdout.join('');
+    const fullStderr = collectedStderr.join('');
 
-    // Log stdout for debugging
-    if (result.stdout) {
-      console.log('[Claude Code E2B] Stdout:', result.stdout.slice(0, 10000));
+    if (fullStderr) {
+      console.log('[Claude Code E2B] Stderr:', fullStderr.slice(0, 5000));
     }
 
     // Read the generated HTML
@@ -208,18 +277,7 @@ export async function generateWithClaudeCode(
     }
 
     // Extract summary from stdout if available
-    let summary = 'Dashboard generated successfully';
-    try {
-      const jsonMatch = result.stdout.match(/\{[^{}]*"summary"[^{}]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed.summary) {
-          summary = parsed.summary;
-        }
-      }
-    } catch {
-      // Use default summary
-    }
+    const summary = extractSummaryFromStreamOutput(fullStdout) || 'Dashboard generated successfully';
 
     const durationMs = Date.now() - startTime;
     console.log(`[Claude Code E2B] Total generation time: ${durationMs}ms`);

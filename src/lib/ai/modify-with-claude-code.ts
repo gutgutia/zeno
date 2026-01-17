@@ -12,6 +12,14 @@
 import { Sandbox } from 'e2b';
 import type { BrandingConfig } from '@/types/database';
 import type { ModifyResultWithUsage } from './agent';
+import {
+  LOGGING_CONFIG,
+  type AgentEvent,
+  logAgentEvent,
+  printLogHeader,
+  printLogFooter,
+  extractSummaryFromStreamOutput,
+} from './agent-logging';
 
 const CONFIG = {
   sandboxTimeoutMs: 300000, // 5 minutes
@@ -96,22 +104,95 @@ export async function modifyWithClaudeCode(
     const escapedPrompt = prompt.replace(/'/g, "'\\''");
 
     console.log('[Modify Claude Code] Running Claude Code CLI...');
-    const result = await sandbox.commands.run(
-      `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`,
-      {
+    const commandStartTime = Date.now();
+    const turnCounter = { value: 0 };
+    const collectedStdout: string[] = [];
+    const collectedStderr: string[] = [];
+
+    printLogHeader('Dashboard Modification');
+
+    // Use streaming JSON format for detailed turn-by-turn logging
+    // Note: --output-format stream-json requires --verbose when using -p
+    const command = LOGGING_CONFIG.enabled
+      ? `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --verbose --output-format stream-json`
+      : `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions`;
+
+    let result: { stdout: string; stderr: string; exitCode: number };
+
+    try {
+      result = await sandbox.commands.run(command, {
         timeoutMs: CONFIG.commandTimeoutMs,
         cwd: '/home/user',
+        onStdout: (data) => {
+          collectedStdout.push(data);
+
+          if (LOGGING_CONFIG.enabled) {
+            const lines = data.split('\n').filter(line => line.trim());
+            for (const line of lines) {
+              try {
+                const event = JSON.parse(line) as AgentEvent;
+                if (event.type === 'assistant') {
+                  turnCounter.value++;
+                }
+                logAgentEvent(event, turnCounter.value);
+              } catch {
+                if (line.trim() && !line.startsWith('{')) {
+                  console.log(`[Raw] ${line}`);
+                }
+              }
+            }
+          }
+        },
+        onStderr: (data) => {
+          collectedStderr.push(data);
+          if (data.trim()) {
+            console.log(`[Stderr] ${data}`);
+          }
+        },
+      });
+    } catch (cmdError: unknown) {
+      // E2B throws on non-zero exit codes, but Claude CLI might still have generated output
+      console.warn('[Modify Claude Code] Command exited with error (checking if output was generated...)');
+
+      const err = cmdError as { result?: { exitCode?: number } };
+      console.log('[Modify Claude Code] Collected stdout chunks:', collectedStdout.length);
+
+      // Check if output.html was actually created
+      let outputExists = false;
+      try {
+        const checkResult = await sandbox.commands.run('test -f /home/user/output.html && echo "exists"', {
+          timeoutMs: 5000,
+        });
+        outputExists = checkResult.stdout.includes('exists');
+        console.log('[Modify Claude Code] output.html exists:', outputExists);
+      } catch {
+        console.log('[Modify Claude Code] Could not check for output.html');
       }
-    );
+
+      if (outputExists || collectedStdout.length > 0) {
+        console.log('[Modify Claude Code] Output was generated, continuing despite exit code');
+        result = {
+          stdout: collectedStdout.join(''),
+          stderr: collectedStderr.join(''),
+          exitCode: err.result?.exitCode || 1,
+        };
+      } else {
+        console.error('[Modify Claude Code] No output generated, throwing error');
+        throw cmdError;
+      }
+    }
+
+    const commandDuration = Date.now() - commandStartTime;
+    printLogFooter(turnCounter.value, commandDuration);
 
     console.log('[Modify Claude Code] Exit code:', result.exitCode);
+    console.log('[Modify Claude Code] Total turns:', turnCounter.value);
 
-    // Log stdout/stderr for debugging
-    if (result.stderr) {
-      console.log('[Modify Claude Code] Stderr:', result.stderr.slice(0, 10000));
-    }
-    if (result.stdout) {
-      console.log('[Modify Claude Code] Stdout:', result.stdout.slice(0, 10000));
+    const fullStdout = collectedStdout.join('');
+    const fullStderr = collectedStderr.join('');
+
+    if (fullStderr) {
+      console.log('[Modify Claude Code] Stderr:', fullStderr.slice(0, 5000));
     }
 
     // Read the output
@@ -125,16 +206,7 @@ export async function modifyWithClaudeCode(
     }
 
     // Extract summary
-    let summary = 'Dashboard modified';
-    try {
-      const jsonMatch = result.stdout.match(/\{[^{}]*"summary"[^{}]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed.summary) summary = parsed.summary;
-      }
-    } catch {
-      // Use default summary
-    }
+    const summary = extractSummaryFromStreamOutput(fullStdout) || 'Dashboard modified';
 
     const durationMs = Date.now() - startTime;
     console.log(`[Modify Claude Code] Completed in ${durationMs}ms`);
