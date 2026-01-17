@@ -235,7 +235,8 @@ export async function POST(request: Request, { params }: RouteParams) {
           .eq('id', user.id)
           .single();
 
-        const ownerName = profile?.name || user.email?.split('@')[0] || 'Someone';
+        // Use full name if available, otherwise use full email address
+        const ownerName = profile?.name || user.email || 'Someone';
         const dashboardUrl = buildDashboardUrl(dashboardData.slug, org);
 
         // Build white-label options if enabled
@@ -245,11 +246,15 @@ export async function POST(request: Request, { params }: RouteParams) {
           senderName: org.email_sender_name || undefined,
         } : undefined;
 
-        // Determine the "from" name (use custom sender name if white-labeled)
+        // Determine the "from" name and email address
         const fromName = whiteLabel?.senderName || 'Zeno';
+        // For white-labeled emails, use {companyslug}@zeno.fyi
+        const fromEmailAddress = whiteLabel?.companyName
+          ? `${whiteLabel.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}@zeno.fyi`
+          : (FROM_EMAIL.split('<')[1]?.replace('>', '') || 'noreply@zeno.fyi');
 
         await resend.emails.send({
-          from: `${fromName} <${FROM_EMAIL.split('<')[1]?.replace('>', '') || 'notifications@zeno.fyi'}>`,
+          from: `${fromName} <${fromEmailAddress}>`,
           to: normalizedValue,
           subject: `${ownerName} shared "${dashboardData.title}" with you`,
           react: ShareNotificationEmail({
