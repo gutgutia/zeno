@@ -12,21 +12,14 @@
 import { Sandbox } from 'e2b';
 import type { BrandingConfig } from '@/types/database';
 import type { ModifyResultWithUsage } from './agent';
+import { AI_CONFIG } from './config';
 import {
-  LOGGING_CONFIG,
   type AgentEvent,
   logAgentEvent,
   printLogHeader,
   printLogFooter,
   extractSummaryFromStreamOutput,
 } from './agent-logging';
-
-const CONFIG = {
-  sandboxTimeoutMs: 300000, // 5 minutes
-  commandTimeoutMs: 240000, // 4 minutes
-  // Model to use: 'sonnet' (default), 'opus' (highest quality), 'haiku' (fastest)
-  model: 'sonnet',
-};
 
 /**
  * Build the prompt for Claude Code modification
@@ -88,7 +81,7 @@ export async function modifyWithClaudeCode(
 
   try {
     sandbox = await Sandbox.create('zeno-claude-code', {
-      timeoutMs: CONFIG.sandboxTimeoutMs,
+      timeoutMs: AI_CONFIG.sandboxTimeoutMs,
       envs: {
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
       },
@@ -114,8 +107,8 @@ export async function modifyWithClaudeCode(
 
     // Build the command with model flag
     // Note: --output-format stream-json requires --verbose when using -p
-    const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${CONFIG.model}`;
-    const command = LOGGING_CONFIG.enabled
+    const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${AI_CONFIG.modifyModel}`;
+    const command = AI_CONFIG.verboseLogging
       ? `${baseCommand} --verbose --output-format stream-json`
       : baseCommand;
 
@@ -123,12 +116,12 @@ export async function modifyWithClaudeCode(
 
     try {
       result = await sandbox.commands.run(command, {
-        timeoutMs: CONFIG.commandTimeoutMs,
+        timeoutMs: AI_CONFIG.commandTimeoutMs,
         cwd: '/home/user',
         onStdout: (data) => {
           collectedStdout.push(data);
 
-          if (LOGGING_CONFIG.enabled) {
+          if (AI_CONFIG.verboseLogging) {
             const lines = data.split('\n').filter(line => line.trim());
             for (const line of lines) {
               try {
@@ -221,7 +214,7 @@ export async function modifyWithClaudeCode(
         costUsd: 0,
         turnCount: 0,
         durationMs,
-        modelId: CONFIG.model,
+        modelId: AI_CONFIG.modifyModel,
       },
     };
 

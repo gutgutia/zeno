@@ -5,18 +5,16 @@
  * understand and debug agent behavior.
  */
 
-// Configuration for verbose logging
-export const LOGGING_CONFIG = {
-  // Enable verbose logging of agent turns and tool calls
-  // Uses --output-format stream-json to get structured events
-  enabled: false,
+import { AI_CONFIG } from './config';
 
-  // Truncate long text in logs to this length
+// Internal config for text truncation (not exposed in central config)
+const TRUNCATION_CONFIG = {
   maxTextLength: 2000,
-
-  // Truncate tool inputs to this length
   maxToolInputLength: 500,
 };
+
+// Helper to check if logging is enabled
+const isLoggingEnabled = () => AI_CONFIG.verboseLogging;
 
 // Event types from Claude Code CLI stream-json output
 export interface AgentEvent {
@@ -44,13 +42,13 @@ export interface AgentEvent {
  */
 export function formatToolInput(input: unknown): string {
   if (typeof input === 'string') {
-    return input.length > LOGGING_CONFIG.maxToolInputLength
-      ? input.slice(0, LOGGING_CONFIG.maxToolInputLength) + '...'
+    return input.length > TRUNCATION_CONFIG.maxToolInputLength
+      ? input.slice(0, TRUNCATION_CONFIG.maxToolInputLength) + '...'
       : input;
   }
   const str = JSON.stringify(input, null, 2);
-  return str.length > LOGGING_CONFIG.maxToolInputLength
-    ? str.slice(0, LOGGING_CONFIG.maxToolInputLength) + '...'
+  return str.length > TRUNCATION_CONFIG.maxToolInputLength
+    ? str.slice(0, TRUNCATION_CONFIG.maxToolInputLength) + '...'
     : str;
 }
 
@@ -58,7 +56,7 @@ export function formatToolInput(input: unknown): string {
  * Log a single agent event in a human-readable format
  */
 export function logAgentEvent(event: AgentEvent, turnNumber: number): void {
-  if (!LOGGING_CONFIG.enabled) return;
+  if (!isLoggingEnabled()) return;
 
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
   const prefix = `[${timestamp}] [Turn ${turnNumber}]`;
@@ -70,8 +68,8 @@ export function logAgentEvent(event: AgentEvent, turnNumber: number): void {
           if (block.type === 'text' && block.text) {
             console.log(`${prefix} 💭 ASSISTANT TEXT:`);
             console.log('-'.repeat(60));
-            const text = block.text.length > LOGGING_CONFIG.maxTextLength
-              ? block.text.slice(0, LOGGING_CONFIG.maxTextLength) + '...'
+            const text = block.text.length > TRUNCATION_CONFIG.maxTextLength
+              ? block.text.slice(0, TRUNCATION_CONFIG.maxTextLength) + '...'
               : block.text;
             console.log(text);
             console.log('-'.repeat(60));
@@ -83,8 +81,8 @@ export function logAgentEvent(event: AgentEvent, turnNumber: number): void {
           } else if (block.type === 'thinking' && block.text) {
             console.log(`${prefix} 🧠 THINKING:`);
             console.log('-'.repeat(60));
-            const text = block.text.length > LOGGING_CONFIG.maxTextLength
-              ? block.text.slice(0, LOGGING_CONFIG.maxTextLength) + '...'
+            const text = block.text.length > TRUNCATION_CONFIG.maxTextLength
+              ? block.text.slice(0, TRUNCATION_CONFIG.maxTextLength) + '...'
               : block.text;
             console.log(text);
             console.log('-'.repeat(60));
@@ -143,7 +141,7 @@ export function processStreamingOutput(
   data: string,
   currentTurn: { value: number }
 ): void {
-  if (!LOGGING_CONFIG.enabled) return;
+  if (!isLoggingEnabled()) return;
 
   const lines = data.split('\n').filter(line => line.trim());
 
@@ -170,7 +168,7 @@ export function processStreamingOutput(
  * Print header for agent execution log
  */
 export function printLogHeader(context: string): void {
-  if (!LOGGING_CONFIG.enabled) return;
+  if (!isLoggingEnabled()) return;
 
   console.log('\n' + '='.repeat(80));
   console.log(`AGENT EXECUTION LOG: ${context}`);
@@ -181,7 +179,7 @@ export function printLogHeader(context: string): void {
  * Print footer for agent execution log
  */
 export function printLogFooter(turnCount: number, durationMs: number): void {
-  if (!LOGGING_CONFIG.enabled) return;
+  if (!isLoggingEnabled()) return;
 
   console.log('\n' + '='.repeat(80));
   console.log(`AGENT COMPLETED: ${turnCount} turns in ${(durationMs / 1000).toFixed(1)}s`);

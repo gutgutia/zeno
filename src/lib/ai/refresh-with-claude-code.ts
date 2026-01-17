@@ -14,20 +14,13 @@ import type { BrandingConfig } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { DataDiff } from '@/lib/data/diff';
 import { formatDiffForAI } from '@/lib/data/diff';
+import { AI_CONFIG } from './config';
 import {
-  LOGGING_CONFIG,
   type AgentEvent,
   logAgentEvent,
   printLogHeader,
   printLogFooter,
 } from './agent-logging';
-
-const CONFIG = {
-  sandboxTimeoutMs: 300000, // 5 minutes
-  commandTimeoutMs: 240000, // 4 minutes
-  // Model to use: 'sonnet' (default), 'opus' (highest quality), 'haiku' (fastest)
-  model: 'sonnet',
-};
 
 export interface RefreshWithClaudeCodeResult {
   html: string;
@@ -112,7 +105,7 @@ export async function refreshWithClaudeCode(
 
   try {
     sandbox = await Sandbox.create('zeno-claude-code', {
-      timeoutMs: CONFIG.sandboxTimeoutMs,
+      timeoutMs: AI_CONFIG.sandboxTimeoutMs,
       envs: {
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
       },
@@ -138,8 +131,8 @@ export async function refreshWithClaudeCode(
 
     // Build the command with model flag
     // Note: --output-format stream-json requires --verbose when using -p
-    const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${CONFIG.model}`;
-    const command = LOGGING_CONFIG.enabled
+    const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${AI_CONFIG.refreshModel}`;
+    const command = AI_CONFIG.verboseLogging
       ? `${baseCommand} --verbose --output-format stream-json`
       : baseCommand;
 
@@ -147,12 +140,12 @@ export async function refreshWithClaudeCode(
 
     try {
       result = await sandbox.commands.run(command, {
-        timeoutMs: CONFIG.commandTimeoutMs,
+        timeoutMs: AI_CONFIG.commandTimeoutMs,
         cwd: '/home/user',
         onStdout: (data) => {
           collectedStdout.push(data);
 
-          if (LOGGING_CONFIG.enabled) {
+          if (AI_CONFIG.verboseLogging) {
             const lines = data.split('\n').filter(line => line.trim());
             for (const line of lines) {
               try {
@@ -256,7 +249,7 @@ export async function refreshWithClaudeCode(
       changes,
       usage: {
         durationMs,
-        modelId: CONFIG.model,
+        modelId: AI_CONFIG.refreshModel,
       },
     };
 

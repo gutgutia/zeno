@@ -14,27 +14,14 @@
 import { Sandbox } from 'e2b';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig } from '@/types/database';
+import { AI_CONFIG } from './config';
 import {
-  LOGGING_CONFIG,
   type AgentEvent,
   logAgentEvent,
   printLogHeader,
   printLogFooter,
   extractSummaryFromStreamOutput,
 } from './agent-logging';
-
-// Configuration
-const CLAUDE_CODE_CONFIG = {
-  // Sandbox timeout (8 minutes)
-  sandboxTimeoutMs: 480000,
-
-  // Command timeout (7 minutes - extended for complex dashboards with extended thinking)
-  commandTimeoutMs: 420000,
-
-  // Model to use for generation
-  // Options: 'sonnet' (default, balanced), 'opus' (highest quality), 'haiku' (fastest)
-  model: 'sonnet',
-};
 
 export interface GenerateResult {
   config: DashboardConfig;
@@ -114,7 +101,7 @@ export async function generateWithClaudeCode(
 
   try {
     sandbox = await Sandbox.create('zeno-claude-code', {
-      timeoutMs: CLAUDE_CODE_CONFIG.sandboxTimeoutMs,
+      timeoutMs: AI_CONFIG.sandboxTimeoutMs,
       envs: {
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
       },
@@ -157,18 +144,18 @@ export async function generateWithClaudeCode(
     try {
       // Build the command with model flag
       // Note: --output-format stream-json requires --verbose when using -p
-      const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${CLAUDE_CODE_CONFIG.model}`;
-      const command = LOGGING_CONFIG.enabled
+      const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${AI_CONFIG.generateModel}`;
+      const command = AI_CONFIG.verboseLogging
         ? `${baseCommand} --verbose --output-format stream-json`
         : baseCommand;
 
       result = await sandbox.commands.run(command, {
-        timeoutMs: CLAUDE_CODE_CONFIG.commandTimeoutMs,
+        timeoutMs: AI_CONFIG.commandTimeoutMs,
         cwd: '/home/user',
         onStdout: (data) => {
           collectedStdout.push(data);
 
-          if (LOGGING_CONFIG.enabled) {
+          if (AI_CONFIG.verboseLogging) {
             // Parse each line as JSON event
             const lines = data.split('\n').filter(line => line.trim());
             for (const line of lines) {
@@ -291,7 +278,7 @@ export async function generateWithClaudeCode(
       charts: {},
       metadata: {
         generatedAt: new Date().toISOString(),
-        generationModel: CLAUDE_CODE_CONFIG.model,
+        generationModel: AI_CONFIG.generateModel,
         userInstructions,
         agentGenerated: true,
         claudeCodeE2B: true, // Flag to identify this approach
@@ -308,7 +295,7 @@ export async function generateWithClaudeCode(
       config,
       usage: {
         durationMs,
-        modelId: CLAUDE_CODE_CONFIG.model,
+        modelId: AI_CONFIG.generateModel,
       },
     };
 
