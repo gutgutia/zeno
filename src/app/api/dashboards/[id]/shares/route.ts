@@ -1,8 +1,37 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
-import type { DashboardShare, ShareViewerType } from '@/types/database';
+import type { DashboardShare, ShareViewerType, Organization, BrandingConfig, CustomDomainStatus } from '@/types/database';
 import { resend, FROM_EMAIL } from '@/lib/email/resend';
 import { ShareNotificationEmail } from '@/lib/email/templates/share-notification-email';
+
+// Helper to build the dashboard URL based on organization settings
+// Only uses custom domain/subdomain when white labeling is enabled
+function buildDashboardUrl(
+  slug: string,
+  org: Pick<Organization, 'subdomain' | 'custom_domain' | 'custom_domain_status' | 'white_label_enabled'> | null
+): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://zeno.fyi';
+
+  // Only use custom domain/subdomain if white labeling is enabled
+  if (!org?.white_label_enabled) {
+    return `${baseUrl}/d/${slug}`;
+  }
+
+  // If org has a verified custom domain, use it
+  if (org.custom_domain && org.custom_domain_status === 'verified') {
+    return `https://${org.custom_domain}/d/${slug}`;
+  }
+
+  // If org has a subdomain, use it
+  if (org.subdomain) {
+    // Extract the base domain from NEXT_PUBLIC_APP_URL or default to zeno.fyi
+    const baseDomain = baseUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    return `https://${org.subdomain}.${baseDomain}/d/${slug}`;
+  }
+
+  // Fallback to default app URL
+  return `${baseUrl}/d/${slug}`;
+}
 
 // Determine viewer type based on domain matching
 function detectViewerType(ownerEmail: string, shareValue: string, shareType: 'email' | 'domain'): ShareViewerType {
@@ -117,13 +146,17 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
     }
 
-    // Verify ownership via workspace and get dashboard details for email
+    // Verify ownership and get dashboard details for email
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: dashboard } = await (supabase as any)
+    const { data: dashboard, error: dashboardError } = await (supabase as any)
       .from('dashboards')
-      .select('workspace_id, title, slug, workspaces!inner(owner_id)')
+      .select('workspace_id, title, slug, owner_id, organization_id')
       .eq('id', id)
       .single();
+
+    if (dashboardError) {
+      console.error('[shares] Dashboard query error:', dashboardError);
+    }
 
     if (!dashboard) {
       return NextResponse.json({ error: 'Dashboard not found' }, { status: 404 });
@@ -133,10 +166,34 @@ export async function POST(request: Request, { params }: RouteParams) {
       workspace_id: string;
       title: string;
       slug: string;
-      workspaces: { owner_id: string }
+      owner_id: string;
+      organization_id: string | null;
     };
-    if (dashboardData.workspaces.owner_id !== user.id) {
+
+    // Check ownership
+    if (dashboardData.owner_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Fetch organization white-label settings if dashboard belongs to an org
+    let org: {
+      branding: BrandingConfig | null;
+      subdomain: string | null;
+      custom_domain: string | null;
+      custom_domain_status: CustomDomainStatus | null;
+      white_label_enabled: boolean;
+      email_sender_name: string | null;
+    } | null = null;
+
+    if (dashboardData.organization_id) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: orgData } = await (supabase as any)
+        .from('organizations')
+        .select('branding, subdomain, custom_domain, custom_domain_status, white_label_enabled, email_sender_name')
+        .eq('id', dashboardData.organization_id)
+        .single();
+
+      org = orgData;
     }
 
     // Determine viewer_type
@@ -179,18 +236,27 @@ export async function POST(request: Request, { params }: RouteParams) {
           .single();
 
         const ownerName = profile?.name || user.email?.split('@')[0] || 'Someone';
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://zeno.fyi';
-        const dashboardUrl = `${appUrl}/d/${dashboardData.slug}`;
+        const dashboardUrl = buildDashboardUrl(dashboardData.slug, org);
+
+        // Build white-label options if enabled
+        const whiteLabel = org?.white_label_enabled ? {
+          companyName: org.branding?.companyName,
+          logoUrl: org.branding?.logoUrl,
+          senderName: org.email_sender_name || undefined,
+        } : undefined;
+
+        // Determine the "from" name (use custom sender name if white-labeled)
+        const fromName = whiteLabel?.senderName || 'Zeno';
 
         await resend.emails.send({
-          from: FROM_EMAIL,
+          from: `${fromName} <${FROM_EMAIL.split('<')[1]?.replace('>', '') || 'notifications@zeno.fyi'}>`,
           to: normalizedValue,
           subject: `${ownerName} shared "${dashboardData.title}" with you`,
           react: ShareNotificationEmail({
             dashboardTitle: dashboardData.title,
             dashboardUrl,
             sharedByName: ownerName,
-            appUrl,
+            whiteLabel,
           }),
         });
       } catch (emailError) {

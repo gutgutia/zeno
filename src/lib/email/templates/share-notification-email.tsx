@@ -15,45 +15,59 @@ import {
 import * as React from 'react';
 import { EMAIL_LOGO_URL, EMAIL_LOGO_SMALL_WIDTH, EMAIL_LOGO_SMALL_HEIGHT } from '../assets';
 
+// White-label options for customizing the email
+export interface WhiteLabelOptions {
+  companyName?: string;
+  logoUrl?: string;
+  senderName?: string;
+}
+
 interface ShareNotificationEmailProps {
   dashboardTitle: string;
   dashboardUrl: string;
   sharedByName?: string;
-  appUrl?: string;
+  whiteLabel?: WhiteLabelOptions;
 }
 
 export function ShareNotificationEmail({
   dashboardTitle,
   dashboardUrl,
   sharedByName,
-  appUrl = 'https://zeno.fyi',
+  whiteLabel,
 }: ShareNotificationEmailProps) {
+  // Determine branding based on white-label settings
+  const isWhiteLabeled = !!whiteLabel?.companyName;
+  const companyName = whiteLabel?.companyName || 'Zeno';
+
   const sharedByText = sharedByName ? `${sharedByName} shared` : 'Someone shared';
+  const previewText = isWhiteLabeled
+    ? `${sharedByText} "${dashboardTitle}" with you`
+    : `${sharedByText} "${dashboardTitle}" with you on Zeno`;
 
   return (
     <Html>
       <Head />
-      <Preview>{sharedByText} "{dashboardTitle}" with you on Zeno</Preview>
+      <Preview>{previewText}</Preview>
       <Body style={main}>
         <Container style={container}>
-          {/* Header */}
+          {/* Header - simplified for white-label (no logo) */}
           <Section style={header}>
-            <Img
-              src={EMAIL_LOGO_URL}
-              width={EMAIL_LOGO_SMALL_WIDTH}
-              height={EMAIL_LOGO_SMALL_HEIGHT}
-              alt="Zeno"
-              style={logoImg}
-            />
-            <Text style={tagline}>A dashboard has been shared with you</Text>
+            {!isWhiteLabeled && (
+              <Img
+                src={EMAIL_LOGO_URL}
+                width={EMAIL_LOGO_SMALL_WIDTH}
+                height={EMAIL_LOGO_SMALL_HEIGHT}
+                alt="Zeno"
+                style={logoImg}
+              />
+            )}
+            <Text style={isWhiteLabeled ? taglineWhiteLabel : tagline}>
+              A dashboard has been shared with you
+            </Text>
           </Section>
 
           {/* Content */}
           <Section style={content}>
-            <Section style={shareIcon}>
-              <Text style={shareIconText}>&#128279;</Text>
-            </Section>
-
             <Heading style={title}>You've Got Access</Heading>
 
             <Text style={message}>
@@ -64,7 +78,7 @@ export function ShareNotificationEmail({
               ) : (
                 <>You have been granted access to a dashboard</>
               )}
-              {' '}on Zeno.
+              {isWhiteLabeled ? '.' : ' on Zeno.'}
             </Text>
 
             <Section style={dashboardPreview}>
@@ -76,28 +90,41 @@ export function ShareNotificationEmail({
               View Dashboard
             </Button>
 
-            <Hr style={divider} />
+            {/* Only show "What is Zeno?" section if not white-labeled */}
+            {!isWhiteLabeled && (
+              <>
+                <Hr style={divider} />
 
-            <Section style={infoSection}>
-              <Text style={infoTitle}>What is Zeno?</Text>
-              <Text style={infoText}>
-                Zeno is a platform for creating beautiful, interactive dashboards
-                from spreadsheet data. You can view this shared dashboard for free,
-                and create your own dashboards anytime.
-              </Text>
-            </Section>
+                <Section style={infoSection}>
+                  <Text style={infoTitle}>What is Zeno?</Text>
+                  <Text style={infoText}>
+                    Zeno is a platform for creating beautiful, interactive dashboards
+                    from spreadsheet data. You can view this shared dashboard for free,
+                    and create your own dashboards anytime.
+                  </Text>
+                </Section>
+              </>
+            )}
           </Section>
 
           {/* Footer */}
           <Section style={footer}>
-            <Text style={footerText}>
-              You received this email because someone shared a dashboard with you.
-              <br />
-              <Link href={appUrl} style={footerLink}>
-                Zeno
-              </Link>{' '}
-              - Create beautiful dashboards in seconds.
-            </Text>
+            {isWhiteLabeled ? (
+              <Text style={footerText}>
+                You received this email because someone shared a dashboard with you.
+                <br />
+                This email was sent by {companyName}.
+              </Text>
+            ) : (
+              <Text style={footerText}>
+                You received this email because someone shared a dashboard with you.
+                <br />
+                <Link href="https://zeno.fyi" style={footerLink}>
+                  Zeno
+                </Link>{' '}
+                - Create beautiful dashboards in seconds.
+              </Text>
+            )}
           </Section>
         </Container>
       </Body>
@@ -139,26 +166,16 @@ const tagline = {
   margin: 0,
 };
 
+// Larger tagline for white-label (no logo above it)
+const taglineWhiteLabel = {
+  fontSize: '20px',
+  color: '#ffffff',
+  fontWeight: '600',
+  margin: 0,
+};
+
 const content = {
   padding: '40px',
-  textAlign: 'center' as const,
-};
-
-const shareIcon = {
-  width: '64px',
-  height: '64px',
-  borderRadius: '50%',
-  backgroundColor: '#dbeafe',
-  margin: '0 auto 24px auto',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
-
-const shareIconText = {
-  fontSize: '28px',
-  margin: 0,
-  lineHeight: '64px',
   textAlign: 'center' as const,
 };
 

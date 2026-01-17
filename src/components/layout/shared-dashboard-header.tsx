@@ -17,6 +17,8 @@ import { createClient } from '@/lib/supabase/client';
 interface SharedDashboardHeaderProps {
   /** User object if authenticated, null otherwise */
   user: { email: string } | null;
+  /** Hide Zeno branding for white-labeled dashboards */
+  hideZenoBranding?: boolean;
 }
 
 /**
@@ -25,7 +27,7 @@ interface SharedDashboardHeaderProps {
  * For authenticated users: Same as AppHeader (logo + avatar dropdown)
  * For unauthenticated users: Logo + Sign In / Get Started buttons
  */
-export function SharedDashboardHeader({ user }: SharedDashboardHeaderProps) {
+export function SharedDashboardHeader({ user, hideZenoBranding }: SharedDashboardHeaderProps) {
   const router = useRouter();
   const supabase = createClient();
   const userInitial = user?.email?.charAt(0).toUpperCase() || 'U';
@@ -39,17 +41,21 @@ export function SharedDashboardHeader({ user }: SharedDashboardHeaderProps) {
     <header className="sticky top-0 z-50 bg-white border-b border-[var(--color-gray-200)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
-          {/* Logo */}
-          <Link href={user ? '/dashboards' : '/'} className="flex items-center">
-            <Image
-              src="/brand/logo-primary.svg"
-              alt="Zeno"
-              width={151}
-              height={66}
-              className="h-7 w-auto"
-              priority
-            />
-          </Link>
+          {/* Logo - hidden for white-labeled dashboards */}
+          {!hideZenoBranding ? (
+            <Link href={user ? '/dashboards' : '/'} className="flex items-center">
+              <Image
+                src="/brand/logo-primary.svg"
+                alt="Zeno"
+                width={151}
+                height={66}
+                className="h-7 w-auto"
+                priority
+              />
+            </Link>
+          ) : (
+            <div /> /* Spacer for layout */
+          )}
 
           {/* Right side */}
           <div className="flex items-center gap-3">
@@ -84,8 +90,8 @@ export function SharedDashboardHeader({ user }: SharedDashboardHeaderProps) {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            ) : (
-              /* Unauthenticated - show sign in buttons */
+            ) : !hideZenoBranding ? (
+              /* Unauthenticated - show sign in buttons (not for white-labeled) */
               <>
                 <Link href="/auth">
                   <Button variant="ghost" size="sm">
@@ -98,7 +104,7 @@ export function SharedDashboardHeader({ user }: SharedDashboardHeaderProps) {
                   </Button>
                 </Link>
               </>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

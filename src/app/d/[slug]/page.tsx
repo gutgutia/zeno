@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createHash } from 'crypto';
 import type { Metadata } from 'next';
-import type { Dashboard, BrandingConfig, DashboardShare, ExternalViewerSession } from '@/types/database';
+import type { Dashboard, BrandingConfig, DashboardShare, ExternalViewerSession, Organization } from '@/types/database';
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
 import Link from 'next/link';
@@ -220,6 +220,24 @@ export default async function PublicDashboardPage({ params }: PageProps) {
     workspaces: { branding: BrandingConfig | null; owner_id: string };
   };
 
+  // Fetch organization white-label settings if dashboard belongs to an org
+  let orgWhiteLabel: {
+    white_label_enabled: boolean;
+    branding: BrandingConfig | null;
+  } | null = null;
+
+  if (dashboardData.organization_id) {
+    const { data: orgData } = await adminSupabase
+      .from('organizations')
+      .select('white_label_enabled, branding')
+      .eq('id', dashboardData.organization_id)
+      .single();
+
+    if (orgData) {
+      orgWhiteLabel = orgData as { white_label_enabled: boolean; branding: BrandingConfig | null };
+    }
+  }
+
   // Get the user client for auth checks
   const userSupabase = await createClient();
   const { data: { user } } = await userSupabase.auth.getUser();
@@ -264,11 +282,17 @@ export default async function PublicDashboardPage({ params }: PageProps) {
       // If not authenticated at all, show auth gate so they can log in
       // (They might be the owner who just isn't logged in yet)
       if (!user && !viewerEmail) {
+        // Pass white-label info if enabled
+        const whiteLabelProps = orgWhiteLabel?.white_label_enabled ? {
+          companyName: orgWhiteLabel.branding?.companyName,
+        } : undefined;
+
         return (
           <SharedDashboardAuthGate
             dashboardTitle={dashboardData.title}
             slug={slug}
             dashboardId={dashboardData.id}
+            whiteLabel={whiteLabelProps}
           />
         );
       }
@@ -310,10 +334,13 @@ export default async function PublicDashboardPage({ params }: PageProps) {
     '--brand-background': branding.colors?.background,
   } as React.CSSProperties;
 
+  // Check if white-labeling is enabled
+  const isWhiteLabeled = orgWhiteLabel?.white_label_enabled ?? false;
+
   return (
     <div className="min-h-screen bg-[var(--color-gray-50)]" style={brandingStyles}>
       {/* Top nav bar - same as owner view */}
-      <SharedDashboardHeader user={headerUser} />
+      <SharedDashboardHeader user={headerUser} hideZenoBranding={isWhiteLabeled} />
 
       {/* Title bar - same as owner view, without action buttons */}
       <DashboardTitleBar
@@ -337,17 +364,19 @@ export default async function PublicDashboardPage({ params }: PageProps) {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-[var(--color-gray-200)] mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <p className="text-sm text-[var(--color-gray-500)] text-center">
-            Created with{' '}
-            <a href="https://zeno.fyi" className="text-[var(--color-primary)] hover:underline">
-              Zeno
-            </a>
-          </p>
-        </div>
-      </footer>
+      {/* Footer - hidden for white-labeled dashboards */}
+      {!isWhiteLabeled && (
+        <footer className="bg-white border-t border-[var(--color-gray-200)] mt-auto">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <p className="text-sm text-[var(--color-gray-500)] text-center">
+              Created with{' '}
+              <a href="https://zeno.fyi" className="text-[var(--color-primary)] hover:underline">
+                Zeno
+              </a>
+            </p>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }

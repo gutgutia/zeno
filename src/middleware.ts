@@ -88,7 +88,10 @@ export async function middleware(request: NextRequest) {
 
   if (subdomain) {
     // Paths that don't require authentication on subdomains
-    const publicPaths = ['/auth', '/api/auth'];
+    // - /auth: login page
+    // - /api/auth: auth API endpoints
+    // - /d/: shared dashboard pages (they have their own auth gate)
+    const publicPaths = ['/auth', '/api/auth', '/d/'];
     const isPublicPath = publicPaths.some(p => pathname.startsWith(p));
 
     // Check authentication for subdomain access

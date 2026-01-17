@@ -18,13 +18,20 @@ function setExternalSessionCookie(token: string, dashboardId: string, expiresAt:
   document.cookie = `${EXTERNAL_SESSION_COOKIE}=${encodeURIComponent(value)}; expires=${expires.toUTCString()}; path=/; SameSite=Strict; Secure`;
 }
 
+// White-label options
+interface WhiteLabelOptions {
+  companyName?: string;
+}
+
 interface SharedDashboardAuthGateProps {
   dashboardTitle: string;
   slug: string;
   dashboardId: string;
+  whiteLabel?: WhiteLabelOptions;
 }
 
-export function SharedDashboardAuthGate({ dashboardTitle, slug, dashboardId }: SharedDashboardAuthGateProps) {
+export function SharedDashboardAuthGate({ dashboardTitle, slug, dashboardId, whiteLabel }: SharedDashboardAuthGateProps) {
+  const isWhiteLabeled = !!whiteLabel?.companyName;
   const [step, setStep] = useState<'email' | 'verify'>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -157,10 +164,12 @@ export function SharedDashboardAuthGate({ dashboardTitle, slug, dashboardId }: S
       {/* Auth modal */}
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 relative z-10">
-          {/* Logo */}
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-[var(--color-gray-900)]">Zeno</h2>
-          </div>
+          {/* Logo - only show Zeno branding if not white-labeled */}
+          {!isWhiteLabeled && (
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-[var(--color-gray-900)]">Zeno</h2>
+            </div>
+          )}
 
           {/* Dashboard info */}
           <div className="bg-[var(--color-gray-50)] rounded-lg p-4 mb-6">
