@@ -35,10 +35,6 @@ const DEFAULT_CHART_COLORS = [
   '#ec4899', // pink
 ];
 
-interface ExtractedBranding extends BrandingConfig {
-  chartColors?: string[];
-}
-
 interface DomainConfig {
   custom_domain: string | null;
   custom_domain_status: CustomDomainStatus | null;
@@ -59,10 +55,11 @@ export default function BrandingSettingsPage() {
   const [success, setSuccess] = useState(false);
 
   // Brand extraction state
+  const [showExtractPanel, setShowExtractPanel] = useState(false);
   const [extractUrl, setExtractUrl] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
-  const [extractedBranding, setExtractedBranding] = useState<ExtractedBranding | null>(null);
+  const [extractedBranding, setExtractedBranding] = useState<BrandingConfig | null>(null);
 
   // Logo upload state
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -77,7 +74,7 @@ export default function BrandingSettingsPage() {
   const [primaryColor, setPrimaryColor] = useState('#6366f1');
   const [secondaryColor, setSecondaryColor] = useState('#64748b');
   const [accentColor, setAccentColor] = useState('#22c55e');
-  const [backgroundColor, setBackgroundColor] = useState('#f8fafc');
+  const [buttonColor, setButtonColor] = useState('#6366f1');
   const [chartColors, setChartColors] = useState<string[]>(DEFAULT_CHART_COLORS);
   const [fontFamily, setFontFamily] = useState<BrandingConfig['fontFamily']>('system');
   const [styleGuide, setStyleGuide] = useState('');
@@ -122,7 +119,7 @@ export default function BrandingSettingsPage() {
             setPrimaryColor(branding.colors?.primary || '#6366f1');
             setSecondaryColor(branding.colors?.secondary || '#64748b');
             setAccentColor(branding.colors?.accent || '#22c55e');
-            setBackgroundColor(branding.colors?.background || '#f8fafc');
+            setButtonColor(branding.colors?.button || branding.colors?.primary || '#6366f1');
             setChartColors(branding.chartColors || DEFAULT_CHART_COLORS);
             setFontFamily(branding.fontFamily || 'system');
             setStyleGuide(branding.styleGuide || '');
@@ -197,20 +194,19 @@ export default function BrandingSettingsPage() {
   const handleApplyExtracted = () => {
     if (!extractedBranding) return;
 
+    // Apply extracted brand values
     if (extractedBranding.companyName) setCompanyName(extractedBranding.companyName);
-    // Note: We intentionally don't apply logoUrl from extraction
-    // Users should upload their logo directly for reliability
     if (extractedBranding.colors?.primary) setPrimaryColor(extractedBranding.colors.primary);
     if (extractedBranding.colors?.secondary) setSecondaryColor(extractedBranding.colors.secondary);
     if (extractedBranding.colors?.accent) setAccentColor(extractedBranding.colors.accent);
-    if (extractedBranding.colors?.background) setBackgroundColor(extractedBranding.colors.background);
-    if (extractedBranding.chartColors) setChartColors(extractedBranding.chartColors);
+    if (extractedBranding.colors?.button) setButtonColor(extractedBranding.colors.button);
     if (extractedBranding.fontFamily) setFontFamily(extractedBranding.fontFamily);
     if (extractedBranding.styleGuide) setStyleGuide(extractedBranding.styleGuide);
 
-    // Clear extracted preview
+    // Clear and close extraction panel
     setExtractedBranding(null);
     setExtractUrl('');
+    setShowExtractPanel(false);
   };
 
   const handleSave = async () => {
@@ -228,7 +224,7 @@ export default function BrandingSettingsPage() {
           primary: primaryColor,
           secondary: secondaryColor,
           accent: accentColor,
-          background: backgroundColor,
+          button: buttonColor,
         },
         chartColors,
         fontFamily,
@@ -261,24 +257,6 @@ export default function BrandingSettingsPage() {
       setError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleChartColorChange = (index: number, color: string) => {
-    const newColors = [...chartColors];
-    newColors[index] = color;
-    setChartColors(newColors);
-  };
-
-  const addChartColor = () => {
-    if (chartColors.length < 12) {
-      setChartColors([...chartColors, '#6366f1']);
-    }
-  };
-
-  const removeChartColor = (index: number) => {
-    if (chartColors.length > 2) {
-      setChartColors(chartColors.filter((_, i) => i !== index));
     }
   };
 
@@ -723,31 +701,51 @@ export default function BrandingSettingsPage() {
       {/* SECTION 2: Dashboard Styling */}
       {/* ============================================ */}
       <div className="space-y-6">
-        <div className="border-b border-[var(--color-gray-200)] pb-2">
-          <h2 className="text-lg font-semibold text-[var(--color-gray-900)]">Dashboard Styling</h2>
-          <p className="text-sm text-[var(--color-gray-500)]">Customize the visual appearance of your dashboard content</p>
+        <div className="flex items-center justify-between border-b border-[var(--color-gray-200)] pb-2">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--color-gray-900)]">Dashboard Styling</h2>
+            <p className="text-sm text-[var(--color-gray-500)]">Customize the visual appearance of your dashboard content</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowExtractPanel(!showExtractPanel)}
+            className="flex items-center gap-2 border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary)]/5 hover:bg-[var(--color-primary)]/10"
+          >
+            <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Extract from Website
+          </Button>
         </div>
 
-        {/* Extract from Website */}
-        <Card className="border-2 border-dashed border-[var(--color-primary)] bg-[var(--color-primary)]/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-[var(--color-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Auto-Extract Brand
-            </CardTitle>
-            <CardDescription>
-              Enter your company website and we&apos;ll automatically extract your brand colors, fonts, and style
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        {/* Collapsible Extract Panel */}
+        {showExtractPanel && (
+          <div className="p-4 bg-[var(--color-gray-50)] rounded-lg border border-[var(--color-gray-200)]">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-[var(--color-gray-600)]">
+                Enter your website URL to auto-extract brand colors and typography
+              </p>
+              <button
+                onClick={() => {
+                  setShowExtractPanel(false);
+                  setExtractedBranding(null);
+                  setExtractUrl('');
+                  setExtractError(null);
+                }}
+                className="text-[var(--color-gray-400)] hover:text-[var(--color-gray-600)]"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             <div className="flex gap-2">
               <Input
                 value={extractUrl}
                 onChange={(e) => setExtractUrl(e.target.value)}
                 placeholder="stripe.com or https://stripe.com"
-                className="flex-1"
+                className="flex-1 bg-white"
                 onKeyDown={(e) => e.key === 'Enter' && handleExtractBrand()}
               />
               <Button
@@ -763,282 +761,173 @@ export default function BrandingSettingsPage() {
                     Analyzing...
                   </>
                 ) : (
-                  'Extract Brand'
+                  'Extract'
                 )}
               </Button>
             </div>
 
             {extractError && (
-              <p className="text-sm text-red-600">{extractError}</p>
+              <p className="text-sm text-red-600 mt-2">{extractError}</p>
             )}
 
             {/* Extracted Preview */}
             {extractedBranding && (
               <div className="mt-4 p-4 bg-white rounded-lg border border-[var(--color-gray-200)]">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium text-[var(--color-gray-900)]">Extracted Brand</h4>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setExtractedBranding(null)}>
-                      Dismiss
-                    </Button>
-                    <Button size="sm" onClick={handleApplyExtracted}>
-                      Apply to Form
-                    </Button>
-                  </div>
+                  <Button size="sm" onClick={handleApplyExtracted}>
+                    Apply
+                  </Button>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  {extractedBranding.companyName && (
-                    <div>
-                      <p className="text-xs text-[var(--color-gray-500)] mb-1">Company</p>
-                      <p className="text-sm font-medium">{extractedBranding.companyName}</p>
-                    </div>
-                  )}
-                  {extractedBranding.fontFamily && (
-                    <div>
-                      <p className="text-xs text-[var(--color-gray-500)] mb-1">Font</p>
-                      <p className="text-sm font-medium capitalize">{extractedBranding.fontFamily}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Color Preview */}
-                <div className="mb-4">
-                  <p className="text-xs text-[var(--color-gray-500)] mb-2">Brand Colors</p>
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Colors */}
                   <div className="flex gap-2">
                     {extractedBranding.colors?.primary && (
-                      <div className="text-center">
-                        <div
-                          className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)]"
-                          style={{ backgroundColor: extractedBranding.colors.primary }}
-                        />
-                        <p className="text-xs text-[var(--color-gray-500)] mt-1">Primary</p>
-                      </div>
+                      <div
+                        className="w-8 h-8 rounded border border-[var(--color-gray-200)]"
+                        style={{ backgroundColor: extractedBranding.colors.primary }}
+                        title="Primary"
+                      />
                     )}
                     {extractedBranding.colors?.secondary && (
-                      <div className="text-center">
-                        <div
-                          className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)]"
-                          style={{ backgroundColor: extractedBranding.colors.secondary }}
-                        />
-                        <p className="text-xs text-[var(--color-gray-500)] mt-1">Secondary</p>
-                      </div>
+                      <div
+                        className="w-8 h-8 rounded border border-[var(--color-gray-200)]"
+                        style={{ backgroundColor: extractedBranding.colors.secondary }}
+                        title="Secondary"
+                      />
                     )}
                     {extractedBranding.colors?.accent && (
-                      <div className="text-center">
-                        <div
-                          className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)]"
-                          style={{ backgroundColor: extractedBranding.colors.accent }}
-                        />
-                        <p className="text-xs text-[var(--color-gray-500)] mt-1">Accent</p>
-                      </div>
+                      <div
+                        className="w-8 h-8 rounded border border-[var(--color-gray-200)]"
+                        style={{ backgroundColor: extractedBranding.colors.accent }}
+                        title="Accent"
+                      />
                     )}
-                    {extractedBranding.colors?.background && (
-                      <div className="text-center">
-                        <div
-                          className="w-10 h-10 rounded-lg border border-[var(--color-gray-200)]"
-                          style={{ backgroundColor: extractedBranding.colors.background }}
-                        />
-                        <p className="text-xs text-[var(--color-gray-500)] mt-1">Background</p>
-                      </div>
+                    {extractedBranding.colors?.button && (
+                      <div
+                        className="w-8 h-8 rounded border border-[var(--color-gray-200)]"
+                        style={{ backgroundColor: extractedBranding.colors.button }}
+                        title="Button"
+                      />
                     )}
                   </div>
-                </div>
-
-                {/* Chart Colors Preview */}
-                {extractedBranding.chartColors && extractedBranding.chartColors.length > 0 && (
-                  <div className="mb-4">
-                    <p className="text-xs text-[var(--color-gray-500)] mb-2">Chart Palette</p>
-                    <div className="flex gap-1">
-                      {extractedBranding.chartColors.map((color, i) => (
-                        <div
-                          key={i}
-                          className="w-8 h-8 rounded border border-[var(--color-gray-200)]"
-                          style={{ backgroundColor: color }}
-                          title={color}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Style Guide Preview */}
-                {extractedBranding.styleGuide && (
-                  <div>
-                    <p className="text-xs text-[var(--color-gray-500)] mb-1">Style Guide</p>
-                    <p className="text-sm text-[var(--color-gray-700)] italic">
-                      &ldquo;{extractedBranding.styleGuide}&rdquo;
-                    </p>
-                  </div>
-                )}
-
-                {/* Logo Note */}
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-xs text-blue-700">
-                    <strong>Note:</strong> Logo should be uploaded separately for reliability.
-                    Use the &quot;Upload Logo&quot; button in the Company Identity section above.
-                  </p>
+                  {/* Font */}
+                  {extractedBranding.fontFamily && (
+                    <span className="text-sm text-[var(--color-gray-600)]">
+                      Font: <span className="font-medium capitalize">{extractedBranding.fontFamily.replace('-', ' ')}</span>
+                    </span>
+                  )}
+                  {/* Company */}
+                  {extractedBranding.companyName && (
+                    <span className="text-sm text-[var(--color-gray-600)]">
+                      Company: <span className="font-medium">{extractedBranding.companyName}</span>
+                    </span>
+                  )}
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
 
-        {/* Colors */}
+        {/* Brand Colors & Typography */}
         <Card>
           <CardHeader>
-            <CardTitle>Brand Colors</CardTitle>
+            <CardTitle>Brand Colors & Typography</CardTitle>
             <CardDescription>
-              Define your color palette for UI elements
+              Define your color palette and font for dashboards
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="primaryColor">Primary</Label>
+          <CardContent className="space-y-4">
+            {/* Colors Row */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="primaryColor" className="text-xs">Primary</Label>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
                     id="primaryColor"
                     value={primaryColor}
                     onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="w-10 h-10 rounded border border-[var(--color-gray-200)] cursor-pointer"
+                    className="w-8 h-8 rounded border border-[var(--color-gray-200)] cursor-pointer"
                   />
                   <Input
                     value={primaryColor}
                     onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="font-mono text-sm"
+                    className="font-mono text-xs h-8"
                     maxLength={7}
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="secondaryColor">Secondary</Label>
+              <div className="space-y-1">
+                <Label htmlFor="secondaryColor" className="text-xs">Secondary</Label>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
                     id="secondaryColor"
                     value={secondaryColor}
                     onChange={(e) => setSecondaryColor(e.target.value)}
-                    className="w-10 h-10 rounded border border-[var(--color-gray-200)] cursor-pointer"
+                    className="w-8 h-8 rounded border border-[var(--color-gray-200)] cursor-pointer"
                   />
                   <Input
                     value={secondaryColor}
                     onChange={(e) => setSecondaryColor(e.target.value)}
-                    className="font-mono text-sm"
+                    className="font-mono text-xs h-8"
                     maxLength={7}
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="accentColor">Accent</Label>
+              <div className="space-y-1">
+                <Label htmlFor="accentColor" className="text-xs">Accent</Label>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
                     id="accentColor"
                     value={accentColor}
                     onChange={(e) => setAccentColor(e.target.value)}
-                    className="w-10 h-10 rounded border border-[var(--color-gray-200)] cursor-pointer"
+                    className="w-8 h-8 rounded border border-[var(--color-gray-200)] cursor-pointer"
                   />
                   <Input
                     value={accentColor}
                     onChange={(e) => setAccentColor(e.target.value)}
-                    className="font-mono text-sm"
+                    className="font-mono text-xs h-8"
                     maxLength={7}
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="backgroundColor">Background</Label>
+              <div className="space-y-1">
+                <Label htmlFor="buttonColor" className="text-xs">Button</Label>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
-                    id="backgroundColor"
-                    value={backgroundColor}
-                    onChange={(e) => setBackgroundColor(e.target.value)}
-                    className="w-10 h-10 rounded border border-[var(--color-gray-200)] cursor-pointer"
+                    id="buttonColor"
+                    value={buttonColor}
+                    onChange={(e) => setButtonColor(e.target.value)}
+                    className="w-8 h-8 rounded border border-[var(--color-gray-200)] cursor-pointer"
                   />
                   <Input
-                    value={backgroundColor}
-                    onChange={(e) => setBackgroundColor(e.target.value)}
-                    className="font-mono text-sm"
+                    value={buttonColor}
+                    onChange={(e) => setButtonColor(e.target.value)}
+                    className="font-mono text-xs h-8"
                     maxLength={7}
                   />
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Chart Colors */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Chart Colors</CardTitle>
-            <CardDescription>
-              Color palette for chart series and data visualizations
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-3">
-                {chartColors.map((color, index) => (
-                  <div key={index} className="flex items-center gap-1">
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => handleChartColorChange(index, e.target.value)}
-                      className="w-10 h-10 rounded border border-[var(--color-gray-200)] cursor-pointer"
-                      title={`Chart color ${index + 1}`}
-                    />
-                    {chartColors.length > 2 && (
-                      <button
-                        onClick={() => removeChartColor(index)}
-                        className="w-6 h-6 flex items-center justify-center text-[var(--color-gray-400)] hover:text-[var(--color-error)] transition-colors"
-                        title="Remove color"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                ))}
+              <div className="space-y-1">
+                <Label htmlFor="fontFamily" className="text-xs">Font</Label>
+                <select
+                  id="fontFamily"
+                  value={fontFamily}
+                  onChange={(e) => setFontFamily(e.target.value as BrandingConfig['fontFamily'])}
+                  className="w-full h-8 px-2 text-sm border border-[var(--color-gray-200)] rounded-lg bg-white text-[var(--color-gray-900)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                >
+                  {FONT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
-              {chartColors.length < 12 && (
-                <Button variant="outline" size="sm" onClick={addChartColor}>
-                  + Add Color
-                </Button>
-              )}
-              <p className="text-xs text-[var(--color-gray-500)]">
-                These colors will be used in charts and graphs. Aim for 4-8 distinct colors.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Typography */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Typography</CardTitle>
-            <CardDescription>
-              Choose a font family for your dashboards
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Label htmlFor="fontFamily">Font Family</Label>
-              <select
-                id="fontFamily"
-                value={fontFamily}
-                onChange={(e) => setFontFamily(e.target.value as BrandingConfig['fontFamily'])}
-                className="w-full md:w-64 px-3 py-2 border border-[var(--color-gray-200)] rounded-lg bg-white text-[var(--color-gray-900)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-              >
-                {FONT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
             </div>
           </CardContent>
         </Card>

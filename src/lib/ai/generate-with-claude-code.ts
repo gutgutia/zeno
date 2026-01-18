@@ -35,22 +35,45 @@ export interface GenerateResult {
  * Build the prompt for Claude Code
  */
 function buildPrompt(branding: BrandingConfig | null, userInstructions?: string): string {
-  const brandingSection = branding ? `
-BRANDING REQUIREMENTS:
-- Company: ${branding.companyName || 'Not specified'}
-- Primary Color: ${branding.colors?.primary || '#2563EB'}
-- Secondary Color: ${branding.colors?.secondary || '#0D9488'}
-- Accent Color: ${branding.colors?.accent || '#8B5CF6'}
-- Background: ${branding.colors?.background || '#F9FAFB'}
-- Font: ${branding.fontFamily || 'system-ui, sans-serif'}
-${branding.logoUrl ? `- Logo URL: ${branding.logoUrl}` : ''}
-` : `
-Use a professional color scheme:
+  // Build branding section with all colors, typography, and style guide
+  let brandingSection: string;
+
+  if (branding && (branding.colors?.primary || branding.styleGuide)) {
+    const colorsSection = `
+BRAND COLORS:
+- Primary: ${branding.colors?.primary || '#2563EB'}
+- Secondary: ${branding.colors?.secondary || '#64748b'}
+- Accent: ${branding.colors?.accent || '#8B5CF6'}
+- Button: ${branding.colors?.button || branding.colors?.primary || '#2563EB'}`;
+
+    const typographySection = `
+TYPOGRAPHY:
+- Font Family: ${branding.fontFamily || 'system'}`;
+
+    const styleGuideSection = branding.styleGuide ? `
+
+STYLE GUIDE:
+${branding.styleGuide}` : `
+
+STYLE GUIDE:
+Create a visually impressive dashboard that makes an impact. Use a bold header section with a solid primary color background and white text - this is the hero of the dashboard. Below the header, use white cards with subtle shadows, colored left borders, or accent elements. Key metrics should be large and colorful. Use the primary color prominently for headers, important values, and visual accents. The secondary color works well for supporting elements. Charts should use brand colors. Never use gradients - solid colors only.`;
+
+    brandingSection = `${colorsSection}${typographySection}${styleGuideSection}`;
+  } else {
+    // Default when no branding is set
+    brandingSection = `
+BRAND COLORS:
 - Primary: #2563EB (blue)
-- Secondary: #0D9488 (teal)
+- Secondary: #64748b (slate)
 - Accent: #8B5CF6 (purple)
-- Background: #F9FAFB
-`;
+- Button: #2563EB (blue)
+
+TYPOGRAPHY:
+- Font Family: system
+
+STYLE GUIDE:
+Create a visually impressive dashboard that makes an impact. Use a bold header section with a solid primary color background and white text - this is the hero of the dashboard. Below the header, use white cards with subtle shadows, colored left borders, or accent elements. Key metrics should be large and colorful. Use the primary color prominently for headers, important values, and visual accents. The secondary color works well for supporting elements. Charts should use brand colors. Never use gradients - solid colors only.`;
+  }
 
   const userSection = userInstructions
     ? `\nUSER INSTRUCTIONS:\n${userInstructions}\n`
@@ -61,15 +84,23 @@ Use a professional color scheme:
 INPUT: The user's data is at /home/user/data.txt
 
 OUTPUT: Write a complete, self-contained HTML file to /home/user/output.html
-
 ${brandingSection}
 ${userSection}
+DESIGN PRINCIPLES:
+- Create visual impact: The dashboard should impress at first glance.
+- Bold header: Use a solid primary color background for the header/hero section with white text.
+- Card-based layout: White cards with subtle shadows or colored left borders organize content.
+- Colorful metrics: Key numbers should be large and use brand colors.
+- Visual hierarchy: Important information stands out through size, color, and placement.
+- NEVER use gradients - they look AI-generated. Use solid colors only.
+- Professional polish: Clean typography, consistent spacing, attention to detail.
+
 REQUIREMENTS:
 1. Read and analyze the data at /home/user/data.txt
 2. Determine the best visualization approach (charts, tables, cards, etc.)
 3. Create a stunning, responsive HTML page with embedded CSS and JavaScript
 4. Use Chart.js from CDN if charts are appropriate
-5. Make it look professional and polished
+5. Make it visually impressive - this should look better than a spreadsheet!
 6. Write the final HTML to /home/user/output.html
 
 After writing the file, output ONLY this JSON (no markdown, no extra text):

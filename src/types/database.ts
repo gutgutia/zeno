@@ -39,8 +39,8 @@ export interface BrandingConfig {
   colors?: {
     primary?: string;      // Main brand color
     secondary?: string;    // Supporting color
-    accent?: string;       // Highlights, CTAs
-    background?: string;   // Dashboard background
+    accent?: string;       // Highlights, badges, notifications
+    button?: string;       // Primary CTA button color
   };
 
   // Chart color palette (array of hex colors for chart series)
@@ -392,7 +392,7 @@ export function getMergedBranding(
       primary: override.colors?.primary ?? base.colors?.primary,
       secondary: override.colors?.secondary ?? base.colors?.secondary,
       accent: override.colors?.accent ?? base.colors?.accent,
-      background: override.colors?.background ?? base.colors?.background,
+      button: override.colors?.button ?? base.colors?.button,
     },
     chartColors: override.chartColors ?? base.chartColors,
     fontFamily: override.fontFamily ?? base.fontFamily,

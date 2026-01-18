@@ -247,10 +247,8 @@ export default async function OrganizationDashboardPage({ params }: PageProps) {
     dashboard.branding_override
   );
 
-  // Compute inline styles from branding
-  const brandingStyles: React.CSSProperties = {
-    ...(branding.colors?.background && { backgroundColor: branding.colors.background }),
-  };
+  // Compute inline styles from branding (empty now that we don't use background color)
+  const brandingStyles: React.CSSProperties = {};
 
   // White-label settings
   const showPoweredBy = !typedOrganization.white_label_enabled;

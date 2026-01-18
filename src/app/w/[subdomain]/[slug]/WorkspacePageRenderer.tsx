@@ -35,7 +35,7 @@ export function WorkspacePageRenderer({
     '--branding-primary': branding.colors?.primary || '#2563eb',
     '--branding-secondary': branding.colors?.secondary || '#64748b',
     '--branding-accent': branding.colors?.accent || '#f59e0b',
-    '--branding-background': branding.colors?.background || '#ffffff',
+    '--branding-button': branding.colors?.button || branding.colors?.primary || '#2563eb',
   } as React.CSSProperties;
 
   return (

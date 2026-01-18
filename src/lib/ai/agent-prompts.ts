@@ -8,26 +8,25 @@ function getBrandingSection(branding: BrandingConfig | null): string {
     return `
 BRANDING & STYLE GUIDE:
 - Company Name: ${branding.companyName || 'Not specified'}
-- Logo URL: ${branding.logoUrl || 'Not provided'}
 - Primary Color: ${branding.colors?.primary || '#2563EB'}
-- Secondary Color: ${branding.colors?.secondary || '#0D9488'}
+- Secondary Color: ${branding.colors?.secondary || '#64748b'}
 - Accent Color: ${branding.colors?.accent || '#8B5CF6'}
-- Background Color: ${branding.colors?.background || '#F9FAFB'}
-- Chart Colors (if charts are appropriate): ${JSON.stringify(branding.chartColors || ['#2563EB', '#0D9488', '#8B5CF6', '#F59E0B', '#EF4444', '#10B981'])}
+- Button Color: ${branding.colors?.button || branding.colors?.primary || '#2563EB'}
 - Font Family: ${branding.fontFamily || 'system-ui, sans-serif'}
 
-Apply these brand colors consistently throughout your design.`;
+Create visual impact: Use a bold header with the primary color as a solid background and white text. Cards should have subtle shadows or colored left borders. Key metrics should be large and colorful. Never use gradients - solid colors only.`;
   }
 
   return `
 BRANDING & STYLE GUIDE:
 Use a professional, modern color scheme:
 - Primary: #2563EB (blue)
-- Secondary: #0D9488 (teal)
+- Secondary: #64748b (slate)
 - Accent: #8B5CF6 (purple)
-- Background: #F9FAFB (light gray)
-- Chart Colors (if charts are appropriate): ["#2563EB", "#0D9488", "#8B5CF6", "#F59E0B", "#EF4444", "#10B981"]
-- Font: system-ui, sans-serif`;
+- Button: #2563EB (blue)
+- Font: system-ui, sans-serif
+
+Create visual impact: Use a bold header with the primary color as a solid background and white text. Cards should have subtle shadows or colored left borders. Key metrics should be large and colorful. Never use gradients - solid colors only.`;
 }
 
 /**

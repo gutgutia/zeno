@@ -120,7 +120,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       }, { status: 402 }); // 402 Payment Required
     }
 
-    // Get the dashboard with workspace branding
+    // Get the dashboard with workspace and organization info
     const { data: dashboardData, error: fetchError } = await supabase
       .from('dashboards')
       .select('*, workspaces!inner(owner_id, branding)')
@@ -138,6 +138,46 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Check ownership
     if (dashboard.workspaces.owner_id !== userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Fetch organization branding if the dashboard belongs to an organization
+    let organizationBranding: BrandingConfig | null = null;
+    if (dashboard.organization_id) {
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('branding')
+        .eq('id', dashboard.organization_id)
+        .single();
+
+      if (orgData) {
+        organizationBranding = orgData.branding as BrandingConfig | null;
+        console.log(`[${id}] Loaded organization branding:`, organizationBranding ? 'found' : 'none');
+      }
+    }
+
+    // Also check if user belongs to an organization (for dashboards not yet linked to org)
+    if (!organizationBranding) {
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .not('accepted_at', 'is', null)
+        .limit(1)
+        .single();
+
+      if (membership) {
+        // Fetch organization branding separately
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('branding')
+          .eq('id', membership.organization_id)
+          .single();
+
+        if (orgData?.branding) {
+          organizationBranding = orgData.branding as BrandingConfig;
+          console.log(`[${id}] Loaded branding from user's organization`);
+        }
+      }
     }
 
     // Check if already generating or completed
@@ -164,23 +204,32 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'No content to generate from' }, { status: 400 });
     }
 
-    // Merge workspace branding with any dashboard override
+    // Merge branding: organization branding takes priority over workspace, dashboard override takes highest priority
+    // Priority: dashboardOverride > organizationBranding > workspaceBranding
     const workspaceBranding = dashboard.workspaces.branding;
+    const baseBranding = organizationBranding || workspaceBranding;
     const dashboardOverride = dashboard.branding_override;
 
-    const effectiveBranding: BrandingConfig | null = workspaceBranding || dashboardOverride ? {
-      companyName: dashboardOverride?.companyName ?? workspaceBranding?.companyName,
-      logoUrl: dashboardOverride?.logoUrl ?? workspaceBranding?.logoUrl,
+    const effectiveBranding: BrandingConfig | null = baseBranding || dashboardOverride ? {
+      companyName: dashboardOverride?.companyName ?? baseBranding?.companyName,
+      logoUrl: dashboardOverride?.logoUrl ?? baseBranding?.logoUrl,
       colors: {
-        primary: dashboardOverride?.colors?.primary ?? workspaceBranding?.colors?.primary,
-        secondary: dashboardOverride?.colors?.secondary ?? workspaceBranding?.colors?.secondary,
-        accent: dashboardOverride?.colors?.accent ?? workspaceBranding?.colors?.accent,
-        background: dashboardOverride?.colors?.background ?? workspaceBranding?.colors?.background,
+        primary: dashboardOverride?.colors?.primary ?? baseBranding?.colors?.primary,
+        secondary: dashboardOverride?.colors?.secondary ?? baseBranding?.colors?.secondary,
+        accent: dashboardOverride?.colors?.accent ?? baseBranding?.colors?.accent,
+        button: dashboardOverride?.colors?.button ?? baseBranding?.colors?.button,
       },
-      chartColors: dashboardOverride?.chartColors ?? workspaceBranding?.chartColors,
-      fontFamily: dashboardOverride?.fontFamily ?? workspaceBranding?.fontFamily,
-      styleGuide: dashboardOverride?.styleGuide ?? workspaceBranding?.styleGuide,
+      chartColors: dashboardOverride?.chartColors ?? baseBranding?.chartColors,
+      fontFamily: dashboardOverride?.fontFamily ?? baseBranding?.fontFamily,
+      styleGuide: dashboardOverride?.styleGuide ?? baseBranding?.styleGuide,
     } : null;
+
+    // Debug: log the effective branding being used
+    if (effectiveBranding) {
+      console.log(`[${id}] Effective branding - Primary: ${effectiveBranding.colors?.primary}, Secondary: ${effectiveBranding.colors?.secondary}, Font: ${effectiveBranding.fontFamily}`);
+    } else {
+      console.log(`[${id}] No branding configured - using defaults`);
+    }
 
     // Update status to generating
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

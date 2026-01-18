@@ -159,12 +159,22 @@ async function classifyRefreshChanges(diff: DataDiff): Promise<ClassificationRes
 // ============================================================================
 
 function getRefreshSystemPrompt(branding: BrandingConfig | null): string {
-  const brandingSection = branding ? `
-## Branding Guidelines
-- Primary color: ${branding.colors?.primary || '#0055FF'}
-- Secondary color: ${branding.colors?.secondary || '#6B7280'}
-- Company: ${branding.companyName || 'Unknown'}
-` : '';
+  let brandingSection = '';
+
+  if (branding && (branding.colors?.primary || branding.styleGuide)) {
+    const colorsSection = branding.colors?.primary ? `
+- Primary color: ${branding.colors.primary}
+- Secondary color: ${branding.colors.secondary || '#64748b'}` : '';
+
+    const styleGuideSection = branding.styleGuide ? `
+- Style: ${branding.styleGuide}` : '';
+
+    brandingSection = `
+## Brand Guidelines${colorsSection}${styleGuideSection}
+
+IMPORTANT: Brand colors are accents, not themes. Use them sparingly. Never use gradients.
+`;
+  }
 
   return `You are a dashboard HTML updater. You make surgical edits to dashboard HTML based on data changes.
 

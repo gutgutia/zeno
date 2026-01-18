@@ -351,7 +351,7 @@ export default async function PublicDashboardPage({ params }: PageProps) {
     '--brand-primary': branding.colors?.primary,
     '--brand-secondary': branding.colors?.secondary,
     '--brand-accent': branding.colors?.accent,
-    '--brand-background': branding.colors?.background,
+    '--brand-button': branding.colors?.button,
   } as React.CSSProperties;
 
   // Check if white-labeling is enabled

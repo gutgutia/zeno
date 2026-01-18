@@ -96,7 +96,7 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
       '--brand-primary': branding.colors.primary,
       '--brand-secondary': branding.colors.secondary,
       '--brand-accent': branding.colors.accent,
-      '--brand-background': branding.colors.background,
+      '--brand-button': branding.colors.button,
     } as React.CSSProperties;
   }, [branding]);
 

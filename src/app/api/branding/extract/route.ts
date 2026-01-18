@@ -10,9 +10,8 @@ const anthropic = new Anthropic({
 // Use Sonnet 4.5 for reliable extraction
 const EXTRACTION_MODEL = 'claude-sonnet-4-5';
 
-interface ExtractedBranding extends BrandingConfig {
-  suggestedChartColors?: string[];
-}
+// ExtractedBranding is just BrandingConfig - we extract colors and generate a style guide
+type ExtractedBranding = BrandingConfig;
 
 interface ExtractionResult {
   success: boolean;
@@ -20,41 +19,51 @@ interface ExtractionResult {
   error?: string;
 }
 
-const EXTRACTION_SYSTEM_PROMPT = `You are a brand identity expert that analyzes websites to extract brand colors, fonts, and visual identity elements.
+const EXTRACTION_SYSTEM_PROMPT = `You are a brand identity expert that analyzes websites to extract brand colors and visual identity.
 
 Your task is to analyze the provided website HTML/CSS and extract:
-1. Primary brand color (the main color used for CTAs, links, brand elements)
-2. Secondary color (supporting color, often used in headers or accents)
-3. Accent color (highlight color for special elements)
-4. Background color (main page background)
-5. Font family (primary font used for headings/body)
+1. Primary brand color (the main color used for logo, brand identity, key elements)
+2. Secondary color (supporting color, often used in headers or text accents)
+3. Accent color (highlight color for special elements, badges, notifications)
+4. Button color (color used for primary CTA buttons - may match primary or be different)
+5. Font family (the primary font used on the website)
 6. Company name (from title, logo alt text, or meta tags)
-7. Logo URL (from og:image, favicon, or common logo paths)
-8. A brief style guide describing the brand's visual identity
-
-Also generate a harmonious chart color palette (6-8 colors) that complements the brand colors.
 
 IMPORTANT: Return ONLY valid JSON, no other text. Use this exact structure:
 {
   "companyName": "string or null",
-  "logoUrl": "string or null",
   "colors": {
     "primary": "#hexcode",
     "secondary": "#hexcode",
     "accent": "#hexcode",
-    "background": "#hexcode"
+    "button": "#hexcode"
   },
-  "fontFamily": "system" | "inter" | "dm-sans" | "space-grotesk",
-  "styleGuide": "Brief description of the brand's visual style and tone",
-  "suggestedChartColors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5", "#hex6"]
+  "fontFamily": "system" | "inter" | "dm-sans" | "space-grotesk"
 }
 
 Guidelines:
-- For fontFamily, map detected fonts to closest match: Sans-serif → "inter", Display/Modern → "space-grotesk", Geometric → "dm-sans", else "system"
+- Extract the TRUE brand colors - the colors that define this company's identity
+- Primary should be the most distinctive brand color (often in logo, brand marks)
+- Secondary should be a supporting color that complements the primary
+- Accent is for highlights, often a contrasting or vibrant color
+- Button color is what's used for primary CTAs - may be same as primary or accent
+- For fontFamily, map detected fonts to closest match:
+  - Sans-serif fonts (Helvetica, Arial, etc.) → "system"
+  - Inter, similar geometric sans → "inter"
+  - DM Sans, similar friendly sans → "dm-sans"
+  - Space Grotesk, monospace-influenced, tech fonts → "space-grotesk"
+  - If unsure, use "system"
 - If you can't detect a color, make an educated guess based on the overall design
-- For logoUrl, look for: og:image meta tag, link[rel="icon"], common paths like /logo.png, /images/logo.svg
-- Chart colors should be visually distinct but harmonious with the brand
-- The style guide should be 2-3 sentences describing the visual tone (e.g., "Modern and clean with bold accents. Professional yet approachable.")`;
+- Avoid extracting generic grays as primary/secondary - find the actual brand colors`;
+
+/**
+ * Generate a default style guide for brand colors.
+ * This guide is color-agnostic - it describes HOW to use the colors,
+ * not what the colors are. Users can customize this later.
+ */
+function generateDefaultStyleGuide(): string {
+  return `Create a visually impressive dashboard that makes an impact. Use a bold header section with a solid primary color background and white text - this is the hero of the dashboard. Below the header, use white cards with subtle shadows, colored left borders, or accent elements. Key metrics should be large and colorful. Use the primary color prominently for headers, important values, and visual accents. The secondary color works well for supporting elements. Charts should use brand colors. Never use gradients - solid colors only.`;
+}
 
 async function fetchWebsiteContent(url: string): Promise<string> {
   // Normalize URL
@@ -162,27 +171,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate and normalize the response
+    const primaryColor = extracted.colors?.primary || '#6366f1';
+    const secondaryColor = extracted.colors?.secondary || '#64748b';
+    const accentColor = extracted.colors?.accent || '#22c55e';
+    const buttonColor = extracted.colors?.button || primaryColor;
+
+    // Validate fontFamily is one of our supported options
+    const validFonts = ['system', 'inter', 'dm-sans', 'space-grotesk'];
+    const fontFamily = validFonts.includes(extracted.fontFamily || '')
+      ? (extracted.fontFamily as BrandingConfig['fontFamily'])
+      : 'system';
+
     const branding: ExtractedBranding = {
       companyName: extracted.companyName || undefined,
-      logoUrl: extracted.logoUrl || undefined,
       colors: {
-        primary: extracted.colors?.primary || '#6366f1',
-        secondary: extracted.colors?.secondary || '#64748b',
-        accent: extracted.colors?.accent || '#22c55e',
-        background: extracted.colors?.background || '#f8fafc',
+        primary: primaryColor,
+        secondary: secondaryColor,
+        accent: accentColor,
+        button: buttonColor,
       },
-      fontFamily: ['system', 'inter', 'dm-sans', 'space-grotesk'].includes(extracted.fontFamily || '')
-        ? extracted.fontFamily as BrandingConfig['fontFamily']
-        : 'system',
-      styleGuide: extracted.styleGuide || undefined,
-      chartColors: extracted.suggestedChartColors || [
-        extracted.colors?.primary || '#6366f1',
-        extracted.colors?.secondary || '#64748b',
-        extracted.colors?.accent || '#22c55e',
-        '#f59e0b',
-        '#ef4444',
-        '#8b5cf6',
-      ],
+      fontFamily,
+      styleGuide: generateDefaultStyleGuide(),
     };
 
     return NextResponse.json({
