@@ -72,8 +72,13 @@ export async function refreshAccessToken(refreshToken: string) {
 }
 
 // Get a valid access token for a connection (refreshes if needed)
-export async function getValidAccessToken(connectionId: string): Promise<string> {
-  const supabase = await createClient();
+// Optionally accepts a Supabase client for server-side use (e.g., cron jobs)
+export async function getValidAccessToken(
+  connectionId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseClient?: any
+): Promise<string> {
+  const supabase = supabaseClient || await createClient();
 
   // Get the connection
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

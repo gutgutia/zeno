@@ -102,9 +102,10 @@ export async function GET(request: NextRequest) {
         console.log(`[Sync] Processing dashboard: ${dashboard.id} - ${dashboard.title}`);
 
         // Get valid access token (google_connection_id is non-null from query filter)
+        // Pass supabase client to bypass RLS
         let accessToken: string;
         try {
-          accessToken = await getValidAccessToken(dashboard.google_connection_id!);
+          accessToken = await getValidAccessToken(dashboard.google_connection_id!, supabase);
         } catch (tokenError) {
           console.error(`[Sync] Token error for ${dashboard.id}:`, tokenError);
           results.push({
