@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 // Main domains where the app is hosted (subdomains of these are organization subdomains)
 const MAIN_DOMAINS = [
   'zeno.fyi',
+  'vercel.app',
   'localhost',
   '127.0.0.1',
 ];
@@ -90,8 +91,9 @@ export async function middleware(request: NextRequest) {
     // Paths that don't require authentication on subdomains
     // - /auth: login page
     // - /api/auth: auth API endpoints
+    // - /api/cron/: cron job endpoints (authenticated via CRON_SECRET)
     // - /d/: shared dashboard pages (they have their own auth gate)
-    const publicPaths = ['/auth', '/api/auth', '/d/'];
+    const publicPaths = ['/auth', '/api/auth', '/api/cron/', '/d/'];
     const isPublicPath = publicPaths.some(p => pathname.startsWith(p));
 
     // Check authentication for subdomain access
