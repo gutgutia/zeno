@@ -9,7 +9,9 @@
  *
  * Two sandbox templates are available (configurable via AI_CONFIG.sandboxTemplate):
  * - 'node': Original Node.js template
- * - 'python': Python template with pandas, numpy, pdfplumber, etc.
+ * - 'python': Python template with data science packages (pandas, numpy, pdfplumber, etc.)
+ *
+ * Both templates use the Claude Code CLI for agentic execution.
  */
 
 import { Sandbox } from 'e2b';
@@ -68,7 +70,7 @@ Use these if they help, but feel free to approach the problem however you see fi
 `
     : '';
 
-  return `You are transforming data into a beautiful, professional dashboard.
+  return `You are creating a beautiful, customer-facing data presentation that brings data to life.
 
 INPUT: The user's data is at /home/user/data.txt
 
@@ -79,11 +81,18 @@ ${userSection}
 ${toolsNote}
 REQUIREMENTS:
 1. Read and analyze the data at /home/user/data.txt
-2. Determine the best visualization approach (charts, tables, cards, etc.)
-3. Create a stunning, responsive HTML page with embedded CSS and JavaScript
-4. Use Chart.js from CDN if charts are appropriate
-5. Make it look professional and polished
-6. Write the final HTML to /home/user/output.html
+2. Lead with key insights or a summary section that highlights what matters most
+3. Use visual hierarchy to tell a story with the data, not just display it
+4. Create a polished, responsive HTML page with embedded CSS and JavaScript
+5. Use Chart.js from CDN for visualizations where appropriate
+6. For larger data tables (10+ rows), include search and filter functionality
+7. Write the final HTML to /home/user/output.html
+
+DESIGN PRINCIPLES:
+- This is a customer-facing presentation, not an internal dashboard
+- Use generous whitespace and modern typography
+- Make it visually engaging and easy to scan
+- Prioritize clarity and impact over data density
 
 After writing the file, output ONLY this JSON (no markdown, no extra text):
 {"summary": "Brief 1-2 sentence description of what you created"}`;
@@ -252,7 +261,6 @@ export async function generateWithClaudeCode(
     });
     console.log('[Claude Code E2B] Claude CLI check:', versionCheck.stdout || versionCheck.stderr);
 
-    // Run the command
     let result: { stdout: string; stderr: string; exitCode: number };
     const turnCounter = { value: 0 };
     const collectedStdout: string[] = [];
@@ -260,72 +268,76 @@ export async function generateWithClaudeCode(
 
     printLogHeader('Dashboard Generation');
 
-    try {
-      const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${AI_CONFIG.generateModel}`;
-      const command = AI_CONFIG.verboseLogging
-        ? `${baseCommand} --verbose --output-format stream-json`
-        : baseCommand;
+    {
+      // Use Claude Code CLI for both templates
 
-      result = await sandbox.commands.run(command, {
-        timeoutMs: AI_CONFIG.commandTimeoutMs,
-        cwd: '/home/user',
-        onStdout: (data) => {
-          collectedStdout.push(data);
+      try {
+        const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${AI_CONFIG.generateModel}`;
+        const command = AI_CONFIG.verboseLogging
+          ? `${baseCommand} --verbose --output-format stream-json`
+          : baseCommand;
 
-          if (AI_CONFIG.verboseLogging) {
-            const lines = data.split('\n').filter(line => line.trim());
-            for (const line of lines) {
-              try {
-                const event = JSON.parse(line) as AgentEvent;
-                if (event.type === 'assistant') {
-                  turnCounter.value++;
-                }
-                logAgentEvent(event, turnCounter.value);
-              } catch {
-                if (line.trim() && !line.startsWith('{')) {
-                  console.log(`[Raw] ${line}`);
+        result = await sandbox.commands.run(command, {
+          timeoutMs: AI_CONFIG.commandTimeoutMs,
+          cwd: '/home/user',
+          onStdout: (data) => {
+            collectedStdout.push(data);
+
+            if (AI_CONFIG.verboseLogging) {
+              const lines = data.split('\n').filter(line => line.trim());
+              for (const line of lines) {
+                try {
+                  const event = JSON.parse(line) as AgentEvent;
+                  if (event.type === 'assistant') {
+                    turnCounter.value++;
+                  }
+                  logAgentEvent(event, turnCounter.value);
+                } catch {
+                  if (line.trim() && !line.startsWith('{')) {
+                    console.log(`[Raw] ${line}`);
+                  }
                 }
               }
             }
-          }
-        },
-        onStderr: (data) => {
-          collectedStderr.push(data);
-          if (data.trim()) {
-            console.log(`[Stderr] ${data}`);
-          }
-        },
-      });
-    } catch (cmdError: unknown) {
-      console.warn('[Claude Code E2B] Command exited with error (checking output...)');
-
-      const err = cmdError as { result?: { stdout?: string; stderr?: string; exitCode?: number }; message?: string };
-      console.log('[Claude Code E2B] Exit code:', err.result?.exitCode);
-
-      let outputExists = false;
-      try {
-        const checkResult = await sandbox.commands.run('test -f /home/user/output.html && echo "exists"', {
-          timeoutMs: 5000,
+          },
+          onStderr: (data) => {
+            collectedStderr.push(data);
+            if (data.trim()) {
+              console.log(`[Stderr] ${data}`);
+            }
+          },
         });
-        outputExists = checkResult.stdout.includes('exists');
-        console.log('[Claude Code E2B] output.html exists:', outputExists);
-      } catch {
-        console.log('[Claude Code E2B] Could not check for output.html');
-      }
+      } catch (cmdError: unknown) {
+        console.warn('[Claude Code E2B] Command exited with error (checking output...)');
 
-      if (outputExists || collectedStdout.length > 0) {
-        console.log('[Claude Code E2B] Output was generated, continuing');
-        result = {
-          stdout: collectedStdout.join(''),
-          stderr: collectedStderr.join(''),
-          exitCode: err.result?.exitCode || 1,
-        };
-      } else {
-        const envCheck = await sandbox.commands.run('echo "ANTHROPIC_API_KEY set: ${ANTHROPIC_API_KEY:+yes}"', {
-          timeoutMs: 5000,
-        }).catch(() => ({ stdout: 'failed to check', stderr: '', exitCode: 1 }));
-        console.log('[Claude Code E2B] API key check:', envCheck.stdout);
-        throw cmdError;
+        const err = cmdError as { result?: { stdout?: string; stderr?: string; exitCode?: number }; message?: string };
+        console.log('[Claude Code E2B] Exit code:', err.result?.exitCode);
+
+        let outputExists = false;
+        try {
+          const checkResult = await sandbox.commands.run('test -f /home/user/output.html && echo "exists"', {
+            timeoutMs: 5000,
+          });
+          outputExists = checkResult.stdout.includes('exists');
+          console.log('[Claude Code E2B] output.html exists:', outputExists);
+        } catch {
+          console.log('[Claude Code E2B] Could not check for output.html');
+        }
+
+        if (outputExists || collectedStdout.length > 0) {
+          console.log('[Claude Code E2B] Output was generated, continuing');
+          result = {
+            stdout: collectedStdout.join(''),
+            stderr: collectedStderr.join(''),
+            exitCode: err.result?.exitCode || 1,
+          };
+        } else {
+          const envCheck = await sandbox.commands.run('echo "ANTHROPIC_API_KEY set: ${ANTHROPIC_API_KEY:+yes}"', {
+            timeoutMs: 5000,
+          }).catch(() => ({ stdout: 'failed to check', stderr: '', exitCode: 1 }));
+          console.log('[Claude Code E2B] API key check:', envCheck.stdout);
+          throw cmdError;
+        }
       }
     }
 

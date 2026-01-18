@@ -45,28 +45,32 @@ export const templateNode = Template()
  * Alias: zeno-claude-code-python
  *
  * This gives the agent:
+ * - Claude Code CLI for agentic execution
  * - Native Python for data analysis (pandas, numpy)
  * - File format support (Excel, PDF, Word, PowerPoint)
- * - Claude Code CLI for agentic execution
- * - Claude Agent SDK (Python) for future use
+ *
+ * Note: Uses Python base + Node.js for Claude Code CLI
  */
 export const templatePython = Template()
-  // Start with Python 3.11 base
+  // Start with Python 3.11
   .fromPythonImage('3.11')
 
-  // System dependencies
+  // System dependencies including Node.js
   .aptInstall([
     'curl',
     'git',
     'ripgrep',
     // For PDF processing
     'poppler-utils',
-    // For Node.js (needed for Claude Code CLI)
+    // Node.js (needed for Claude Code CLI)
     'nodejs',
     'npm',
   ])
 
-  // Data science and file processing packages
+  // Install Claude Code CLI globally
+  .npmInstall('@anthropic-ai/claude-code', { g: true })
+
+  // Python data science packages
   .pipInstall([
     // Core data science
     'pandas',
@@ -84,16 +88,10 @@ export const templatePython = Template()
     'python-docx',
     'python-pptx',
 
-    // Claude Agent SDK (Python) - for future use
-    'anthropic-claude-agent-sdk',
-
     // Utilities
     'tabulate',
     'chardet',
-  ])
-
-  // Install Claude Code CLI globally via npm
-  .npmInstall('@anthropic-ai/claude-code', { g: true });
+  ]);
 
 // ============================================================================
 // Default export (for backwards compatibility with existing build.ts)

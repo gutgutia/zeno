@@ -11,7 +11,7 @@ export const AI_CONFIG = {
   // Options: 'sonnet' (balanced), 'opus' (highest quality), 'haiku' (fastest)
 
   /** Model for dashboard generation */
-  generateModel: 'haiku' as 'sonnet' | 'opus' | 'haiku',
+  generateModel: 'sonnet' as 'sonnet' | 'opus' | 'haiku',
 
   /** Model for dashboard modifications */
   modifyModel: 'sonnet' as 'sonnet' | 'opus' | 'haiku',
@@ -30,7 +30,7 @@ export const AI_CONFIG = {
    *
    * To build templates: npx tsx e2b/build.ts [node|python|all]
    */
-  sandboxTemplate: 'node' as 'node' | 'python',
+  sandboxTemplate: 'python' as 'node' | 'python',
 
   // ============================================================================
   // LOGGING
@@ -40,7 +40,7 @@ export const AI_CONFIG = {
    * Enable verbose logging of agent execution
    * Shows turn-by-turn tool calls, thinking, and results
    */
-  verboseLogging: false,
+  verboseLogging: true,
 
   // ============================================================================
   // TIMEOUTS
