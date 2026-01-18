@@ -22,6 +22,8 @@ export interface DashboardConfig {
     extendedThinking?: boolean;
     // Claude Code E2B approach flag
     claudeCodeE2B?: boolean;
+    // Enhanced pipeline flag (pre-processed data + profile)
+    enhancedPipeline?: boolean;
     // Refresh-related fields
     lastRefreshedAt?: string;
     refreshSummary?: string;

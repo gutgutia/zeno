@@ -39,25 +39,83 @@ export function getAgentSystemPrompt(branding: BrandingConfig | null): string {
 
   return `You are an expert at transforming raw data into stunning, professional web pages.
 
-You have access to a Python sandbox via the execute_python tool. The user's content is available at /tmp/data.txt.
+You have full access to a Python sandbox with pandas, numpy, and data science tools.
 
 ${brandingSection}
 
-WORKFLOW:
-1. Use execute_python to read and understand the content at /tmp/data.txt
-2. Analyze what type of content it is and what would best represent it
-3. Use Python if you need to compute metrics, aggregations, or transform the data
-4. Generate a beautiful, self-contained HTML page
-
-TECHNICAL NOTES:
-- Output a complete HTML document with embedded CSS and JavaScript
-- You may use CDN resources (Google Fonts, Chart.js, etc.) if appropriate
-- If using charts, ensure canvas containers have explicit height (e.g., 300px) and use maintainAspectRatio: false
-- Make it responsive and polished
-
 OUTPUT FORMAT:
-When ready, respond with ONLY this JSON (no markdown, no explanation):
-{"html": "<complete HTML page>", "summary": "Brief 1-2 sentence description"}`;
+When done, write the final HTML to /home/user/output.html, then respond with ONLY this JSON:
+{"summary": "Brief 1-2 sentence description of what you created"}`;
+}
+
+/**
+ * Enhanced system prompt for Claude Code E2B generation
+ * Uses pre-computed data profile to speed up analysis
+ */
+export function getEnhancedAgentSystemPrompt(
+  branding: BrandingConfig | null,
+  dataProfile: string
+): string {
+  const brandingSection = getBrandingSection(branding);
+
+  return `You are an expert at transforming data into stunning, professional dashboards.
+
+You have access to:
+- Full Python environment with pandas, numpy, and data science tools
+- Pre-processed data at /home/user/data.csv
+- Utility library at /home/user/agent_utils.py with helper functions
+
+${brandingSection}
+
+=== PRE-COMPUTED DATA PROFILE ===
+${dataProfile}
+=== END PROFILE ===
+
+The data has already been analyzed for you. Use the profile above to make quick, informed decisions about visualization.
+
+UTILITY LIBRARY (agent_utils.py):
+- load_data() -> returns pandas DataFrame
+- get_profile() -> returns data profile dict
+- summarize_numeric(df) -> summary stats for numeric columns
+- aggregate_by(df, group_col, value_col) -> grouped aggregation
+- chart_bar(labels, values, title) -> Chart.js bar config
+- chart_line(labels, values, title) -> Chart.js line config
+- chart_pie(labels, values, title) -> Chart.js pie config
+- html.metric_card(title, value, subtitle) -> metric card HTML
+- html.chart_container(id, title) -> chart container HTML
+- html.data_table(df) -> styled table HTML
+- page_template(title, body) -> complete HTML page
+
+EXAMPLE USAGE:
+\`\`\`python
+from agent_utils import load_data, html, chart_bar, page_template, format_currency
+
+df = load_data()
+
+# Build metrics
+total_revenue = df['revenue'].sum()
+metrics = html.metric_card("Total Revenue", format_currency(total_revenue))
+
+# Build chart
+by_category = df.groupby('category')['revenue'].sum()
+chart_config = chart_bar(by_category.index.tolist(), by_category.values.tolist(), "Revenue by Category")
+
+# Assemble page
+body = f"""
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 24px;">
+    {metrics}
+</div>
+{html.chart_container('chart1', 'Revenue by Category')}
+<script>
+new Chart(document.getElementById('chart1'), {json.dumps(chart_config)});
+</script>
+"""
+html_output = page_template("Sales Dashboard", body)
+\`\`\`
+
+OUTPUT:
+Write the final HTML to /home/user/output.html, then respond with ONLY:
+{"summary": "Brief description of the dashboard you created"}`;
 }
 
 /**
@@ -73,11 +131,31 @@ Please incorporate these specific requests into your design.
 `
     : '';
 
-  return `${instructionsSection}Transform the content at /tmp/data.txt into a stunning, professional web page.
+  return `${instructionsSection}Transform the data into a stunning, professional dashboard.
 
-Use your judgment about the best way to represent this information - whether that's a dashboard with charts, an interactive timeline, a data table, cards, or something else entirely. Choose whatever format best serves the content.
+Use your judgment about the best way to represent this information - whether that's a dashboard with charts, an interactive timeline, a data table, cards, or something else entirely. Choose whatever format best serves the content.`;
+}
 
-The content is waiting for you at /tmp/data.txt in the sandbox.`;
+/**
+ * Enhanced user prompt for Claude Code E2B generation
+ */
+export function getEnhancedAgentUserPrompt(userInstructions?: string): string {
+  const instructionsSection = userInstructions
+    ? `USER INSTRUCTIONS:
+${userInstructions}
+
+`
+    : '';
+
+  return `${instructionsSection}Create a professional dashboard from the data.
+
+QUICK START:
+1. The data is ready at /home/user/data.csv
+2. The profile at /home/user/profile.json tells you about the data
+3. Use the agent_utils.py library for quick chart/component generation
+4. Write final HTML to /home/user/output.html
+
+Focus on creating an insightful, visually appealing dashboard that highlights the key patterns and metrics in the data.`;
 }
 
 /**
