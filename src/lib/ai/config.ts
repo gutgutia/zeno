@@ -20,6 +20,19 @@ export const AI_CONFIG = {
   refreshModel: 'sonnet' as 'sonnet' | 'opus' | 'haiku',
 
   // ============================================================================
+  // SANDBOX TEMPLATE
+  // ============================================================================
+
+  /**
+   * Which E2B sandbox template to use
+   * - 'node': Original Node.js template (stable)
+   * - 'python': Python template with data science stack (experimental)
+   *
+   * To build templates: npx tsx e2b/build.ts [node|python|all]
+   */
+  sandboxTemplate: 'node' as 'node' | 'python',
+
+  // ============================================================================
   // LOGGING
   // ============================================================================
 

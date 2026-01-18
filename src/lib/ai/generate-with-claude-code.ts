@@ -1,15 +1,19 @@
 /**
  * Generate dashboards using Claude Code CLI running inside E2B sandbox
  *
- * Enhanced approach with:
- * - Pre-processed data (CSV format)
- * - Pre-computed data profile
- * - Utility library for faster development
- * - Python sandbox with data science stack
+ * This approach gives the agent full Claude Code capabilities:
+ * - Bash commands
+ * - File read/write/edit
+ * - Glob/Grep search
+ * - Iterative development and debugging
+ *
+ * Two sandbox templates are available (configurable via AI_CONFIG.sandboxTemplate):
+ * - 'node': Original Node.js template
+ * - 'python': Python template with pandas, numpy, pdfplumber, etc.
  */
 
 import { Sandbox } from 'e2b';
-import type { DashboardConfig, ParsedData, DataSchema } from '@/types/dashboard';
+import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig } from '@/types/database';
 import { AI_CONFIG } from './config';
 import {
@@ -19,8 +23,7 @@ import {
   printLogFooter,
   extractSummaryFromStreamOutput,
 } from './agent-logging';
-import { generateDataProfile, formatProfileForAgent } from '@/lib/data/profile';
-import { getEnhancedAgentSystemPrompt, getEnhancedAgentUserPrompt } from './agent-prompts';
+import { TEMPLATE_ALIASES } from '../../../e2b/template';
 
 export interface GenerateResult {
   config: DashboardConfig;
@@ -30,63 +33,10 @@ export interface GenerateResult {
   };
 }
 
-export interface GenerateInput {
-  // Pre-parsed data (preferred - faster)
-  parsedData?: ParsedData;
-  schema?: DataSchema;
-  // Raw content fallback
-  rawContent?: string;
-}
-
 /**
- * Convert ParsedData to CSV string
+ * Build the prompt for Claude Code
  */
-function parsedDataToCSV(data: ParsedData): string {
-  const { rows, columns } = data;
-  if (rows.length === 0) return '';
-
-  // Header row
-  const header = columns.join(',');
-
-  // Data rows
-  const dataRows = rows.map(row => {
-    return columns.map(col => {
-      const value = row[col];
-      if (value === null || value === undefined) return '';
-      const str = String(value);
-      // Escape commas and quotes
-      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-        return `"${str.replace(/"/g, '""')}"`;
-      }
-      return str;
-    }).join(',');
-  });
-
-  return [header, ...dataRows].join('\n');
-}
-
-/**
- * Build the enhanced prompt with data profile
- */
-function buildEnhancedPrompt(
-  branding: BrandingConfig | null,
-  dataProfile: string,
-  userInstructions?: string
-): string {
-  const systemPrompt = getEnhancedAgentSystemPrompt(branding, dataProfile);
-  const userPrompt = getEnhancedAgentUserPrompt(userInstructions);
-
-  return `${systemPrompt}
-
----
-
-${userPrompt}`;
-}
-
-/**
- * Legacy prompt builder (for raw content without profile)
- */
-function buildLegacyPrompt(branding: BrandingConfig | null, userInstructions?: string): string {
+function buildPrompt(branding: BrandingConfig | null, userInstructions?: string): string {
   const brandingSection = branding ? `
 BRANDING REQUIREMENTS:
 - Company: ${branding.companyName || 'Not specified'}
@@ -108,6 +58,16 @@ Use a professional color scheme:
     ? `\nUSER INSTRUCTIONS:\n${userInstructions}\n`
     : '';
 
+  // Add note about available tools if using Python template
+  const toolsNote = AI_CONFIG.sandboxTemplate === 'python'
+    ? `
+AVAILABLE TOOLS:
+You have access to Python with pandas, numpy, openpyxl, pdfplumber, python-docx, and python-pptx.
+A utility library is available at /home/user/agent_utils.py with helper functions for charts and HTML components.
+Use these if they help, but feel free to approach the problem however you see fit.
+`
+    : '';
+
   return `You are transforming data into a beautiful, professional dashboard.
 
 INPUT: The user's data is at /home/user/data.txt
@@ -116,6 +76,7 @@ OUTPUT: Write a complete, self-contained HTML file to /home/user/output.html
 
 ${brandingSection}
 ${userSection}
+${toolsNote}
 REQUIREMENTS:
 1. Read and analyze the data at /home/user/data.txt
 2. Determine the best visualization approach (charts, tables, cards, etc.)
@@ -130,55 +91,27 @@ After writing the file, output ONLY this JSON (no markdown, no extra text):
 
 /**
  * Agent utility library (Python)
- * This gets written to the sandbox for the agent to use
+ * Available for the agent to use if it finds it helpful
  */
 const AGENT_UTILS_PYTHON = `"""
-Agent Utility Library for Dashboard Generation
+Agent Utility Library - Optional helper functions for dashboard generation
+Import what you need: from agent_utils import load_data, html, chart_bar, format_currency
 """
 import json
 import pandas as pd
 import numpy as np
-from pathlib import Path
 from typing import Any, Optional
 from datetime import datetime
 
-_cached_df: Optional[pd.DataFrame] = None
-_cached_profile: Optional[dict] = None
-
-def load_data(path: str = "/home/user/data.csv") -> pd.DataFrame:
-    """Load the pre-processed CSV data into a pandas DataFrame."""
-    global _cached_df
-    if _cached_df is not None:
-        return _cached_df
-    _cached_df = pd.read_csv(path)
-    return _cached_df
-
-def get_profile(path: str = "/home/user/profile.json") -> dict:
-    """Get the pre-computed data profile."""
-    global _cached_profile
-    if _cached_profile is not None:
-        return _cached_profile
-    with open(path) as f:
-        _cached_profile = json.load(f)
-    return _cached_profile
-
-def summarize_numeric(df: pd.DataFrame) -> pd.DataFrame:
-    """Get summary statistics for all numeric columns."""
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    if len(numeric_cols) == 0:
-        return pd.DataFrame()
-    summary = df[numeric_cols].agg(['min', 'max', 'mean', 'median', 'sum']).T
-    summary.columns = ['Min', 'Max', 'Mean', 'Median', 'Total']
-    return summary.round(2)
-
-def aggregate_by(df: pd.DataFrame, group_col: str, value_col: str, agg_func: str = 'sum') -> pd.DataFrame:
-    """Aggregate a value column by a grouping column."""
-    result = df.groupby(group_col)[value_col].agg(agg_func).reset_index()
-    result.columns = [group_col, value_col]
-    return result.sort_values(value_col, ascending=False)
+def load_data(path: str = "/home/user/data.txt") -> pd.DataFrame:
+    """Try to load data as CSV/TSV. Returns DataFrame or raises error."""
+    try:
+        return pd.read_csv(path)
+    except:
+        return pd.read_csv(path, sep='\\t')
 
 def chart_bar(labels: list, values: list, title: str = "", color: str = "#2563EB") -> dict:
-    """Generate Chart.js configuration for a bar chart."""
+    """Generate Chart.js bar chart config."""
     return {
         "type": "bar",
         "data": {"labels": labels, "datasets": [{"data": values, "backgroundColor": color, "borderRadius": 4}]},
@@ -186,7 +119,7 @@ def chart_bar(labels: list, values: list, title: str = "", color: str = "#2563EB
     }
 
 def chart_line(labels: list, values: list, title: str = "", color: str = "#2563EB", fill: bool = False) -> dict:
-    """Generate Chart.js configuration for a line chart."""
+    """Generate Chart.js line chart config."""
     return {
         "type": "line",
         "data": {"labels": labels, "datasets": [{"data": values, "borderColor": color, "backgroundColor": color + "20" if fill else "transparent", "fill": fill, "tension": 0.3}]},
@@ -194,7 +127,7 @@ def chart_line(labels: list, values: list, title: str = "", color: str = "#2563E
     }
 
 def chart_pie(labels: list, values: list, title: str = "", colors: Optional[list] = None) -> dict:
-    """Generate Chart.js configuration for a pie/doughnut chart."""
+    """Generate Chart.js pie/doughnut chart config."""
     default_colors = ["#2563EB", "#0D9488", "#8B5CF6", "#F59E0B", "#EF4444", "#10B981"]
     colors = colors or default_colors[:len(labels)]
     return {
@@ -204,42 +137,25 @@ def chart_pie(labels: list, values: list, title: str = "", colors: Optional[list
     }
 
 class html:
-    """HTML component builders for dashboard generation."""
-
+    """HTML component builders."""
     @staticmethod
     def metric_card(title: str, value: Any, subtitle: str = "", color: str = "#2563EB") -> str:
-        return f'''<div style="background:white;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-            <div style="color:#6B7280;font-size:14px;margin-bottom:8px;">{title}</div>
-            <div style="color:#111827;font-size:32px;font-weight:700;">{value}</div>
-            {f'<div style="color:{color};font-size:14px;margin-top:8px;">{subtitle}</div>' if subtitle else ''}
-        </div>'''
+        return f'<div style="background:white;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1);"><div style="color:#6B7280;font-size:14px;margin-bottom:8px;">{title}</div><div style="color:#111827;font-size:32px;font-weight:700;">{value}</div>{f"<div style=\\"color:{color};font-size:14px;margin-top:8px;\\">{subtitle}</div>" if subtitle else ""}</div>'
 
     @staticmethod
     def chart_container(chart_id: str, title: str = "", height: int = 300) -> str:
         title_html = f'<h3 style="margin:0 0 16px 0;color:#111827;font-size:18px;">{title}</h3>' if title else ''
-        return f'''<div style="background:white;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-            {title_html}<div style="height:{height}px;"><canvas id="{chart_id}"></canvas></div>
-        </div>'''
+        return f'<div style="background:white;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">{title_html}<div style="height:{height}px;"><canvas id="{chart_id}"></canvas></div></div>'
 
     @staticmethod
     def data_table(df: pd.DataFrame, max_rows: int = 50) -> str:
         df_display = df.head(max_rows)
         headers = ''.join(f'<th style="padding:12px;text-align:left;border-bottom:2px solid #E5E7EB;color:#374151;font-weight:600;">{col}</th>' for col in df_display.columns)
-        rows = []
-        for _, row in df_display.iterrows():
-            cells = ''.join(f'<td style="padding:12px;border-bottom:1px solid #E5E7EB;">{val}</td>' for val in row)
-            rows.append(f'<tr style="background:white;">{cells}</tr>')
-        return f'''<div style="background:white;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow-x:auto;">
-            <table style="width:100%;border-collapse:collapse;font-size:14px;"><thead><tr style="background:#F9FAFB;">{headers}</tr></thead><tbody>{''.join(rows)}</tbody></table>
-            {f'<div style="color:#6B7280;font-size:12px;margin-top:12px;">Showing {len(df_display)} of {len(df)} rows</div>' if len(df) > max_rows else ''}
-        </div>'''
+        rows = ''.join(f'<tr style="background:white;">{"".join(f"<td style=\\"padding:12px;border-bottom:1px solid #E5E7EB;\\">{val}</td>" for val in row)}</tr>' for _, row in df_display.iterrows())
+        return f'<div style="background:white;border-radius:12px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:14px;"><thead><tr style="background:#F9FAFB;">{headers}</tr></thead><tbody>{rows}</tbody></table></div>'
 
-def page_template(title: str, body: str, branding: Optional[dict] = None) -> str:
-    """Generate a complete HTML page with proper structure."""
-    branding = branding or {}
-    primary = branding.get('primary', '#2563EB')
-    background = branding.get('background', '#F9FAFB')
-    font = branding.get('font', 'system-ui, -apple-system, sans-serif')
+def page_template(title: str, body: str) -> str:
+    """Generate complete HTML page."""
     return f'''<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -249,7 +165,7 @@ def page_template(title: str, body: str, branding: Optional[dict] = None) -> str
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: {font}; background: {background}; color: #111827; line-height: 1.5; }}
+        body {{ font-family: system-ui, -apple-system, sans-serif; background: #F9FAFB; color: #111827; line-height: 1.5; }}
         .container {{ max-width: 1400px; margin: 0 auto; padding: 32px; }}
         h1 {{ color: #111827; font-size: 32px; font-weight: 700; margin-bottom: 8px; }}
         .subtitle {{ color: #6B7280; font-size: 16px; margin-bottom: 32px; }}
@@ -281,51 +197,25 @@ def format_percent(value: float, decimals: int = 1) -> str:
 
 /**
  * Generate a dashboard using Claude Code CLI inside E2B sandbox
- *
- * Enhanced flow:
- * 1. Pre-process data to CSV (if parsed data provided)
- * 2. Generate data profile
- * 3. Write data, profile, and utility library to sandbox
- * 4. Run Claude Code with enhanced prompts
  */
 export async function generateWithClaudeCode(
   rawContent: string,
   branding: BrandingConfig | null,
-  userInstructions?: string,
-  input?: GenerateInput
+  userInstructions?: string
 ): Promise<GenerateResult> {
-  console.log('[Claude Code E2B] Starting enhanced generation...');
+  const templateType = AI_CONFIG.sandboxTemplate;
+  const templateAlias = TEMPLATE_ALIASES[templateType];
+
+  console.log(`[Claude Code E2B] Starting generation with ${templateType} template...`);
+  console.log('[Claude Code E2B] Content length:', rawContent.length, 'characters');
   const startTime = Date.now();
-
-  // Determine if we have pre-parsed data
-  const hasParsedData = input?.parsedData && input?.schema;
-
-  let csvContent: string;
-  let profileString: string;
-  let profileJson: string;
-
-  if (hasParsedData) {
-    console.log('[Claude Code E2B] Using pre-parsed data (optimized path)');
-    csvContent = parsedDataToCSV(input.parsedData!);
-    const profile = generateDataProfile(input.parsedData!, input.schema!);
-    profileString = formatProfileForAgent(profile);
-    profileJson = JSON.stringify(profile, null, 2);
-    console.log('[Claude Code E2B] CSV length:', csvContent.length, 'chars');
-    console.log('[Claude Code E2B] Profile generated with', profile.columns.length, 'columns');
-  } else {
-    console.log('[Claude Code E2B] Using raw content (legacy path)');
-    csvContent = rawContent;
-    profileString = '';
-    profileJson = '{}';
-  }
-
-  // Create sandbox with enhanced template
-  console.log('[Claude Code E2B] Creating sandbox with zeno-claude-code template...');
 
   let sandbox: Sandbox | null = null;
 
   try {
-    sandbox = await Sandbox.create('zeno-claude-code', {
+    // Create sandbox with configured template
+    console.log(`[Claude Code E2B] Creating sandbox with template: ${templateAlias}...`);
+    sandbox = await Sandbox.create(templateAlias, {
       timeoutMs: AI_CONFIG.sandboxTimeoutMs,
       envs: {
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
@@ -334,34 +224,21 @@ export async function generateWithClaudeCode(
 
     console.log('[Claude Code E2B] Sandbox created successfully');
 
-    // Write files to sandbox in parallel
-    console.log('[Claude Code E2B] Writing files to sandbox...');
-    const writeStartTime = Date.now();
+    // Write data to sandbox
+    console.log('[Claude Code E2B] Writing data to sandbox...');
+    await sandbox.files.write('/home/user/data.txt', rawContent);
 
-    await Promise.all([
-      // Data file (CSV if parsed, otherwise raw)
-      hasParsedData
-        ? sandbox.files.write('/home/user/data.csv', csvContent)
-        : sandbox.files.write('/home/user/data.txt', rawContent),
-      // Profile JSON (if available)
-      hasParsedData
-        ? sandbox.files.write('/home/user/profile.json', profileJson)
-        : Promise.resolve(),
-      // Utility library
-      sandbox.files.write('/home/user/agent_utils.py', AGENT_UTILS_PYTHON),
-    ]);
-
-    console.log(`[Claude Code E2B] Files written in ${Date.now() - writeStartTime}ms`);
+    // If using Python template, also write the utility library (agent can use it if helpful)
+    if (templateType === 'python') {
+      await sandbox.files.write('/home/user/agent_utils.py', AGENT_UTILS_PYTHON);
+      console.log('[Claude Code E2B] Utility library written to sandbox');
+    }
 
     // Build the prompt
-    const prompt = hasParsedData
-      ? buildEnhancedPrompt(branding, profileString, userInstructions)
-      : buildLegacyPrompt(branding, userInstructions);
-
-    // Escape the prompt for shell
+    const prompt = buildPrompt(branding, userInstructions);
     const escapedPrompt = prompt.replace(/'/g, "'\\''");
 
-    // Run Claude Code with full permissions
+    // Run Claude Code CLI
     console.log('[Claude Code E2B] Running Claude Code CLI...');
     const commandStartTime = Date.now();
 
@@ -375,7 +252,7 @@ export async function generateWithClaudeCode(
     });
     console.log('[Claude Code E2B] Claude CLI check:', versionCheck.stdout || versionCheck.stderr);
 
-    // Run the actual command
+    // Run the command
     let result: { stdout: string; stderr: string; exitCode: number };
     const turnCounter = { value: 0 };
     const collectedStdout: string[] = [];
@@ -506,7 +383,6 @@ export async function generateWithClaudeCode(
         userInstructions,
         agentGenerated: true,
         claudeCodeE2B: true,
-        enhancedPipeline: !!hasParsedData, // Flag for enhanced flow
       },
       analysis: {
         contentType: 'data',

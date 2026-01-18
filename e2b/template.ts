@@ -1,32 +1,60 @@
 /**
- * E2B Template Definition for Claude Code sandbox
+ * E2B Template Definitions
  *
- * This template creates a sandbox with:
- * - Python runtime with data science stack
- * - Node.js for Claude Code CLI
- * - Required system dependencies for file processing
+ * We maintain two templates for experimentation:
+ * 1. templateNode (alias: zeno-claude-code) - Original Node.js based template
+ * 2. templatePython (alias: zeno-claude-code-python) - Enhanced Python template
  *
- * Two execution modes are supported:
- * 1. Claude Code CLI (Node.js) - current approach
- * 2. Claude Agent SDK (Python) - alternative approach with native data access
+ * Use build.ts to build either template.
  */
 
 import { Template } from 'e2b';
 
+// ============================================================================
+// Template Aliases (used when creating sandboxes)
+// ============================================================================
+
+export const TEMPLATE_ALIASES = {
+  node: 'zeno-claude-code',
+  python: 'zeno-claude-code-python',
+} as const;
+
+export type TemplateType = keyof typeof TEMPLATE_ALIASES;
+
+// ============================================================================
+// Node.js Template (Original)
+// ============================================================================
+
 /**
- * Main template: Python-based with full data science stack
+ * Original template: Node.js with Claude Code CLI
+ * Alias: zeno-claude-code
+ *
+ * This is the existing, stable template.
+ */
+export const templateNode = Template()
+  .fromNodeImage('24')
+  .aptInstall(['curl', 'git', 'ripgrep'])
+  .npmInstall('@anthropic-ai/claude-code', { g: true });
+
+// ============================================================================
+// Python Template (Experimental)
+// ============================================================================
+
+/**
+ * Enhanced template: Python with data science stack + Claude Code CLI
+ * Alias: zeno-claude-code-python
  *
  * This gives the agent:
  * - Native Python for data analysis (pandas, numpy)
  * - File format support (Excel, PDF, Word, PowerPoint)
  * - Claude Code CLI for agentic execution
- * - Claude Agent SDK (Python) for alternative execution
+ * - Claude Agent SDK (Python) for future use
  */
-export const template = Template()
+export const templatePython = Template()
   // Start with Python 3.11 base
   .fromPythonImage('3.11')
 
-  // System dependencies for file parsing and tools
+  // System dependencies
   .aptInstall([
     'curl',
     'git',
@@ -56,7 +84,7 @@ export const template = Template()
     'python-docx',
     'python-pptx',
 
-    // Claude Agent SDK (Python)
+    // Claude Agent SDK (Python) - for future use
     'anthropic-claude-agent-sdk',
 
     // Utilities
@@ -65,14 +93,10 @@ export const template = Template()
   ])
 
   // Install Claude Code CLI globally via npm
-  // Note: This works because we installed nodejs and npm via aptInstall above
   .npmInstall('@anthropic-ai/claude-code', { g: true });
 
-/**
- * Lightweight template: Just Claude Code CLI
- * Use this if you don't need Python data processing
- */
-export const templateLite = Template()
-  .fromNodeImage('24')
-  .aptInstall(['curl', 'git', 'ripgrep'])
-  .npmInstall('@anthropic-ai/claude-code@latest', { g: true });
+// ============================================================================
+// Default export (for backwards compatibility with existing build.ts)
+// ============================================================================
+
+export const template = templateNode;
