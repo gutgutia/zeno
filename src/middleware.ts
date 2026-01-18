@@ -4,7 +4,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 // Main domains where the app is hosted (subdomains of these are organization subdomains)
 const MAIN_DOMAINS = [
   'zeno.fyi',
-  'vercel.app',
   'localhost',
   '127.0.0.1',
 ];
