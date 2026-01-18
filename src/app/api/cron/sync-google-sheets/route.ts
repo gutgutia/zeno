@@ -175,6 +175,19 @@ export async function GET(request: NextRequest) {
         console.log(`[Sync] Changes detected for ${dashboard.id}, refreshing...`);
 
         const config = dashboard.config as DashboardConfig;
+
+        // Skip dashboards without generated HTML
+        if (!config?.html) {
+          console.log(`[Sync] Skipping ${dashboard.id} - no HTML in config`);
+          results.push({
+            id: dashboard.id,
+            title: dashboard.title,
+            status: 'skipped',
+            message: 'Dashboard has no generated HTML',
+          });
+          continue;
+        }
+
         const branding = getMergedBranding(
           dashboard.workspace?.branding as BrandingConfig | null,
           dashboard.branding_override as Partial<BrandingConfig> | null
