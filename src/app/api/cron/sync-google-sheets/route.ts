@@ -109,11 +109,23 @@ export async function GET(request: NextRequest) {
           accessToken = await getValidAccessToken(dashboard.google_connection_id!, supabase);
         } catch (tokenError) {
           console.error(`[Sync] Token error for ${dashboard.id}:`, tokenError);
+
+          // Disable sync for this dashboard - token is invalid, user needs to reconnect
+          try {
+            await supabase
+              .from('dashboards')
+              .update({ sync_enabled: false })
+              .eq('id', dashboard.id);
+            console.log(`[Sync] Disabled sync for ${dashboard.id} due to invalid token`);
+          } catch (updateError) {
+            console.error(`[Sync] Failed to disable sync for ${dashboard.id}:`, updateError);
+          }
+
           results.push({
             id: dashboard.id,
             title: dashboard.title,
             status: 'error',
-            message: 'Failed to get Google access token',
+            message: 'Google token invalid - sync disabled. User needs to reconnect.',
           });
           continue;
         }
