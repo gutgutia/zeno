@@ -81,15 +81,16 @@ ${userSection}
 ${toolsNote}
 REQUIREMENTS:
 1. Read and analyze the data at /home/user/data.txt
-2. Lead with key insights or a summary section that highlights what matters most
-3. Use visual hierarchy to tell a story with the data, not just display it
-4. Create a polished, responsive HTML page with embedded CSS and JavaScript
-5. Use Chart.js from CDN for visualizations where appropriate
-6. For larger data tables (10+ rows), include search and filter functionality
+2. Start with a well-designed header section (title, subtitle, and optional logo/branding)
+3. Lead with key insights or a summary section that highlights what matters most
+4. Use visual hierarchy to tell a story with the data, not just display it
+5. Create a polished, responsive HTML page with embedded CSS and JavaScript
+6. Use Chart.js from CDN for visualizations where appropriate
 7. Write the final HTML to /home/user/output.html
 
 DESIGN PRINCIPLES:
 - This is a customer-facing presentation, not an internal dashboard
+- The header should be visually striking and set the tone for the page
 - Use generous whitespace and modern typography
 - Make it visually engaging and easy to scan
 - Prioritize clarity and impact over data density
