@@ -9,6 +9,7 @@ import { computeDataDiff } from '@/lib/data/diff';
 import { refreshDashboardDirect, needsRegeneration } from '@/lib/ai/refresh-direct';
 import { refreshWithClaudeCode } from '@/lib/ai/refresh-with-claude-code';
 import { sendDashboardUpdatedEmail } from '@/lib/email/send';
+import { createVersion, getCurrentVersion } from '@/lib/versions';
 
 export const maxDuration = 300; // 5 minutes for batch processing
 
@@ -236,6 +237,24 @@ export async function GET(request: NextRequest) {
             })
             .eq('id', dashboard.id);
 
+          // Create version history
+          let versionLabel = '';
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const version = await createVersion(supabase as any, {
+              dashboardId: dashboard.id,
+              changeType: 'data_refresh',
+              changeSummary: refreshResult.summary,
+              config: updatedConfig,
+              rawContent: newContent,
+            });
+            versionLabel = `${version.major_version}.${version.minor_version}`;
+            console.log(`[Sync] Created version ${versionLabel} for dashboard ${dashboard.id}`);
+          } catch (versionError) {
+            console.error(`[Sync] Failed to create version for ${dashboard.id}:`, versionError);
+            // Don't fail the sync if version creation fails
+          }
+
           // Send email notification to the dashboard owner
           try {
             const userEmail = await getUserEmail(dashboard.owner_id);
@@ -244,6 +263,7 @@ export async function GET(request: NextRequest) {
                 to: userEmail,
                 dashboardTitle: dashboard.title,
                 dashboardSlug: dashboard.slug,
+                versionLabel: versionLabel || undefined,
                 summary: refreshResult.summary,
               });
               console.log(`[Sync] Email notification sent to ${userEmail} for dashboard ${dashboard.id}`);
