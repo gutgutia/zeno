@@ -11,7 +11,7 @@ export const AI_CONFIG = {
   // Options: 'sonnet' (balanced), 'opus' (highest quality), 'haiku' (fastest)
 
   /** Model for dashboard generation */
-  generateModel: 'haiku' as 'sonnet' | 'opus' | 'haiku',
+  generateModel: 'sonnet' as 'sonnet' | 'opus' | 'haiku',
 
   /** Model for dashboard modifications */
   modifyModel: 'sonnet' as 'sonnet' | 'opus' | 'haiku',
