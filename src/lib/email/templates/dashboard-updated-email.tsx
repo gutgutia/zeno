@@ -139,7 +139,7 @@ const container = {
 };
 
 const header = {
-  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+  background: 'linear-gradient(135deg, #0055FF 0%, #0044CC 100%)',
   padding: '40px',
   textAlign: 'center' as const,
 };
@@ -169,7 +169,7 @@ const successIconCell = {
   width: '64px',
   height: '64px',
   borderRadius: '50%',
-  backgroundColor: '#fef3c7',
+  backgroundColor: '#dbeafe',
   textAlign: 'center' as const,
   verticalAlign: 'middle' as const,
 };
@@ -258,7 +258,7 @@ const changesCountText = {
 
 const ctaButton = {
   display: 'inline-block',
-  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+  background: 'linear-gradient(135deg, #0055FF 0%, #0044CC 100%)',
   color: '#ffffff',
   fontSize: '15px',
   fontWeight: '600',
@@ -309,7 +309,7 @@ const footerText = {
 };
 
 const footerLink = {
-  color: '#f59e0b',
+  color: '#0055FF',
   textDecoration: 'none',
 };
 
