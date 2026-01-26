@@ -16,6 +16,17 @@ interface PlanCredits {
   is_one_time: boolean;
 }
 
+interface AIConfig {
+  generateModel: 'sonnet' | 'opus' | 'haiku';
+  modifyModel: 'sonnet' | 'opus' | 'haiku';
+  refreshModel: 'sonnet' | 'opus' | 'haiku';
+  sandboxTemplate: 'node' | 'python';
+  promptStyle: 'enhanced' | 'minimal';
+  verboseLogging: boolean;
+  sandboxTimeoutMs: number;
+  commandTimeoutMs: number;
+}
+
 interface GlobalSettings {
   plan_pricing: {
     free: PlanPricing;
@@ -37,6 +48,7 @@ interface GlobalSettings {
     new_signups_enabled: boolean;
     google_sheets_enabled: boolean;
   };
+  ai_config: AIConfig;
 }
 
 export default function GlobalSettingsPage() {
@@ -334,6 +346,196 @@ export default function GlobalSettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* AI Configuration */}
+      {settings.ai_config && (
+        <div className="bg-white rounded-lg border border-[var(--color-gray-200)] p-6">
+          <h2 className="text-lg font-semibold text-[var(--color-gray-900)] mb-4">AI Configuration</h2>
+          <p className="text-sm text-[var(--color-gray-500)] mb-4">
+            Configure AI model selection, sandbox settings, and prompt styles
+          </p>
+
+          {/* Model Selection */}
+          <div className="mb-6">
+            <h3 className="font-medium text-[var(--color-gray-900)] mb-3">Model Selection</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label className="text-xs">Generation Model</Label>
+                <select
+                  value={settings.ai_config.generateModel}
+                  onChange={(e) => {
+                    const newConfig = {
+                      ...settings.ai_config,
+                      generateModel: e.target.value as 'sonnet' | 'opus' | 'haiku',
+                    };
+                    setSettings({ ...settings, ai_config: newConfig });
+                  }}
+                  className="mt-1 w-full rounded-md border border-[var(--color-gray-300)] px-3 py-2 text-sm"
+                >
+                  <option value="opus">Opus (highest quality)</option>
+                  <option value="sonnet">Sonnet (balanced)</option>
+                  <option value="haiku">Haiku (fastest)</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs">Modify Model</Label>
+                <select
+                  value={settings.ai_config.modifyModel}
+                  onChange={(e) => {
+                    const newConfig = {
+                      ...settings.ai_config,
+                      modifyModel: e.target.value as 'sonnet' | 'opus' | 'haiku',
+                    };
+                    setSettings({ ...settings, ai_config: newConfig });
+                  }}
+                  className="mt-1 w-full rounded-md border border-[var(--color-gray-300)] px-3 py-2 text-sm"
+                >
+                  <option value="opus">Opus (highest quality)</option>
+                  <option value="sonnet">Sonnet (balanced)</option>
+                  <option value="haiku">Haiku (fastest)</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs">Refresh Model</Label>
+                <select
+                  value={settings.ai_config.refreshModel}
+                  onChange={(e) => {
+                    const newConfig = {
+                      ...settings.ai_config,
+                      refreshModel: e.target.value as 'sonnet' | 'opus' | 'haiku',
+                    };
+                    setSettings({ ...settings, ai_config: newConfig });
+                  }}
+                  className="mt-1 w-full rounded-md border border-[var(--color-gray-300)] px-3 py-2 text-sm"
+                >
+                  <option value="opus">Opus (highest quality)</option>
+                  <option value="sonnet">Sonnet (balanced)</option>
+                  <option value="haiku">Haiku (fastest)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Sandbox & Prompt Settings */}
+          <div className="mb-6">
+            <h3 className="font-medium text-[var(--color-gray-900)] mb-3">Sandbox & Prompt</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs">Sandbox Template</Label>
+                <select
+                  value={settings.ai_config.sandboxTemplate}
+                  onChange={(e) => {
+                    const newConfig = {
+                      ...settings.ai_config,
+                      sandboxTemplate: e.target.value as 'node' | 'python',
+                    };
+                    setSettings({ ...settings, ai_config: newConfig });
+                  }}
+                  className="mt-1 w-full rounded-md border border-[var(--color-gray-300)] px-3 py-2 text-sm"
+                >
+                  <option value="python">Python (pandas, numpy)</option>
+                  <option value="node">Node.js (original)</option>
+                </select>
+                <p className="text-xs text-[var(--color-gray-500)] mt-1">
+                  Python template has data science stack
+                </p>
+              </div>
+              <div>
+                <Label className="text-xs">Prompt Style</Label>
+                <select
+                  value={settings.ai_config.promptStyle}
+                  onChange={(e) => {
+                    const newConfig = {
+                      ...settings.ai_config,
+                      promptStyle: e.target.value as 'enhanced' | 'minimal',
+                    };
+                    setSettings({ ...settings, ai_config: newConfig });
+                  }}
+                  className="mt-1 w-full rounded-md border border-[var(--color-gray-300)] px-3 py-2 text-sm"
+                >
+                  <option value="enhanced">Enhanced (header, insights focus)</option>
+                  <option value="minimal">Minimal (simple, original)</option>
+                </select>
+                <p className="text-xs text-[var(--color-gray-500)] mt-1">
+                  Enhanced emphasizes visual hierarchy and storytelling
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Timeouts */}
+          <div className="mb-6">
+            <h3 className="font-medium text-[var(--color-gray-900)] mb-3">Timeouts</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs">Sandbox Timeout (ms)</Label>
+                <Input
+                  type="number"
+                  value={settings.ai_config.sandboxTimeoutMs}
+                  onChange={(e) => {
+                    const newConfig = {
+                      ...settings.ai_config,
+                      sandboxTimeoutMs: parseInt(e.target.value) || 480000,
+                    };
+                    setSettings({ ...settings, ai_config: newConfig });
+                  }}
+                  className="mt-1"
+                />
+                <p className="text-xs text-[var(--color-gray-500)] mt-1">
+                  How long the E2B sandbox stays alive
+                </p>
+              </div>
+              <div>
+                <Label className="text-xs">Command Timeout (ms)</Label>
+                <Input
+                  type="number"
+                  value={settings.ai_config.commandTimeoutMs}
+                  onChange={(e) => {
+                    const newConfig = {
+                      ...settings.ai_config,
+                      commandTimeoutMs: parseInt(e.target.value) || 420000,
+                    };
+                    setSettings({ ...settings, ai_config: newConfig });
+                  }}
+                  className="mt-1"
+                />
+                <p className="text-xs text-[var(--color-gray-500)] mt-1">
+                  How long to wait for Claude CLI
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Verbose Logging */}
+          <div className="flex items-center justify-between p-3 bg-[var(--color-gray-50)] rounded-lg mb-4">
+            <div>
+              <p className="font-medium text-[var(--color-gray-900)]">Verbose Logging</p>
+              <p className="text-sm text-[var(--color-gray-500)]">Show turn-by-turn tool calls and results</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.ai_config.verboseLogging}
+              onChange={(e) => {
+                const newConfig = {
+                  ...settings.ai_config,
+                  verboseLogging: e.target.checked,
+                };
+                setSettings({ ...settings, ai_config: newConfig });
+              }}
+              className="rounded border-gray-300 h-5 w-5"
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              onClick={() => saveSetting('ai_config', settings.ai_config)}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Save AI Config'}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,7 @@
  * understand and debug agent behavior.
  */
 
-import { AI_CONFIG } from './config';
+import { DEFAULT_AI_CONFIG } from './config';
 
 // Internal config for text truncation (not exposed in central config)
 const TRUNCATION_CONFIG = {
@@ -14,7 +14,9 @@ const TRUNCATION_CONFIG = {
 };
 
 // Helper to check if logging is enabled
-const isLoggingEnabled = () => AI_CONFIG.verboseLogging;
+// Note: Uses default config for simplicity; the actual logging decision
+// is made in the calling code based on the fetched config
+const isLoggingEnabled = () => DEFAULT_AI_CONFIG.verboseLogging;
 
 // Event types from Claude Code CLI stream-json output
 export interface AgentEvent {

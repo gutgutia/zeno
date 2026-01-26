@@ -12,7 +12,7 @@
 import { Sandbox } from 'e2b';
 import type { BrandingConfig } from '@/types/database';
 import type { ModifyResultWithUsage } from './agent';
-import { AI_CONFIG } from './config';
+import { getAIConfig } from './config';
 import {
   type AgentEvent,
   logAgentEvent,
@@ -74,7 +74,10 @@ export async function modifyWithClaudeCode(
   instructions: string,
   branding: BrandingConfig | null
 ): Promise<ModifyResultWithUsage> {
-  const templateType = AI_CONFIG.sandboxTemplate;
+  // Fetch config from database (with fallback to defaults)
+  const config = await getAIConfig();
+
+  const templateType = config.sandboxTemplate;
   const templateAlias = TEMPLATE_ALIASES[templateType];
 
   console.log(`[Modify Claude Code] Starting modification with ${templateType} template...`);
@@ -85,7 +88,7 @@ export async function modifyWithClaudeCode(
 
   try {
     sandbox = await Sandbox.create(templateAlias, {
-      timeoutMs: AI_CONFIG.sandboxTimeoutMs,
+      timeoutMs: config.sandboxTimeoutMs,
       envs: {
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
       },
@@ -110,8 +113,8 @@ export async function modifyWithClaudeCode(
     printLogHeader('Dashboard Modification');
 
     // Build the command with model flag
-    const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${AI_CONFIG.modifyModel}`;
-    const command = AI_CONFIG.verboseLogging
+    const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${config.modifyModel}`;
+    const command = config.verboseLogging
       ? `${baseCommand} --verbose --output-format stream-json`
       : baseCommand;
 
@@ -119,12 +122,12 @@ export async function modifyWithClaudeCode(
 
     try {
       result = await sandbox.commands.run(command, {
-        timeoutMs: AI_CONFIG.commandTimeoutMs,
+        timeoutMs: config.commandTimeoutMs,
         cwd: '/home/user',
         onStdout: (data) => {
           collectedStdout.push(data);
 
-          if (AI_CONFIG.verboseLogging) {
+          if (config.verboseLogging) {
             const lines = data.split('\n').filter(line => line.trim());
             for (const line of lines) {
               try {
@@ -215,7 +218,7 @@ export async function modifyWithClaudeCode(
         costUsd: 0,
         turnCount: 0,
         durationMs,
-        modelId: AI_CONFIG.modifyModel,
+        modelId: config.modifyModel,
       },
     };
 

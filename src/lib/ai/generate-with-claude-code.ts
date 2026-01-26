@@ -17,7 +17,7 @@
 import { Sandbox } from 'e2b';
 import type { DashboardConfig } from '@/types/dashboard';
 import type { BrandingConfig } from '@/types/database';
-import { AI_CONFIG } from './config';
+import { getAIConfig, type AIConfigType, DEFAULT_AI_CONFIG } from './config';
 import {
   type AgentEvent,
   logAgentEvent,
@@ -57,8 +57,8 @@ Use a professional color scheme:
 `;
 }
 
-function getToolsNote(): string {
-  return AI_CONFIG.sandboxTemplate === 'python'
+function getToolsNote(config: AIConfigType): string {
+  return config.sandboxTemplate === 'python'
     ? `
 AVAILABLE TOOLS:
 You have access to Python with pandas, numpy, openpyxl, pdfplumber, python-docx, and python-pptx.
@@ -71,10 +71,10 @@ Use these if they help, but feel free to approach the problem however you see fi
 /**
  * Build the enhanced prompt (customer-facing presentation focus)
  */
-function buildEnhancedPrompt(branding: BrandingConfig | null, userInstructions?: string): string {
+function buildEnhancedPrompt(branding: BrandingConfig | null, config: AIConfigType, userInstructions?: string): string {
   const brandingSection = getBrandingSection(branding);
   const userSection = userInstructions ? `\nUSER INSTRUCTIONS:\n${userInstructions}\n` : '';
-  const toolsNote = getToolsNote();
+  const toolsNote = getToolsNote(config);
 
   return `You are creating a beautiful, customer-facing data presentation that brings data to life.
 
@@ -108,10 +108,10 @@ After writing the file, output ONLY this JSON (no markdown, no extra text):
 /**
  * Build the minimal prompt (simpler, original style)
  */
-function buildMinimalPrompt(branding: BrandingConfig | null, userInstructions?: string): string {
+function buildMinimalPrompt(branding: BrandingConfig | null, config: AIConfigType, userInstructions?: string): string {
   const brandingSection = getBrandingSection(branding);
   const userSection = userInstructions ? `\nUSER INSTRUCTIONS:\n${userInstructions}\n` : '';
-  const toolsNote = getToolsNote();
+  const toolsNote = getToolsNote(config);
 
   return `You are an expert at transforming raw data into stunning, professional web pages.
 
@@ -136,11 +136,11 @@ After writing the file, output ONLY this JSON (no markdown, no extra text):
 /**
  * Build the prompt for Claude Code based on config
  */
-function buildPrompt(branding: BrandingConfig | null, userInstructions?: string): string {
-  if (AI_CONFIG.promptStyle === 'enhanced') {
-    return buildEnhancedPrompt(branding, userInstructions);
+function buildPrompt(branding: BrandingConfig | null, config: AIConfigType, userInstructions?: string): string {
+  if (config.promptStyle === 'enhanced') {
+    return buildEnhancedPrompt(branding, config, userInstructions);
   }
-  return buildMinimalPrompt(branding, userInstructions);
+  return buildMinimalPrompt(branding, config, userInstructions);
 }
 
 /**
@@ -257,7 +257,10 @@ export async function generateWithClaudeCode(
   branding: BrandingConfig | null,
   userInstructions?: string
 ): Promise<GenerateResult> {
-  const templateType = AI_CONFIG.sandboxTemplate;
+  // Fetch config from database (with fallback to defaults)
+  const config = await getAIConfig();
+
+  const templateType = config.sandboxTemplate;
   const templateAlias = TEMPLATE_ALIASES[templateType];
 
   console.log(`[Claude Code E2B] Starting generation with ${templateType} template...`);
@@ -270,7 +273,7 @@ export async function generateWithClaudeCode(
     // Create sandbox with configured template
     console.log(`[Claude Code E2B] Creating sandbox with template: ${templateAlias}...`);
     sandbox = await Sandbox.create(templateAlias, {
-      timeoutMs: AI_CONFIG.sandboxTimeoutMs,
+      timeoutMs: config.sandboxTimeoutMs,
       envs: {
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
       },
@@ -289,7 +292,7 @@ export async function generateWithClaudeCode(
     }
 
     // Build the prompt
-    const prompt = buildPrompt(branding, userInstructions);
+    const prompt = buildPrompt(branding, config, userInstructions);
     const escapedPrompt = prompt.replace(/'/g, "'\\''");
 
     // Run Claude Code CLI
@@ -317,18 +320,18 @@ export async function generateWithClaudeCode(
       // Use Claude Code CLI for both templates
 
       try {
-        const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${AI_CONFIG.generateModel}`;
-        const command = AI_CONFIG.verboseLogging
+        const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${config.generateModel}`;
+        const command = config.verboseLogging
           ? `${baseCommand} --verbose --output-format stream-json`
           : baseCommand;
 
         result = await sandbox.commands.run(command, {
-          timeoutMs: AI_CONFIG.commandTimeoutMs,
+          timeoutMs: config.commandTimeoutMs,
           cwd: '/home/user',
           onStdout: (data) => {
             collectedStdout.push(data);
 
-            if (AI_CONFIG.verboseLogging) {
+            if (config.verboseLogging) {
               const lines = data.split('\n').filter(line => line.trim());
               for (const line of lines) {
                 try {
@@ -436,7 +439,7 @@ export async function generateWithClaudeCode(
       charts: {},
       metadata: {
         generatedAt: new Date().toISOString(),
-        generationModel: AI_CONFIG.generateModel,
+        generationModel: config.generateModel,
         userInstructions,
         agentGenerated: true,
         claudeCodeE2B: true,
@@ -453,7 +456,7 @@ export async function generateWithClaudeCode(
       config,
       usage: {
         durationMs,
-        modelId: AI_CONFIG.generateModel,
+        modelId: config.generateModel,
       },
     };
 
