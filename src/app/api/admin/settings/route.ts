@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { clearAIConfigCache } from '@/lib/ai/config';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AdminSupabase = SupabaseClient<any, any, any>;
@@ -94,6 +95,11 @@ export async function PUT(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Clear AI config cache if that's what was updated (immediate effect)
+  if (key === 'ai_config') {
+    clearAIConfigCache();
   }
 
   // Log admin action
