@@ -30,6 +30,17 @@ import type { Dashboard, BrandingConfig, DashboardVersion } from '@/types/databa
 import type { DashboardConfig, GenerationStatus } from '@/types/dashboard';
 
 const POLL_INTERVAL = 3000; // 3 seconds
+const STALE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes - consider operation stale/timed out
+
+/**
+ * Check if an operation has timed out based on generation_started_at
+ */
+function isOperationTimedOut(startedAt: string | null | undefined): boolean {
+  if (!startedAt) return false;
+  const startTime = new Date(startedAt).getTime();
+  const elapsed = Date.now() - startTime;
+  return elapsed > STALE_TIMEOUT_MS;
+}
 
 /**
  * Format a date as relative time or absolute date
@@ -150,6 +161,29 @@ export default function DashboardEditorPage({ params }: { params: Promise<{ id: 
       if (data) {
         const newStatus = data.dashboard.generation_status as GenerationStatus;
         const oldStatus = dashboard.generation_status;
+        const startedAt = data.dashboard.generation_started_at;
+
+        // Check for timeout - if operation has been running too long
+        const timedOut = isOperationTimedOut(startedAt) &&
+          (newStatus === 'generating' || newStatus === 'analyzing' || newStatus === 'refreshing');
+
+        if (timedOut) {
+          // Mark as failed locally and show timeout message
+          setDashboard({
+            ...data.dashboard,
+            generation_status: 'failed',
+            generation_error: 'Operation timed out. The server may have been overloaded. Please try again.',
+          });
+
+          if (oldStatus === 'refreshing' || isRefreshingStatus) {
+            toast.error('Data update timed out. Please try again.');
+          } else {
+            toast.error('Generation timed out. Please try again.');
+          }
+          clearInterval(interval);
+          return;
+        }
+
         setDashboard(data.dashboard);
 
         if (newStatus === 'completed') {

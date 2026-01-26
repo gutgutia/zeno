@@ -34,7 +34,11 @@ export interface RefreshWithClaudeCodeResult {
 }
 
 /**
- * Build the prompt for Claude Code refresh/regeneration
+ * Build the prompt for Claude Code refresh
+ * Uses different prompts based on the severity of data changes:
+ * - Values only: Surgical update, preserve layout exactly
+ * - Minor schema change: Preserve layout, adapt minimally
+ * - Major schema change: Regenerate with same style
  */
 function buildRefreshPrompt(
   diff: DataDiff,
@@ -55,10 +59,93 @@ ORIGINAL DASHBOARD PURPOSE:
 ${originalSummary}
 ` : '';
 
-  return `You are refreshing a dashboard with new data. The data has changed significantly, so you'll create an updated dashboard.
+  // Determine the refresh strategy based on diff
+  const columnsAdded = diff.schema?.columnsAdded || [];
+  const columnsRemoved = diff.schema?.columnsRemoved || [];
+  const totalColumns = (diff.schema?.columnsUnchanged?.length || 0) + columnsAdded.length;
+
+  const isMajorSchemaChange = diff.domainChanged ||
+    (columnsAdded.length + columnsRemoved.length > Math.max(3, totalColumns * 0.3));
+
+  const isMinorSchemaChange = !isMajorSchemaChange &&
+    (columnsAdded.length > 0 || columnsRemoved.length > 0);
+
+  // Default: Values-only change - most conservative
+  if (!isMinorSchemaChange && !isMajorSchemaChange) {
+    return `You are updating a dashboard with new data values. The data structure is the same, only values changed.
 
 FILES:
-- /home/user/existing.html - The previous dashboard HTML (for reference on style/layout)
+- /home/user/existing.html - The current dashboard HTML (PRESERVE THIS LAYOUT)
+- /home/user/data.txt - The NEW data with updated values
+
+OUTPUT: Write the updated HTML to /home/user/output.html
+
+${brandingSection}
+${contextSection}
+
+DATA CHANGES:
+${diffSummary}
+
+WORKFLOW:
+1. Read /home/user/existing.html carefully - you must preserve its EXACT structure
+2. Read /home/user/data.txt to see the new values
+3. Update ONLY the data values in the HTML - do NOT change the layout or structure
+4. Write the complete HTML to /home/user/output.html
+
+CRITICAL REQUIREMENTS:
+- Preserve the EXACT layout, structure, and styling of the existing dashboard
+- Do NOT add, remove, or rearrange any charts, cards, tables, or sections
+- Do NOT redesign or "improve" the dashboard - only update values
+- Keep all CSS, classes, and HTML structure identical
+- Only change the actual data values (numbers, text in tables, chart data)
+- If a metric/value appears in the existing dashboard, update it with the new value
+- This is a DATA UPDATE, not a redesign
+
+After writing output.html, output ONLY this JSON (no markdown):
+{"summary": "Updated data values", "changes": [{"metric": "Name", "old": "oldValue", "new": "newValue"}]}`;
+  }
+
+  // Minor schema change - preserve layout, adapt minimally
+  if (isMinorSchemaChange) {
+    return `You are updating a dashboard with new data. Some columns were added or removed, but the core data is similar.
+
+FILES:
+- /home/user/existing.html - The current dashboard HTML (PRESERVE THIS LAYOUT as much as possible)
+- /home/user/data.txt - The NEW data
+
+OUTPUT: Write the updated HTML to /home/user/output.html
+
+${brandingSection}
+${contextSection}
+
+DATA CHANGES:
+${diffSummary}
+
+WORKFLOW:
+1. Read /home/user/existing.html carefully - preserve its structure as much as possible
+2. Read /home/user/data.txt to understand the new data
+3. Update the dashboard with minimal changes:
+   - Update all existing values with new data
+   - If a column was removed, you may remove its visualization (but keep the overall layout)
+   - If a column was added, you may add a small element for it (matching the existing style)
+4. Write the complete HTML to /home/user/output.html
+
+IMPORTANT REQUIREMENTS:
+- Preserve the overall layout and visual design
+- Make MINIMAL structural changes - only what's necessary for the schema change
+- Keep the same styling, colors, and visual hierarchy
+- Do NOT redesign or significantly restructure the dashboard
+- Match the existing style for any new elements
+
+After writing output.html, output ONLY this JSON (no markdown):
+{"summary": "Brief description of changes", "changes": [{"metric": "Name", "old": "oldValue", "new": "newValue"}]}`;
+  }
+
+  // Major schema change - regenerate with same style
+  return `You are refreshing a dashboard with significantly changed data. The data structure changed substantially, so you'll need to create an updated dashboard while keeping the visual style.
+
+FILES:
+- /home/user/existing.html - The previous dashboard HTML (reference for VISUAL STYLE only)
 - /home/user/data.txt - The NEW data to visualize
 
 OUTPUT: Write the refreshed HTML to /home/user/output.html
@@ -70,19 +157,18 @@ DATA CHANGES:
 ${diffSummary}
 
 WORKFLOW:
-1. Read /home/user/existing.html to understand the previous dashboard's style and approach
-2. Read /home/user/data.txt to analyze the NEW data
+1. Read /home/user/existing.html to understand the visual style (colors, fonts, card styles, etc.)
+2. Read /home/user/data.txt to analyze the NEW data structure
 3. Create an updated dashboard that:
-   - Preserves the visual style and branding from the original
-   - Properly visualizes the NEW data
-   - Adapts to any schema changes (new/removed columns)
+   - Uses the same visual style and branding from the original
+   - Properly visualizes the NEW data structure
+   - Creates appropriate charts/cards for the new columns
 4. Write the complete HTML to /home/user/output.html
 
 IMPORTANT:
-- Keep the same professional look and feel
-- Adapt visualizations to match the new data structure
-- If columns were added, consider adding new charts/cards
-- If columns were removed, remove corresponding visualizations
+- Keep the same professional look, colors, and visual style
+- Create visualizations appropriate for the new data structure
+- This is a regeneration due to major schema changes
 
 After writing output.html, output ONLY this JSON (no markdown):
 {"summary": "Brief description of refresh", "changes": [{"metric": "Name", "old": "oldValue", "new": "newValue"}]}`;

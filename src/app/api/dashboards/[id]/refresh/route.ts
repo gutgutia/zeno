@@ -117,11 +117,15 @@ export async function POST(
     if (syncFromSheet && dashboard.google_connection_id && dashboard.google_sheet_id) {
       isGoogleSheetSync = true;
 
-      // Update status to refreshing
+      // Update status to refreshing with timestamp for timeout detection
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any)
         .from('dashboards')
-        .update({ generation_status: 'refreshing' })
+        .update({
+          generation_status: 'refreshing',
+          generation_started_at: new Date().toISOString(),
+          generation_error: null,
+        })
         .eq('id', id);
 
       try {
@@ -213,7 +217,11 @@ export async function POST(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any)
         .from('dashboards')
-        .update({ generation_status: 'refreshing' })
+        .update({
+          generation_status: 'refreshing',
+          generation_started_at: new Date().toISOString(),
+          generation_error: null,
+        })
         .eq('id', id);
     }
 
