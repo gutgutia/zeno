@@ -121,24 +121,32 @@ export function detectContentType(content: string): ContentType {
     const parseResult = Papa.parse(trimmed, {
       header: false,
       skipEmptyLines: true,
-      preview: 20, // Only parse first 20 rows for detection
+      preview: 50, // Parse more rows for better detection
     });
 
     if (parseResult.data && parseResult.data.length >= 2) {
       const rows = parseResult.data as string[][];
-      const firstRowCols = rows[0]?.length || 0;
 
-      // Check if we have multiple columns and consistent column counts
-      if (firstRowCols > 1) {
-        // Check if at least 80% of rows have similar column count
-        const consistentRows = rows.filter(row => {
-          const cols = row.length;
-          return cols === firstRowCols || Math.abs(cols - firstRowCols) <= 1;
-        });
+      // For tabular detection, we need:
+      // 1. Multiple columns in most rows
+      // 2. Reasonably consistent column counts (Google Sheets often has trailing empty cols)
 
-        if (consistentRows.length >= rows.length * 0.8) {
-          return 'tabular';
-        }
+      // Find the most common column count range (allowing for trailing empty columns)
+      const colCounts = rows.map(row => row.length);
+      const minCols = Math.min(...colCounts);
+      const maxCols = Math.max(...colCounts);
+
+      // If most rows have at least 2 columns and the range isn't too wide, it's tabular
+      // Google Sheets exports often have: header with N cols, data rows with N-3 to N cols
+      const rowsWithMultipleCols = rows.filter(row => row.length >= 2).length;
+      const hasMultipleColumns = rowsWithMultipleCols >= rows.length * 0.8;
+
+      // Column count variance is acceptable if within reasonable range
+      // (Google Sheets trailing empty columns cause variance of 1-4 typically)
+      const acceptableVariance = maxCols - minCols <= Math.max(4, maxCols * 0.3);
+
+      if (hasMultipleColumns && minCols >= 2 && acceptableVariance) {
+        return 'tabular';
       }
     }
 
@@ -147,22 +155,21 @@ export function detectContentType(content: string): ContentType {
       header: false,
       skipEmptyLines: true,
       delimiter: '\t',
-      preview: 20,
+      preview: 50,
     });
 
     if (tabParseResult.data && tabParseResult.data.length >= 2) {
       const rows = tabParseResult.data as string[][];
-      const firstRowCols = rows[0]?.length || 0;
+      const colCounts = rows.map(row => row.length);
+      const minCols = Math.min(...colCounts);
+      const maxCols = Math.max(...colCounts);
 
-      if (firstRowCols > 1) {
-        const consistentRows = rows.filter(row => {
-          const cols = row.length;
-          return cols === firstRowCols || Math.abs(cols - firstRowCols) <= 1;
-        });
+      const rowsWithMultipleCols = rows.filter(row => row.length >= 2).length;
+      const hasMultipleColumns = rowsWithMultipleCols >= rows.length * 0.8;
+      const acceptableVariance = maxCols - minCols <= Math.max(4, maxCols * 0.3);
 
-        if (consistentRows.length >= rows.length * 0.8) {
-          return 'tabular';
-        }
+      if (hasMultipleColumns && minCols >= 2 && acceptableVariance) {
+        return 'tabular';
       }
     }
   }
