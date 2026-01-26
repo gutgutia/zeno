@@ -146,8 +146,9 @@ function buildPrompt(branding: BrandingConfig | null, config: AIConfigType, user
 /**
  * Agent utility library (Python)
  * Available for the agent to use if it finds it helpful
+ * Exported for use by refresh and modify modules
  */
-const AGENT_UTILS_PYTHON = `"""
+export const AGENT_UTILS_PYTHON = `"""
 Agent Utility Library - Optional helper functions for dashboard generation
 Import what you need: from agent_utils import load_data, html, chart_bar, format_currency
 """

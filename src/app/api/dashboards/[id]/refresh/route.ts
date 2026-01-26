@@ -312,8 +312,7 @@ export async function POST(
           const claudeCodeResult = await refreshWithClaudeCode(
             newContent,
             config,
-            branding,
-            diff
+            branding
           );
           usedClaudeCodeE2B = true;
 
@@ -340,8 +339,7 @@ export async function POST(
         const claudeCodeResult = await refreshWithClaudeCode(
           newContent,
           config,
-          branding,
-          diff
+          branding
         );
         usedClaudeCodeE2B = true;
 

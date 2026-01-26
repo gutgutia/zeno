@@ -12,8 +12,6 @@
 import { Sandbox } from 'e2b';
 import type { BrandingConfig } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
-import type { DataDiff } from '@/lib/data/diff';
-import { formatDiffForAI } from '@/lib/data/diff';
 import { getAIConfig } from './config';
 import {
   type AgentEvent,
@@ -22,6 +20,7 @@ import {
   printLogFooter,
 } from './agent-logging';
 import { TEMPLATE_ALIASES } from '../../../e2b/template';
+import { AGENT_UTILS_PYTHON } from './generate-with-claude-code';
 
 export interface RefreshWithClaudeCodeResult {
   html: string;
@@ -40,142 +39,22 @@ export interface RefreshWithClaudeCodeResult {
  * - Minor schema change: Preserve layout, adapt minimally
  * - Major schema change: Regenerate with same style
  */
-function buildRefreshPrompt(
-  diff: DataDiff,
-  branding: BrandingConfig | null,
-  originalSummary?: string
-): string {
-  const brandingSection = branding ? `
-BRANDING:
-- Company: ${branding.companyName || 'Not specified'}
-- Primary: ${branding.colors?.primary || '#2563EB'}
-- Secondary: ${branding.colors?.secondary || '#0D9488'}
-- Font: ${branding.fontFamily || 'system-ui, sans-serif'}
-` : '';
+function buildRefreshPrompt(): string {
+  return `You are updating a dashboard with new data.
 
-  const diffSummary = formatDiffForAI(diff);
-  const contextSection = originalSummary ? `
-ORIGINAL DASHBOARD PURPOSE:
-${originalSummary}
-` : '';
+INPUT:
+- /home/user/existing.html - Current dashboard
+- /home/user/data.txt - New data (source of truth)
 
-  // Determine the refresh strategy based on diff
-  const columnsAdded = diff.schema?.columnsAdded || [];
-  const columnsRemoved = diff.schema?.columnsRemoved || [];
-  const totalColumns = (diff.schema?.columnsUnchanged?.length || 0) + columnsAdded.length;
+OUTPUT: Write updated HTML to /home/user/output.html
 
-  const isMajorSchemaChange = diff.domainChanged ||
-    (columnsAdded.length + columnsRemoved.length > Math.max(3, totalColumns * 0.3));
+GOAL: Make all values, counts, tables, and charts accurately reflect the new data.
+Preserve the existing design unless the data structure changed significantly.
 
-  const isMinorSchemaChange = !isMajorSchemaChange &&
-    (columnsAdded.length > 0 || columnsRemoved.length > 0);
+A utility library is available at /home/user/agent_utils.py if you need help parsing data or building components.
 
-  // Default: Values-only change - most conservative
-  // This handles: value updates, row additions/deletions, computed metrics updates
-  if (!isMinorSchemaChange && !isMajorSchemaChange) {
-    return `You are updating a dashboard with new data. The data structure (columns) is the same, but values have changed and rows may have been added or removed.
-
-FILES:
-- /home/user/existing.html - The current dashboard HTML (PRESERVE THIS DESIGN)
-- /home/user/data.txt - The NEW data (this is the source of truth)
-
-OUTPUT: Write the updated HTML to /home/user/output.html
-
-${brandingSection}
-${contextSection}
-
-DATA CHANGES:
-${diffSummary}
-
-WORKFLOW:
-1. Read /home/user/existing.html to understand the dashboard design
-2. Read /home/user/data.txt - this is the NEW source of truth
-3. Update the dashboard to reflect the new data:
-   - Update all summary statistics/counts (e.g., "45 projects in green status")
-   - Update table contents to match the new data exactly (add new rows, remove deleted rows, update changed values)
-   - Update any charts/visualizations with new values
-4. Write the complete HTML to /home/user/output.html
-
-CRITICAL REQUIREMENTS:
-- PRESERVE the dashboard design: same layout, same cards, same chart types, same styling
-- SYNC the data: all numbers, tables, and charts must reflect the NEW data exactly
-- Update summary metrics (counts, totals, percentages) based on the new data
-- Tables should show exactly what's in the new data (add/remove rows as needed)
-- Do NOT redesign, rearrange, or add new visualization types
-- Do NOT change colors, fonts, card layouts, or overall structure
-- This is a DATA SYNC, not a redesign
-
-After writing output.html, output ONLY this JSON (no markdown):
-{"summary": "Updated data values", "changes": [{"metric": "Name", "old": "oldValue", "new": "newValue"}]}`;
-  }
-
-  // Minor schema change - preserve layout, adapt minimally
-  if (isMinorSchemaChange) {
-    return `You are updating a dashboard with new data. Some columns were added or removed, but the core data is similar.
-
-FILES:
-- /home/user/existing.html - The current dashboard HTML (PRESERVE THIS LAYOUT as much as possible)
-- /home/user/data.txt - The NEW data
-
-OUTPUT: Write the updated HTML to /home/user/output.html
-
-${brandingSection}
-${contextSection}
-
-DATA CHANGES:
-${diffSummary}
-
-WORKFLOW:
-1. Read /home/user/existing.html carefully - preserve its structure as much as possible
-2. Read /home/user/data.txt to understand the new data
-3. Update the dashboard with minimal changes:
-   - Update all existing values with new data
-   - If a column was removed, you may remove its visualization (but keep the overall layout)
-   - If a column was added, you may add a small element for it (matching the existing style)
-4. Write the complete HTML to /home/user/output.html
-
-IMPORTANT REQUIREMENTS:
-- Preserve the overall layout and visual design
-- Make MINIMAL structural changes - only what's necessary for the schema change
-- Keep the same styling, colors, and visual hierarchy
-- Do NOT redesign or significantly restructure the dashboard
-- Match the existing style for any new elements
-
-After writing output.html, output ONLY this JSON (no markdown):
-{"summary": "Brief description of changes", "changes": [{"metric": "Name", "old": "oldValue", "new": "newValue"}]}`;
-  }
-
-  // Major schema change - regenerate with same style
-  return `You are refreshing a dashboard with significantly changed data. The data structure changed substantially, so you'll need to create an updated dashboard while keeping the visual style.
-
-FILES:
-- /home/user/existing.html - The previous dashboard HTML (reference for VISUAL STYLE only)
-- /home/user/data.txt - The NEW data to visualize
-
-OUTPUT: Write the refreshed HTML to /home/user/output.html
-
-${brandingSection}
-${contextSection}
-
-DATA CHANGES:
-${diffSummary}
-
-WORKFLOW:
-1. Read /home/user/existing.html to understand the visual style (colors, fonts, card styles, etc.)
-2. Read /home/user/data.txt to analyze the NEW data structure
-3. Create an updated dashboard that:
-   - Uses the same visual style and branding from the original
-   - Properly visualizes the NEW data structure
-   - Creates appropriate charts/cards for the new columns
-4. Write the complete HTML to /home/user/output.html
-
-IMPORTANT:
-- Keep the same professional look, colors, and visual style
-- Create visualizations appropriate for the new data structure
-- This is a regeneration due to major schema changes
-
-After writing output.html, output ONLY this JSON (no markdown):
-{"summary": "Brief description of refresh", "changes": [{"metric": "Name", "old": "oldValue", "new": "newValue"}]}`;
+After writing output.html, output ONLY this JSON:
+{"summary": "Brief description of changes"}`;
 }
 
 /**
@@ -185,8 +64,7 @@ After writing output.html, output ONLY this JSON (no markdown):
 export async function refreshWithClaudeCode(
   newContent: string,
   currentConfig: DashboardConfig,
-  branding: BrandingConfig | null,
-  diff: DataDiff
+  branding: BrandingConfig | null
 ): Promise<RefreshWithClaudeCodeResult> {
   // Fetch config from database (with fallback to defaults)
   const config = await getAIConfig();
@@ -194,8 +72,7 @@ export async function refreshWithClaudeCode(
   const templateType = config.sandboxTemplate;
   const templateAlias = TEMPLATE_ALIASES[templateType];
 
-  console.log(`[Refresh Claude Code] Starting refresh/regeneration with ${templateType} template...`);
-  console.log('[Refresh Claude Code] Diff summary:', diff.summary);
+  console.log(`[Refresh Claude Code] Starting refresh with ${templateType} template...`);
   const startTime = Date.now();
 
   let sandbox: Sandbox | null = null;
@@ -214,8 +91,13 @@ export async function refreshWithClaudeCode(
     await sandbox.files.write('/home/user/existing.html', currentConfig.html);
     await sandbox.files.write('/home/user/data.txt', newContent);
 
+    // Write utility library (available if the agent wants to use it)
+    if (templateType === 'python') {
+      await sandbox.files.write('/home/user/agent_utils.py', AGENT_UTILS_PYTHON);
+    }
+
     // Build and run prompt
-    const prompt = buildRefreshPrompt(diff, branding, currentConfig.analysis?.summary);
+    const prompt = buildRefreshPrompt();
     const escapedPrompt = prompt.replace(/'/g, "'\\''");
 
     console.log('[Refresh Claude Code] Running Claude Code CLI...');

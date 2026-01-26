@@ -224,8 +224,7 @@ export async function GET(request: NextRequest) {
             const claudeCodeResult = await refreshWithClaudeCode(
               newContent,
               config,
-              branding,
-              diff
+              branding
             );
             refreshResult = { html: claudeCodeResult.html, summary: claudeCodeResult.summary };
           } else {

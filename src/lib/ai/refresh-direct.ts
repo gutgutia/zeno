@@ -249,7 +249,15 @@ function calculateDataStats(rawData: string): string {
     };
 
     const headers = parseRow(lines[0]).map(h => h.toLowerCase());
-    const rows = lines.slice(1).map(parseRow);
+    const allRows = lines.slice(1).map(parseRow);
+
+    // Filter out empty/invalid rows:
+    // - Rows where most cells are empty (just have row number or minimal data)
+    // - A valid row should have at least 3 non-empty cells (e.g., name, status, date)
+    const rows = allRows.filter(row => {
+      const nonEmptyCells = row.filter(cell => cell.trim() !== '').length;
+      return nonEmptyCells >= 3;
+    });
 
     // Find status column (common names)
     const statusColIndex = headers.findIndex(h =>

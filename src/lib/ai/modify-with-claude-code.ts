@@ -21,50 +21,26 @@ import {
   extractSummaryFromStreamOutput,
 } from './agent-logging';
 import { TEMPLATE_ALIASES } from '../../../e2b/template';
+import { AGENT_UTILS_PYTHON } from './generate-with-claude-code';
 
 /**
  * Build the prompt for Claude Code modification
  */
-function buildModifyPrompt(
-  instructions: string,
-  branding: BrandingConfig | null
-): string {
-  const brandingSection = branding ? `
-BRANDING:
-- Company: ${branding.companyName || 'Not specified'}
-- Primary: ${branding.colors?.primary || '#2563EB'}
-- Secondary: ${branding.colors?.secondary || '#0D9488'}
-- Font: ${branding.fontFamily || 'system-ui, sans-serif'}
-` : '';
-
+function buildModifyPrompt(instructions: string): string {
   return `You are modifying an existing dashboard based on user instructions.
 
-FILES:
-- /home/user/existing.html - The current dashboard HTML (read this first)
-- /home/user/data.txt - The underlying data (if you need it)
+INPUT:
+- /home/user/existing.html - Current dashboard
+- /home/user/data.txt - Underlying data (if needed)
 
-OUTPUT: Write the modified HTML to /home/user/output.html
+OUTPUT: Write modified HTML to /home/user/output.html
 
-${brandingSection}
-
-USER INSTRUCTIONS:
+USER REQUEST:
 ${instructions}
 
-WORKFLOW:
-1. Read /home/user/existing.html to understand the current dashboard
-2. Read /home/user/data.txt if you need data context
-3. Make the requested modifications
-4. Write the complete modified HTML to /home/user/output.html
+A utility library is available at /home/user/agent_utils.py if you need help parsing data or building components.
 
-IMPORTANT:
-- Preserve existing structure, layout, and styling unless explicitly asked to change
-- Make SURGICAL, targeted changes - update only what needs to change
-- Do NOT redesign or restructure the dashboard unless specifically requested
-- When updating data/values: change the numbers/text but keep the same visual presentation
-- Keep all existing charts, cards, tables, and components in place
-- Keep the dashboard functional and responsive
-
-After writing output.html, output ONLY this JSON (no markdown):
+After writing output.html, output ONLY this JSON:
 {"summary": "Brief description of changes made"}`;
 }
 
@@ -103,8 +79,13 @@ export async function modifyWithClaudeCode(
     await sandbox.files.write('/home/user/existing.html', existingHtml);
     await sandbox.files.write('/home/user/data.txt', rawContent);
 
+    // Write utility library (available if the agent wants to use it)
+    if (templateType === 'python') {
+      await sandbox.files.write('/home/user/agent_utils.py', AGENT_UTILS_PYTHON);
+    }
+
     // Build and run prompt
-    const prompt = buildModifyPrompt(instructions, branding);
+    const prompt = buildModifyPrompt(instructions);
     const escapedPrompt = prompt.replace(/'/g, "'\\''");
 
     console.log('[Modify Claude Code] Running Claude Code CLI...');
