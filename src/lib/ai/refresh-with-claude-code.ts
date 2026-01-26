@@ -71,12 +71,13 @@ ${originalSummary}
     (columnsAdded.length > 0 || columnsRemoved.length > 0);
 
   // Default: Values-only change - most conservative
+  // This handles: value updates, row additions/deletions, computed metrics updates
   if (!isMinorSchemaChange && !isMajorSchemaChange) {
-    return `You are updating a dashboard with new data values. The data structure is the same, only values changed.
+    return `You are updating a dashboard with new data. The data structure (columns) is the same, but values have changed and rows may have been added or removed.
 
 FILES:
-- /home/user/existing.html - The current dashboard HTML (PRESERVE THIS LAYOUT)
-- /home/user/data.txt - The NEW data with updated values
+- /home/user/existing.html - The current dashboard HTML (PRESERVE THIS DESIGN)
+- /home/user/data.txt - The NEW data (this is the source of truth)
 
 OUTPUT: Write the updated HTML to /home/user/output.html
 
@@ -87,19 +88,22 @@ DATA CHANGES:
 ${diffSummary}
 
 WORKFLOW:
-1. Read /home/user/existing.html carefully - you must preserve its EXACT structure
-2. Read /home/user/data.txt to see the new values
-3. Update ONLY the data values in the HTML - do NOT change the layout or structure
+1. Read /home/user/existing.html to understand the dashboard design
+2. Read /home/user/data.txt - this is the NEW source of truth
+3. Update the dashboard to reflect the new data:
+   - Update all summary statistics/counts (e.g., "45 projects in green status")
+   - Update table contents to match the new data exactly (add new rows, remove deleted rows, update changed values)
+   - Update any charts/visualizations with new values
 4. Write the complete HTML to /home/user/output.html
 
 CRITICAL REQUIREMENTS:
-- Preserve the EXACT layout, structure, and styling of the existing dashboard
-- Do NOT add, remove, or rearrange any charts, cards, tables, or sections
-- Do NOT redesign or "improve" the dashboard - only update values
-- Keep all CSS, classes, and HTML structure identical
-- Only change the actual data values (numbers, text in tables, chart data)
-- If a metric/value appears in the existing dashboard, update it with the new value
-- This is a DATA UPDATE, not a redesign
+- PRESERVE the dashboard design: same layout, same cards, same chart types, same styling
+- SYNC the data: all numbers, tables, and charts must reflect the NEW data exactly
+- Update summary metrics (counts, totals, percentages) based on the new data
+- Tables should show exactly what's in the new data (add/remove rows as needed)
+- Do NOT redesign, rearrange, or add new visualization types
+- Do NOT change colors, fonts, card layouts, or overall structure
+- This is a DATA SYNC, not a redesign
 
 After writing output.html, output ONLY this JSON (no markdown):
 {"summary": "Updated data values", "changes": [{"metric": "Name", "old": "oldValue", "new": "newValue"}]}`;
