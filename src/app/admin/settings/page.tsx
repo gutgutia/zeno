@@ -25,6 +25,8 @@ interface AIConfig {
   verboseLogging: boolean;
   sandboxTimeoutMs: number;
   commandTimeoutMs: number;
+  useDirectModify: boolean;
+  useDirectRefresh: boolean;
 }
 
 interface GlobalSettings {
@@ -524,6 +526,53 @@ export default function GlobalSettingsPage() {
               }}
               className="rounded border-gray-300 h-5 w-5"
             />
+          </div>
+
+          {/* Approach Toggles */}
+          <div className="mb-6">
+            <h3 className="font-medium text-[var(--color-gray-900)] mb-3">Approach Selection</h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-[var(--color-gray-50)] rounded-lg">
+                <div>
+                  <p className="font-medium text-[var(--color-gray-900)]">Direct Modify</p>
+                  <p className="text-sm text-[var(--color-gray-500)]">
+                    ON: Try fast surgical edits first, fallback to agentic. OFF: Always use agentic (better for data reconciliation)
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={settings.ai_config.useDirectModify ?? true}
+                  onChange={(e) => {
+                    const newConfig = {
+                      ...settings.ai_config,
+                      useDirectModify: e.target.checked,
+                    };
+                    setSettings({ ...settings, ai_config: newConfig });
+                  }}
+                  className="rounded border-gray-300 h-5 w-5"
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-[var(--color-gray-50)] rounded-lg">
+                <div>
+                  <p className="font-medium text-[var(--color-gray-900)]">Direct Refresh</p>
+                  <p className="text-sm text-[var(--color-gray-500)]">
+                    ON: Try surgical value updates first, fallback to agentic. OFF: Always regenerate with agentic
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={settings.ai_config.useDirectRefresh ?? true}
+                  onChange={(e) => {
+                    const newConfig = {
+                      ...settings.ai_config,
+                      useDirectRefresh: e.target.checked,
+                    };
+                    setSettings({ ...settings, ai_config: newConfig });
+                  }}
+                  className="rounded border-gray-300 h-5 w-5"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end">

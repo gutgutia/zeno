@@ -16,6 +16,9 @@ export interface AIConfigType {
   verboseLogging: boolean;
   sandboxTimeoutMs: number;
   commandTimeoutMs: number;
+  // Approach toggles
+  useDirectModify: boolean;  // true = try direct first, false = always use agentic
+  useDirectRefresh: boolean; // true = try direct first, false = always use agentic
 }
 
 /**
@@ -30,6 +33,8 @@ export const DEFAULT_AI_CONFIG: AIConfigType = {
   verboseLogging: true,
   sandboxTimeoutMs: 480000, // 8 minutes
   commandTimeoutMs: 420000, // 7 minutes
+  useDirectModify: true,    // Try direct approach first for modifications
+  useDirectRefresh: true,   // Try direct approach first for refresh
 };
 
 // Cache for the config to avoid fetching on every call

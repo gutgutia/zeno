@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import type { Dashboard, BrandingConfig } from '@/types/database';
 import { getMergedBranding } from '@/types/database';
 import type { DashboardConfig } from '@/types/dashboard';
-import { AGENT_CONFIG } from '@/lib/ai/agent';
+import { getAIConfig } from '@/lib/ai/config';
 import { modifyDashboardDirect } from '@/lib/ai/modify-direct';
 import { modifyWithClaudeCode } from '@/lib/ai/modify-with-claude-code';
 import { createVersion } from '@/lib/versions';
@@ -104,13 +104,31 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Get raw content for reference
     const rawContent = dashboard.raw_content || '';
 
+    // Fetch AI config from database
+    const aiConfig = await getAIConfig();
+
     // Modification approach: Direct first, Claude Code E2B fallback
     // Direct is fast and cheap for simple edits
     // Claude Code E2B is powerful for complex modifications
     let modifyResult;
     let usedClaudeCodeE2B = false;
 
-    if (AGENT_CONFIG.useDirectModify) {
+    // Heuristic: Force agentic mode for comprehensive data review instructions
+    const comprehensiveReviewKeywords = [
+      'all values', 'all data', 'entire data', 'every value', 'every metric',
+      'thoroughly', 'comprehensive', 'reconcile', 'verify all', 'check all',
+      'review the data', 'look at the data again', 'update all', 'refresh all'
+    ];
+    const instructionLower = instructions.toLowerCase();
+    const needsComprehensiveReview = comprehensiveReviewKeywords.some(kw => instructionLower.includes(kw));
+
+    if (needsComprehensiveReview) {
+      console.log('[Modify API] Comprehensive review detected, forcing agentic approach');
+    }
+
+    const shouldUseDirectApproach = aiConfig.useDirectModify && !needsComprehensiveReview;
+
+    if (shouldUseDirectApproach) {
       console.log('[Modify API] Trying direct modification approach...');
       try {
         modifyResult = await modifyDashboardDirect(
