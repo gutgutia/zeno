@@ -220,6 +220,66 @@ Return a JSON object with:
 Return ONLY valid JSON, no markdown code blocks.`;
 }
 
+/**
+ * Calculate summary statistics from raw data for accurate counts
+ */
+function calculateDataStats(rawData: string): string {
+  try {
+    // Parse as CSV
+    const lines = rawData.split('\n').filter(l => l.trim());
+    if (lines.length < 2) return '';
+
+    // Simple CSV parsing (handles basic cases)
+    const parseRow = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (const char of line) {
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    const headers = parseRow(lines[0]).map(h => h.toLowerCase());
+    const rows = lines.slice(1).map(parseRow);
+
+    // Find status column (common names)
+    const statusColIndex = headers.findIndex(h =>
+      h.includes('status') || h === 'state' || h === 'health'
+    );
+
+    const stats: string[] = [];
+    stats.push(`TOTAL ROWS: ${rows.length}`);
+
+    // Count by status if we found a status column
+    if (statusColIndex >= 0) {
+      const statusCounts: Record<string, number> = {};
+      for (const row of rows) {
+        const status = (row[statusColIndex] || '').trim();
+        if (status) {
+          statusCounts[status] = (statusCounts[status] || 0) + 1;
+        }
+      }
+      stats.push('STATUS COUNTS:');
+      for (const [status, count] of Object.entries(statusCounts).sort((a, b) => b[1] - a[1])) {
+        stats.push(`  - ${status}: ${count}`);
+      }
+    }
+
+    return stats.join('\n');
+  } catch {
+    return '';
+  }
+}
+
 function getRefreshUserPrompt(
   html: string,
   diff: DataDiff,
@@ -227,9 +287,12 @@ function getRefreshUserPrompt(
 ): string {
   const diffSummary = formatDiffForAI(diff);
 
-  // Truncate data if too long
-  const truncatedData = newData.length > 8000
-    ? newData.slice(0, 8000) + '\n... (data truncated)'
+  // Calculate accurate stats from the FULL data
+  const dataStats = calculateDataStats(newData);
+
+  // Include more data (up to 20KB) to ensure Sonnet sees enough
+  const truncatedData = newData.length > 20000
+    ? newData.slice(0, 20000) + '\n... (data truncated)'
     : newData;
 
   return `## Current Dashboard HTML
@@ -240,12 +303,17 @@ ${html}
 ## Data Changes
 ${diffSummary}
 
+## ACCURATE DATA STATISTICS (calculated from full data)
+${dataStats || 'Unable to calculate stats'}
+
+IMPORTANT: Use these statistics for summary cards/counts. The numbers above are calculated from the COMPLETE dataset.
+
 ## New Data
 \`\`\`
 ${truncatedData}
 \`\`\`
 
-Return the JSON with edits needed to update this dashboard with the new data.`;
+Return the JSON with edits needed to update this dashboard with the new data. Make sure summary statistics match the ACCURATE DATA STATISTICS above.`;
 }
 
 interface ApplyRefreshOptions {
