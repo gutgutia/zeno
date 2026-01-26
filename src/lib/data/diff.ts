@@ -9,6 +9,7 @@
  * surgical updates to dashboards rather than full regeneration.
  */
 
+import Papa from 'papaparse';
 import { parseCSV, detectDelimiter } from './parser';
 
 // Content type detection
@@ -88,6 +89,7 @@ export interface DataDiff {
 
 /**
  * Detect the type of content
+ * Uses PapaParse for proper CSV detection (handles quoted fields correctly)
  */
 export function detectContentType(content: string): ContentType {
   const trimmed = content.trim();
@@ -111,19 +113,54 @@ export function detectContentType(content: string): ContentType {
     }
   }
 
-  // Check for tabular (CSV/TSV)
+  // Use PapaParse for proper CSV/TSV detection (handles quoted fields correctly)
+  // This is important for Google Sheets data which may have commas in values
   const lines = trimmed.split('\n').filter(l => l.trim());
   if (lines.length >= 2) {
-    const delimiters = [',', '\t', '|', ';'];
-    for (const delim of delimiters) {
-      const firstLineCols = lines[0].split(delim).length;
-      if (firstLineCols > 1) {
-        // Check if at least 80% of lines have similar column count
-        const consistentLines = lines.filter(l => {
-          const cols = l.split(delim).length;
-          return cols === firstLineCols || Math.abs(cols - firstLineCols) <= 1;
+    // Try parsing as CSV with PapaParse
+    const parseResult = Papa.parse(trimmed, {
+      header: false,
+      skipEmptyLines: true,
+      preview: 20, // Only parse first 20 rows for detection
+    });
+
+    if (parseResult.data && parseResult.data.length >= 2) {
+      const rows = parseResult.data as string[][];
+      const firstRowCols = rows[0]?.length || 0;
+
+      // Check if we have multiple columns and consistent column counts
+      if (firstRowCols > 1) {
+        // Check if at least 80% of rows have similar column count
+        const consistentRows = rows.filter(row => {
+          const cols = row.length;
+          return cols === firstRowCols || Math.abs(cols - firstRowCols) <= 1;
         });
-        if (consistentLines.length >= lines.length * 0.8) {
+
+        if (consistentRows.length >= rows.length * 0.8) {
+          return 'tabular';
+        }
+      }
+    }
+
+    // Fallback: try tab-separated detection (PapaParse defaults to comma)
+    const tabParseResult = Papa.parse(trimmed, {
+      header: false,
+      skipEmptyLines: true,
+      delimiter: '\t',
+      preview: 20,
+    });
+
+    if (tabParseResult.data && tabParseResult.data.length >= 2) {
+      const rows = tabParseResult.data as string[][];
+      const firstRowCols = rows[0]?.length || 0;
+
+      if (firstRowCols > 1) {
+        const consistentRows = rows.filter(row => {
+          const cols = row.length;
+          return cols === firstRowCols || Math.abs(cols - firstRowCols) <= 1;
+        });
+
+        if (consistentRows.length >= rows.length * 0.8) {
           return 'tabular';
         }
       }
