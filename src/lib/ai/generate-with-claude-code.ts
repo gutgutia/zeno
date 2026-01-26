@@ -43,17 +43,17 @@ function getBrandingSection(branding: BrandingConfig | null): string {
 BRANDING REQUIREMENTS:
 - Company: ${branding.companyName || 'Not specified'}
 - Primary Color: ${branding.colors?.primary || '#2563EB'}
-- Secondary Color: ${branding.colors?.secondary || '#0D9488'}
+- Secondary Color: ${branding.colors?.secondary || '#64748b'}
 - Accent Color: ${branding.colors?.accent || '#8B5CF6'}
-- Background: ${branding.colors?.background || '#F9FAFB'}
+- Button Color: ${branding.colors?.button || branding.colors?.primary || '#2563EB'}
 - Font: ${branding.fontFamily || 'system-ui, sans-serif'}
 ${branding.logoUrl ? `- Logo URL: ${branding.logoUrl}` : ''}
 ` : `
 Use a professional color scheme:
 - Primary: #2563EB (blue)
-- Secondary: #0D9488 (teal)
+- Secondary: #64748b (slate)
 - Accent: #8B5CF6 (purple)
-- Background: #F9FAFB
+- Button: #2563EB (blue)
 `;
 }
 
@@ -258,9 +258,9 @@ export async function generateWithClaudeCode(
   userInstructions?: string
 ): Promise<GenerateResult> {
   // Fetch config from database (with fallback to defaults)
-  const config = await getAIConfig();
+  const aiConfig = await getAIConfig();
 
-  const templateType = config.sandboxTemplate;
+  const templateType = aiConfig.sandboxTemplate;
   const templateAlias = TEMPLATE_ALIASES[templateType];
 
   console.log(`[Claude Code E2B] Starting generation with ${templateType} template...`);
@@ -273,7 +273,7 @@ export async function generateWithClaudeCode(
     // Create sandbox with configured template
     console.log(`[Claude Code E2B] Creating sandbox with template: ${templateAlias}...`);
     sandbox = await Sandbox.create(templateAlias, {
-      timeoutMs: config.sandboxTimeoutMs,
+      timeoutMs: aiConfig.sandboxTimeoutMs,
       envs: {
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
       },
@@ -292,7 +292,7 @@ export async function generateWithClaudeCode(
     }
 
     // Build the prompt
-    const prompt = buildPrompt(branding, config, userInstructions);
+    const prompt = buildPrompt(branding, aiConfig, userInstructions);
     const escapedPrompt = prompt.replace(/'/g, "'\\''");
 
     // Run Claude Code CLI
@@ -320,18 +320,18 @@ export async function generateWithClaudeCode(
       // Use Claude Code CLI for both templates
 
       try {
-        const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${config.generateModel}`;
-        const command = config.verboseLogging
+        const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${aiConfig.generateModel}`;
+        const command = aiConfig.verboseLogging
           ? `${baseCommand} --verbose --output-format stream-json`
           : baseCommand;
 
         result = await sandbox.commands.run(command, {
-          timeoutMs: config.commandTimeoutMs,
+          timeoutMs: aiConfig.commandTimeoutMs,
           cwd: '/home/user',
           onStdout: (data) => {
             collectedStdout.push(data);
 
-            if (config.verboseLogging) {
+            if (aiConfig.verboseLogging) {
               const lines = data.split('\n').filter(line => line.trim());
               for (const line of lines) {
                 try {
@@ -432,14 +432,14 @@ export async function generateWithClaudeCode(
     const durationMs = Date.now() - startTime;
     console.log(`[Claude Code E2B] Total generation time: ${durationMs}ms`);
 
-    // Build config
-    const config: DashboardConfig = {
+    // Build dashboard config
+    const dashboardConfig: DashboardConfig = {
       contentType: 'data',
       html,
       charts: {},
       metadata: {
         generatedAt: new Date().toISOString(),
-        generationModel: config.generateModel,
+        generationModel: aiConfig.generateModel,
         userInstructions,
         agentGenerated: true,
         claudeCodeE2B: true,
@@ -453,10 +453,10 @@ export async function generateWithClaudeCode(
     };
 
     return {
-      config,
+      config: dashboardConfig,
       usage: {
         durationMs,
-        modelId: config.generateModel,
+        modelId: aiConfig.generateModel,
       },
     };
 
