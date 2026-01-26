@@ -11,13 +11,37 @@ export const AI_CONFIG = {
   // Options: 'sonnet' (balanced), 'opus' (highest quality), 'haiku' (fastest)
 
   /** Model for dashboard generation */
-  generateModel: 'sonnet' as 'sonnet' | 'opus' | 'haiku',
+  generateModel: 'opus' as 'sonnet' | 'opus' | 'haiku',
 
   /** Model for dashboard modifications */
   modifyModel: 'sonnet' as 'sonnet' | 'opus' | 'haiku',
 
   /** Model for dashboard refresh/regeneration */
   refreshModel: 'sonnet' as 'sonnet' | 'opus' | 'haiku',
+
+  // ============================================================================
+  // SANDBOX TEMPLATE
+  // ============================================================================
+
+  /**
+   * Which E2B sandbox template to use
+   * - 'node': Original Node.js template (stable)
+   * - 'python': Python template with data science stack (experimental)
+   *
+   * To build templates: npx tsx e2b/build.ts [node|python|all]
+   */
+  sandboxTemplate: 'python' as 'node' | 'python',
+
+  // ============================================================================
+  // PROMPT STYLE
+  // ============================================================================
+
+  /**
+   * Which prompt style to use for dashboard generation
+   * - 'enhanced': Customer-facing presentation focus with header, insights, visual hierarchy
+   * - 'minimal': Simple, straightforward prompt (original style)
+   */
+  promptStyle: 'enhanced' as 'enhanced' | 'minimal',
 
   // ============================================================================
   // LOGGING
@@ -27,7 +51,7 @@ export const AI_CONFIG = {
    * Enable verbose logging of agent execution
    * Shows turn-by-turn tool calls, thinking, and results
    */
-  verboseLogging: false,
+  verboseLogging: true,
 
   // ============================================================================
   // TIMEOUTS

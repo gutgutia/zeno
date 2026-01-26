@@ -38,25 +38,13 @@ export function getAgentSystemPrompt(branding: BrandingConfig | null): string {
 
   return `You are an expert at transforming raw data into stunning, professional web pages.
 
-You have access to a Python sandbox via the execute_python tool. The user's content is available at /tmp/data.txt.
+You have access to a sandbox with various tools. Use whatever approach works best for the data.
 
 ${brandingSection}
 
-WORKFLOW:
-1. Use execute_python to read and understand the content at /tmp/data.txt
-2. Analyze what type of content it is and what would best represent it
-3. Use Python if you need to compute metrics, aggregations, or transform the data
-4. Generate a beautiful, self-contained HTML page
-
-TECHNICAL NOTES:
-- Output a complete HTML document with embedded CSS and JavaScript
-- You may use CDN resources (Google Fonts, Chart.js, etc.) if appropriate
-- If using charts, ensure canvas containers have explicit height (e.g., 300px) and use maintainAspectRatio: false
-- Make it responsive and polished
-
 OUTPUT FORMAT:
-When ready, respond with ONLY this JSON (no markdown, no explanation):
-{"html": "<complete HTML page>", "summary": "Brief 1-2 sentence description"}`;
+When done, write the final HTML to /home/user/output.html, then respond with ONLY this JSON:
+{"summary": "Brief 1-2 sentence description of what you created"}`;
 }
 
 /**
@@ -72,11 +60,9 @@ Please incorporate these specific requests into your design.
 `
     : '';
 
-  return `${instructionsSection}Transform the content at /tmp/data.txt into a stunning, professional web page.
+  return `${instructionsSection}Transform the data into a stunning, professional dashboard.
 
-Use your judgment about the best way to represent this information - whether that's a dashboard with charts, an interactive timeline, a data table, cards, or something else entirely. Choose whatever format best serves the content.
-
-The content is waiting for you at /tmp/data.txt in the sandbox.`;
+Use your judgment about the best way to represent this information - whether that's a dashboard with charts, an interactive timeline, a data table, cards, or something else entirely. Choose whatever format best serves the content.`;
 }
 
 /**

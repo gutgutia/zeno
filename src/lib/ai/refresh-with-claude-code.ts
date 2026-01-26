@@ -21,6 +21,7 @@ import {
   printLogHeader,
   printLogFooter,
 } from './agent-logging';
+import { TEMPLATE_ALIASES } from '../../../e2b/template';
 
 export interface RefreshWithClaudeCodeResult {
   html: string;
@@ -97,14 +98,17 @@ export async function refreshWithClaudeCode(
   branding: BrandingConfig | null,
   diff: DataDiff
 ): Promise<RefreshWithClaudeCodeResult> {
-  console.log('[Refresh Claude Code] Starting refresh/regeneration...');
+  const templateType = AI_CONFIG.sandboxTemplate;
+  const templateAlias = TEMPLATE_ALIASES[templateType];
+
+  console.log(`[Refresh Claude Code] Starting refresh/regeneration with ${templateType} template...`);
   console.log('[Refresh Claude Code] Diff summary:', diff.summary);
   const startTime = Date.now();
 
   let sandbox: Sandbox | null = null;
 
   try {
-    sandbox = await Sandbox.create('zeno-claude-code', {
+    sandbox = await Sandbox.create(templateAlias, {
       timeoutMs: AI_CONFIG.sandboxTimeoutMs,
       envs: {
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
@@ -130,7 +134,6 @@ export async function refreshWithClaudeCode(
     printLogHeader('Dashboard Refresh');
 
     // Build the command with model flag
-    // Note: --output-format stream-json requires --verbose when using -p
     const baseCommand = `echo '${escapedPrompt}' | claude -p --dangerously-skip-permissions --model ${AI_CONFIG.refreshModel}`;
     const command = AI_CONFIG.verboseLogging
       ? `${baseCommand} --verbose --output-format stream-json`
@@ -170,13 +173,11 @@ export async function refreshWithClaudeCode(
         },
       });
     } catch (cmdError: unknown) {
-      // E2B throws on non-zero exit codes, but Claude CLI might still have generated output
       console.warn('[Refresh Claude Code] Command exited with error (checking if output was generated...)');
 
       const err = cmdError as { result?: { exitCode?: number } };
       console.log('[Refresh Claude Code] Collected stdout chunks:', collectedStdout.length);
 
-      // Check if output.html was actually created
       let outputExists = false;
       try {
         const checkResult = await sandbox.commands.run('test -f /home/user/output.html && echo "exists"', {

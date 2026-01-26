@@ -58,6 +58,18 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Check if user's organization has branding application enabled
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: orgMembership } = await (supabase as any)
+      .from('organization_members')
+      .select('organization_id, organizations(apply_branding_to_dashboards, branding)')
+      .eq('user_id', user.id)
+      .not('accepted_at', 'is', null)
+      .limit(1)
+      .single();
+
+    const applyBranding = orgMembership?.organizations?.apply_branding_to_dashboards ?? true;
+
     // Check credit balance (estimated 10 credits for modifications)
     const ESTIMATED_MODIFY_CREDITS = 10;
     const hasCredits = await hasEnoughCredits(user.id, ESTIMATED_MODIFY_CREDITS);
@@ -81,11 +93,13 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    // Get merged branding
-    const branding = getMergedBranding(
-      dashboard.workspaces.branding,
-      dashboard.branding_override
-    );
+    // Get merged branding (only if enabled at org level)
+    const branding = applyBranding
+      ? getMergedBranding(
+          orgMembership?.organizations?.branding || dashboard.workspaces.branding,
+          dashboard.branding_override
+        )
+      : null;
 
     // Get raw content for reference
     const rawContent = dashboard.raw_content || '';
