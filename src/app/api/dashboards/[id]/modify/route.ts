@@ -10,6 +10,9 @@ import { createVersion } from '@/lib/versions';
 import { deductCredits, hasEnoughCredits, getCreditBalance } from '@/lib/credits';
 import { logUsage } from '@/lib/costs';
 
+// Allow long-running requests for agent modifications
+export const maxDuration = 300; // 5 minutes (Vercel Pro limit)
+
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
