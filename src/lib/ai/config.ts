@@ -11,7 +11,7 @@ export const AI_CONFIG = {
   // Options: 'sonnet' (balanced), 'opus' (highest quality), 'haiku' (fastest)
 
   /** Model for dashboard generation */
-  generateModel: 'sonnet' as 'sonnet' | 'opus' | 'haiku',
+  generateModel: 'opus' as 'sonnet' | 'opus' | 'haiku',
 
   /** Model for dashboard modifications */
   modifyModel: 'sonnet' as 'sonnet' | 'opus' | 'haiku',
@@ -31,6 +31,17 @@ export const AI_CONFIG = {
    * To build templates: npx tsx e2b/build.ts [node|python|all]
    */
   sandboxTemplate: 'python' as 'node' | 'python',
+
+  // ============================================================================
+  // PROMPT STYLE
+  // ============================================================================
+
+  /**
+   * Which prompt style to use for dashboard generation
+   * - 'enhanced': Customer-facing presentation focus with header, insights, visual hierarchy
+   * - 'minimal': Simple, straightforward prompt (original style)
+   */
+  promptStyle: 'enhanced' as 'enhanced' | 'minimal',
 
   // ============================================================================
   // LOGGING

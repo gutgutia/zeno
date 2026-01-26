@@ -106,6 +106,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       'white_label_enabled',
       'favicon_url',
       'email_sender_name',
+      // AI Generation settings
+      'apply_branding_to_dashboards',
     ];
     const updateData: Record<string, unknown> = {};
 

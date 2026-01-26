@@ -170,10 +170,30 @@ export async function GET(request: NextRequest) {
         console.log(`[Sync] Changes detected for ${dashboard.id}, refreshing...`);
 
         const config = dashboard.config as DashboardConfig;
-        const branding = getMergedBranding(
-          dashboard.workspace?.branding as BrandingConfig | null,
-          dashboard.branding_override as Partial<BrandingConfig> | null
+
+        // Check if owner's organization has branding application enabled
+        const serviceClient = createServiceClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: orgMembership } = await (serviceClient as any)
+          .from('organization_members')
+          .select('organization_id, organizations(apply_branding_to_dashboards, branding)')
+          .eq('user_id', dashboard.owner_id)
+          .not('accepted_at', 'is', null)
+          .limit(1)
+          .single();
+
+        const applyBranding = orgMembership?.organizations?.apply_branding_to_dashboards ?? true;
+
+        // Get merged branding (only if enabled at org level)
+        const branding = applyBranding
+          ? getMergedBranding(
+              orgMembership?.organizations?.branding || (dashboard.workspace?.branding as BrandingConfig | null),
+              dashboard.branding_override as Partial<BrandingConfig> | null
+            )
+          : null;
 
         try {
           // Compute diff
@@ -221,7 +241,7 @@ export async function GET(request: NextRequest) {
           };
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (supabase as any)
+          const { error: updateError } = await (supabase as any)
             .from('dashboards')
             .update({
               config: updatedConfig,
@@ -231,6 +251,11 @@ export async function GET(request: NextRequest) {
               generation_status: 'completed',
             })
             .eq('id', dashboard.id);
+
+          if (updateError) {
+            console.error(`[Sync] Failed to update dashboard ${dashboard.id}:`, updateError);
+            throw new Error(`Failed to save refreshed dashboard: ${updateError.message}`);
+          }
 
           // Send email notification to the dashboard owner
           try {

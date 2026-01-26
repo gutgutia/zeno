@@ -140,6 +140,19 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Check if user's organization has branding application enabled
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: orgMembership } = await (supabase as any)
+      .from('organization_members')
+      .select('organization_id, organizations(apply_branding_to_dashboards, branding)')
+      .eq('user_id', userId)
+      .not('accepted_at', 'is', null)
+      .limit(1)
+      .single();
+
+    const applyBranding = orgMembership?.organizations?.apply_branding_to_dashboards ?? true;
+    const orgBranding = orgMembership?.organizations?.branding as BrandingConfig | null;
+
     // Check if already generating or completed
     if (dashboard.generation_status === 'generating' || dashboard.generation_status === 'analyzing') {
       return NextResponse.json({
@@ -164,23 +177,30 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json({ error: 'No content to generate from' }, { status: 400 });
     }
 
-    // Merge workspace branding with any dashboard override
-    const workspaceBranding = dashboard.workspaces.branding;
-    const dashboardOverride = dashboard.branding_override;
+    // Merge branding: org branding takes precedence over workspace branding, then dashboard override
+    // If applyBranding is disabled at org level, skip branding entirely
+    let effectiveBranding: BrandingConfig | null = null;
 
-    const effectiveBranding: BrandingConfig | null = workspaceBranding || dashboardOverride ? {
-      companyName: dashboardOverride?.companyName ?? workspaceBranding?.companyName,
-      logoUrl: dashboardOverride?.logoUrl ?? workspaceBranding?.logoUrl,
-      colors: {
-        primary: dashboardOverride?.colors?.primary ?? workspaceBranding?.colors?.primary,
-        secondary: dashboardOverride?.colors?.secondary ?? workspaceBranding?.colors?.secondary,
-        accent: dashboardOverride?.colors?.accent ?? workspaceBranding?.colors?.accent,
-        background: dashboardOverride?.colors?.background ?? workspaceBranding?.colors?.background,
-      },
-      chartColors: dashboardOverride?.chartColors ?? workspaceBranding?.chartColors,
-      fontFamily: dashboardOverride?.fontFamily ?? workspaceBranding?.fontFamily,
-      styleGuide: dashboardOverride?.styleGuide ?? workspaceBranding?.styleGuide,
-    } : null;
+    if (applyBranding) {
+      // Prefer org branding over workspace branding (org is the newer model)
+      const baseBranding = orgBranding || dashboard.workspaces.branding;
+      const dashboardOverride = dashboard.branding_override;
+
+      effectiveBranding = baseBranding || dashboardOverride ? {
+        companyName: dashboardOverride?.companyName ?? baseBranding?.companyName,
+        logoUrl: dashboardOverride?.logoUrl ?? baseBranding?.logoUrl,
+        colors: {
+          primary: dashboardOverride?.colors?.primary ?? baseBranding?.colors?.primary,
+          secondary: dashboardOverride?.colors?.secondary ?? baseBranding?.colors?.secondary,
+          accent: dashboardOverride?.colors?.accent ?? baseBranding?.colors?.accent,
+          background: dashboardOverride?.colors?.background ?? baseBranding?.colors?.background,
+        },
+        chartColors: dashboardOverride?.chartColors ?? baseBranding?.chartColors,
+        fontFamily: dashboardOverride?.fontFamily ?? baseBranding?.fontFamily,
+        styleGuide: dashboardOverride?.styleGuide ?? baseBranding?.styleGuide,
+      } : null;
+    }
+    console.log(`[${id}] Apply branding: ${applyBranding}, effective branding: ${effectiveBranding ? 'yes' : 'no'}`);
 
     // Update status to generating
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

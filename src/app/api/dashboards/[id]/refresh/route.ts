@@ -72,6 +72,18 @@ export async function POST(
       );
     }
 
+    // Check if user's organization has branding application enabled
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: orgMembership } = await (supabase as any)
+      .from('organization_members')
+      .select('organization_id, organizations(apply_branding_to_dashboards, branding)')
+      .eq('user_id', user.id)
+      .not('accepted_at', 'is', null)
+      .limit(1)
+      .single();
+
+    const applyBranding = orgMembership?.organizations?.apply_branding_to_dashboards ?? true;
+
     // Check credit balance (estimated 15 credits for refresh)
     const ESTIMATED_REFRESH_CREDITS = 15;
     const hasCredits = await hasEnoughCredits(user.id, ESTIMATED_REFRESH_CREDITS);
@@ -206,11 +218,13 @@ export async function POST(
     }
 
     try {
-      // Get merged branding
-      const branding = getMergedBranding(
-        dashboard.workspace?.branding as BrandingConfig | null,
-        dashboard.branding_override as Partial<BrandingConfig> | null
-      );
+      // Get merged branding (only if enabled at org level)
+      const branding = applyBranding
+        ? getMergedBranding(
+            orgMembership?.organizations?.branding || (dashboard.workspace?.branding as BrandingConfig | null),
+            dashboard.branding_override as Partial<BrandingConfig> | null
+          )
+        : null;
 
       // Get old raw_content for diff computation
       const oldRawContent = dashboard.raw_content || '';
@@ -446,10 +460,15 @@ export async function POST(
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
+      const { error: updateError } = await (supabase as any)
         .from('dashboards')
         .update(updateData)
         .eq('id', id);
+
+      if (updateError) {
+        console.error('[Refresh] Failed to update dashboard:', updateError);
+        throw new Error(`Failed to save refreshed dashboard: ${updateError.message}`);
+      }
 
       // Create a major version for this data refresh
       let versionInfo = null;

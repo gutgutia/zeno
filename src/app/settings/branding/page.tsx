@@ -86,6 +86,9 @@ export default function BrandingSettingsPage() {
   const [whiteLabelEnabled, setWhiteLabelEnabled] = useState(false);
   const [faviconUrl, setFaviconUrl] = useState('');
   const [emailSenderName, setEmailSenderName] = useState('');
+
+  // AI Generation settings
+  const [applyBrandingToDashboards, setApplyBrandingToDashboards] = useState(true);
   const [isUploadingFavicon, setIsUploadingFavicon] = useState(false);
   const [faviconError, setFaviconError] = useState<string | null>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
@@ -131,6 +134,8 @@ export default function BrandingSettingsPage() {
           setWhiteLabelEnabled(selectedOrg.white_label_enabled || false);
           setFaviconUrl(selectedOrg.favicon_url || '');
           setEmailSenderName(selectedOrg.email_sender_name || '');
+          // Populate AI generation settings (default to true if not set)
+          setApplyBrandingToDashboards(selectedOrg.apply_branding_to_dashboards ?? true);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -244,6 +249,8 @@ export default function BrandingSettingsPage() {
           white_label_enabled: whiteLabelEnabled,
           favicon_url: faviconUrl || null,
           email_sender_name: emailSenderName || null,
+          // AI Generation settings
+          apply_branding_to_dashboards: applyBrandingToDashboards,
         }),
       });
 
@@ -727,6 +734,36 @@ export default function BrandingSettingsPage() {
           <h2 className="text-lg font-semibold text-[var(--color-gray-900)]">Dashboard Styling</h2>
           <p className="text-sm text-[var(--color-gray-500)]">Customize the visual appearance of your dashboard content</p>
         </div>
+
+        {/* Apply Branding Toggle */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-[var(--color-gray-900)]">Apply Branding to Dashboards</p>
+                <p className="text-sm text-[var(--color-gray-500)]">
+                  When enabled, the AI will use your brand colors, fonts, and style guide when generating new dashboards.
+                  Turn off to let the AI choose its own styling.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={applyBrandingToDashboards}
+                onClick={() => setApplyBrandingToDashboards(!applyBrandingToDashboards)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  applyBrandingToDashboards ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-gray-300)]'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    applyBrandingToDashboards ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Extract from Website */}
         <Card className="border-2 border-dashed border-[var(--color-primary)] bg-[var(--color-primary)]/5">

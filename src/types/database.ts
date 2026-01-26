@@ -86,6 +86,9 @@ export interface Organization {
   favicon_url: string | null;
   email_sender_name: string | null;
 
+  // AI Generation settings
+  apply_branding_to_dashboards: boolean; // Whether to use branding config when generating dashboards
+
   // Metadata
   created_by: string;
   created_at: string;

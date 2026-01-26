@@ -36,10 +36,10 @@ export interface GenerateResult {
 }
 
 /**
- * Build the prompt for Claude Code
+ * Build shared prompt sections
  */
-function buildPrompt(branding: BrandingConfig | null, userInstructions?: string): string {
-  const brandingSection = branding ? `
+function getBrandingSection(branding: BrandingConfig | null): string {
+  return branding ? `
 BRANDING REQUIREMENTS:
 - Company: ${branding.companyName || 'Not specified'}
 - Primary Color: ${branding.colors?.primary || '#2563EB'}
@@ -55,13 +55,10 @@ Use a professional color scheme:
 - Accent: #8B5CF6 (purple)
 - Background: #F9FAFB
 `;
+}
 
-  const userSection = userInstructions
-    ? `\nUSER INSTRUCTIONS:\n${userInstructions}\n`
-    : '';
-
-  // Add note about available tools if using Python template
-  const toolsNote = AI_CONFIG.sandboxTemplate === 'python'
+function getToolsNote(): string {
+  return AI_CONFIG.sandboxTemplate === 'python'
     ? `
 AVAILABLE TOOLS:
 You have access to Python with pandas, numpy, openpyxl, pdfplumber, python-docx, and python-pptx.
@@ -69,6 +66,15 @@ A utility library is available at /home/user/agent_utils.py with helper function
 Use these if they help, but feel free to approach the problem however you see fit.
 `
     : '';
+}
+
+/**
+ * Build the enhanced prompt (customer-facing presentation focus)
+ */
+function buildEnhancedPrompt(branding: BrandingConfig | null, userInstructions?: string): string {
+  const brandingSection = getBrandingSection(branding);
+  const userSection = userInstructions ? `\nUSER INSTRUCTIONS:\n${userInstructions}\n` : '';
+  const toolsNote = getToolsNote();
 
   return `You are creating a beautiful, customer-facing data presentation that brings data to life.
 
@@ -97,6 +103,44 @@ DESIGN PRINCIPLES:
 
 After writing the file, output ONLY this JSON (no markdown, no extra text):
 {"summary": "Brief 1-2 sentence description of what you created"}`;
+}
+
+/**
+ * Build the minimal prompt (simpler, original style)
+ */
+function buildMinimalPrompt(branding: BrandingConfig | null, userInstructions?: string): string {
+  const brandingSection = getBrandingSection(branding);
+  const userSection = userInstructions ? `\nUSER INSTRUCTIONS:\n${userInstructions}\n` : '';
+  const toolsNote = getToolsNote();
+
+  return `You are an expert at transforming raw data into stunning, professional web pages.
+
+INPUT: The user's data is at /home/user/data.txt
+
+OUTPUT: Write a complete, self-contained HTML file to /home/user/output.html
+
+${brandingSection}
+${userSection}
+${toolsNote}
+REQUIREMENTS:
+1. Read and analyze the data at /home/user/data.txt
+2. Choose the best visualization approach for this data (dashboard, table, charts, cards, etc.)
+3. Create a polished, responsive HTML page with embedded CSS and JavaScript
+4. Use Chart.js from CDN for any charts
+5. Write the final HTML to /home/user/output.html
+
+After writing the file, output ONLY this JSON (no markdown, no extra text):
+{"summary": "Brief 1-2 sentence description of what you created"}`;
+}
+
+/**
+ * Build the prompt for Claude Code based on config
+ */
+function buildPrompt(branding: BrandingConfig | null, userInstructions?: string): string {
+  if (AI_CONFIG.promptStyle === 'enhanced') {
+    return buildEnhancedPrompt(branding, userInstructions);
+  }
+  return buildMinimalPrompt(branding, userInstructions);
 }
 
 /**
