@@ -57,8 +57,11 @@ WORKFLOW:
 4. Write the complete modified HTML to /home/user/output.html
 
 IMPORTANT:
-- Preserve existing structure and styling unless asked to change
-- Make targeted changes based on the instructions
+- Preserve existing structure, layout, and styling unless explicitly asked to change
+- Make SURGICAL, targeted changes - update only what needs to change
+- Do NOT redesign or restructure the dashboard unless specifically requested
+- When updating data/values: change the numbers/text but keep the same visual presentation
+- Keep all existing charts, cards, tables, and components in place
 - Keep the dashboard functional and responsive
 
 After writing output.html, output ONLY this JSON (no markdown):
